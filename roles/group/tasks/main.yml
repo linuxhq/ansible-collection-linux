@@ -1,0 +1,19 @@
+---
+- name: Ensure groups are present
+  tags:
+    - group
+  ansible.builtin.group:
+    gid: "{{ _group.gid }}"
+    local: "{{ _group.local | default(false) }}"
+    name: "{{ _group.name }}"
+    non_unique: "{{ _group.non_unique | default(false) }}"
+    state: present
+    system: "{{ _group.system | default(false) }}"
+  loop: "{{ groups }}"
+  loop_control:
+    label: "{{ _group.name | default(none) }}"
+    loop_var: _group
+  when:
+    - _group.gid is defined
+    - _group.name is defined
+...
