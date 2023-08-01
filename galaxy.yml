@@ -1,0 +1,23 @@
+---
+authors:
+  - Taylor Kimball (https://github.com/tkimball83)
+build_ignore:
+  - .gitignore
+description: A collection of linux roles
+dependencies:
+  community.general: '*'
+documentation: https://github.com/linuxhq/ansible-collection-linux/blob/main/README.md
+homepage: https://www.linuxhq.org
+issues: https://github.com/linuxhq/ansible-collection-linux/issues
+license:
+  - GPL-3.0-or-later
+name: linux
+namespace: linuxhq
+readme: README.md
+repository: https://github.com/linuxhq/ansible-collection-linux
+tags:
+  - cloud
+  - infrastructure
+  - linux
+version: 1.0.0
+...
