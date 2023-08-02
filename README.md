@@ -23,8 +23,13 @@ An example playbook utilizing roles available in this collection
 
     - hosts: linux
       vars:
-        groups:
-        uesrs:
+        groupadd:
+          - name: linuxhq
+            gid: 2000
+        useradd:
+          - name: tkimball
+            group: linuxhq
+            uid: 2001
 
       roles:
         - linuxhq.linux.group
