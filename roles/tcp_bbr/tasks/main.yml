@@ -1,0 +1,45 @@
+---
+- name: Ensure tcp bbr modules are persistent and present
+  tags:
+    - tcp_bbr
+  become: true
+  community.general.modprobe:
+    name: "{{ _module }}"
+    persistent: present
+    state: present
+  loop: "{{ tcp_bbr_modules }}"
+  loop_control:
+    label: "{{ _module | default(none) }}"
+    loop_var: _module
+
+- name: Ensure tcp bbr sysctl directory is present
+  tags:
+    - tcp_bbr
+  become: true
+  ansible.builtin.file:
+    group: root
+    mode: '0755'
+    owner: root
+    path: "{{ tcp_bbr_sysctl_file | dirname }}"
+    state: directory
+
+- name: Ensure tcp bbr sysctl configuration is present
+  tags:
+    - tcp_bbr
+  become: true
+  ansible.posix.sysctl:
+    ignoreerrors: false
+    name: "{{ _sysctl.key }}"
+    reload: true
+    state: present
+    sysctl_file: "{{ tcp_bbr_sysctl_file }}"
+    sysctl_set: true
+    value: "{{ _sysctl.value }}"
+  loop: "{{ tcp_bbr_sysctl }}"
+  loop_control:
+    label: "{{ _sysctl.key | default(none) }}"
+    loop_var: _sysctl
+  when:
+    - _sysctl.key is defined
+    - _sysctl.value is defined
+...

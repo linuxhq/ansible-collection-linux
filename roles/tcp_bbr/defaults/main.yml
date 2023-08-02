@@ -1,0 +1,11 @@
+---
+tcp_bbr_modules:
+  - sch_fq
+  - tcp_bbr
+tcp_bbr_sysctl:
+  - key: net.core.default_qdisc
+    value: fq
+  - key: net.ipv4.tcp_congestion_control
+    value: bbr
+tcp_bbr_sysctl_file: /etc/sysctl.d/10-tcp_bbr.conf
+...

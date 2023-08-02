@@ -22,6 +22,8 @@ None
 ## Example Playbook
 
     - hosts: server
+      collections:
+        - linuxhq.linux
       roles:
         - role: linuxhq.linux.group
           groupadd:
