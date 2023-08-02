@@ -1,0 +1,48 @@
+---
+- name: Ensure git packages are present
+  tags:
+    - git
+  become: true
+  package:
+    name: "{{ git_packages }}"
+    state: present
+
+- name: Ensure git repositories are present
+  tags:
+    - git
+  become: "{{ git_become | bool }}"
+  become_user: "{{ git_become_user }}"
+  ansible.builtin.git:
+    accept_newhostkey: "{{ _repository.accept_newhostkey | default(false) }}"
+    archive: "{{ _repository.archive | default(omit) }}"
+    archive_prefix: "{{ _repository.archive_prefix | default(omit) }}"
+    bare: "{{ _repository.bare | default(false) }}"
+    clone: "{{ _repository.clone | default(true) }}"
+    depth: "{{ _repository.depth | default(omit) }}"
+    dest: "{{ _repository.dest }}"
+    executable: "{{ _repository.executable | default(omit) }}"
+    force: "{{ _repository.force | default(false) }}"
+    gpg_whitelist: "{{ _repository.gpg_whitelist | default([]) }}"
+    key_file: "{{ _repository.key_file | default(omit) }}"
+    recursive: "{{ _repository.recursive | default(true) }}"
+    reference: "{{ _repository.reference | default(omit) }}"
+    refspec: "{{ _repository.refspec | default(omit) }}"
+    remote: "{{ _repository.remote | default('origin') }}"
+    repo: "{{ _repository.repo }}"
+    separate_git_dir: "{{ _repository.separate_git_dir | default(omit) }}"
+    single_branch: "{{ _repository.single_branch | default(false) }}"
+    ssh_opts: "{{ _repository.ssh_opts | default(omit) }}"
+    track_submodules: "{{ _repository.track_submodules | default(false) }}"
+    umask: "{{ _repository.umask | default(omit) }}"
+    update: "{{ _repository.update_repository | default(true) }}"
+    verify_commit: "{{ _repository.verify_commit | default(false) }}"
+    version: "{{ _repository.version | default('HEAD') }}"
+  loop: "{{ git_repositories }}"
+  loop_control:
+    label: "{{ _repository.repo.split('/')[-1] }}"
+    loop_var: _repository
+  vars:
+  when:
+    - _repository.dest is defined
+    - _repository.repo is defined
+...
