@@ -2,6 +2,7 @@
 - name: Ensure groups are present
   tags:
     - group
+  become: true
   ansible.builtin.group:
     gid: "{{ _group.gid | default(omit) }}"
     local: "{{ _group.local | default(false) }}"
@@ -19,6 +20,7 @@
 - name: Ensure groups are absent
   tags:
     - group
+  become: true
   ansible.builtin.group:
     force: "{{ _group.force | default(false) }}"
     name: "{{ _group.name }}"
