@@ -24,7 +24,7 @@ None
 
 ## Example Playbook
 
-    - hosts: linux
+    - hosts: server
       roles:
         - role: linuxhq.linux.git
           git_become: true
