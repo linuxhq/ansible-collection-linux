@@ -1,0 +1,26 @@
+---
+logrotate_conf:
+  - weekly
+  - rotate 4
+  - create
+  - dateext
+  - include /etc/logrotate.d
+logrotate_d:
+  - file: btmp
+    logs:
+      - path: /var/log/btmp
+        options:
+          - missingok
+          - monthly
+          - create 0660 root utmp
+          - rotate 1
+  - file: wtmp
+    logs:
+      - path: /var/log/wtmp
+        options:
+          - missingok
+          - monthly
+          - create 0664 root utmp
+          - minsize 1M
+          - rotate 1
+...
