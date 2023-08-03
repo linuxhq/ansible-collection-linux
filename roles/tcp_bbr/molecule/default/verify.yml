@@ -1,0 +1,37 @@
+---
+- name: Verify
+  hosts: all
+  tasks:
+    - name: Ensure kernel modules are loaded
+      community.general.modprobe:
+        name: "{{ _module }}"
+        state: present
+      register: _modprobe
+      loop:
+        - sch_fq
+        - tcp_bbr
+      loop_control:
+        label: "{{ _module }}"
+        loop_var: _module
+
+    - name: Ensure sysctl settings are active
+      ansible.posix.sysctl:
+        name: "{{ _sysctl.key }}"
+        sysctl_set: true
+        value: "{{ _sysctl.value }}"
+      register: _sysctl
+      loop:
+        - key: net.core.default_qdisc
+          value: fq
+        - key: net.ipv4.tcp_congestion_control
+          value: bbr
+      loop_control:
+        label: "{{ _sysctl.key }}"
+        loop_var: _sysctl
+
+    - name: Ensure none of the previous tasks are changed
+      ansible.builtin.assert:
+        that:
+          - _modprobe is not changed
+          - _sysctl is not changed
+...
