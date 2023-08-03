@@ -1,0 +1,11 @@
+---
+- name: Converge
+  hosts: all
+  vars:
+    authorized_keys:
+      - user: root
+        exclusive: true
+        key: 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQCAb6KOS/cXy/QLS/0Pv83G7Vvx36z2MZ9GGrxAKqxUwMH2OL+mZIps1hBks+oCUbHyPVaUBx/LFP8tfWfDztIhNiyRzYibQDj9jme5wfGGQLEvDB10v8kMhTvUHAJ8wFoU1cmOVHF2TKsg4ge2xNFUkAHxdxnJAeEYLMgVlD4TxwH85piT9kcyx0Hz0J74xa7oyQ0KprmKj3yJ3x/zZayFEmztJgfwaQJ5hefyelChcItEKNpkIr85+OSccVPoWBIwuDDabDKcGlofyY9OYSKjBtRoZNDEPQML2+rdawqsE6fA6/XxPieKc6FoMijjjhdpkPKgkXAUorTffX5fx4OcSsDI94cwrg7czURMX4PO7BIWLbZQqUO9r/NGrn1ov7rU6nAtjSJwiY59O+H+5Pa5tpcFsBrPGgLAJAb5iUIDcDpq8GaGJ0K/wCKGjM/shW8+Z9NGyWjNdrX+P1v2DfuSJqmM1X0gIt8N3MhGLm0VUUfzoucctden8hYW0T5LGM/Aa5pmwirdskCngyC7Uf24OQJrklWdyv8bRiHN2bcQsc42U4I/O7u0icgXi5KUsNi+O+i/kt56ljAJ+YZys5YdOsZZf3N363+VgyCo7yQzd2AvIXi8bk/cIJrGUu/exTfUrBctePj0aQ4mr7XD0ujfwy6miuPrykjW3sDfbjQbNw=='
+  roles:
+    - linuxhq.linux.authorized_key
+...
