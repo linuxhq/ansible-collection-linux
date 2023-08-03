@@ -1,0 +1,17 @@
+---
+- name: Verify
+  hosts: all
+  vars:
+    selinux_state: disabled
+  tasks:
+    - name: Ensure sestatus information is gathered
+      ansible.builtin.command:
+        cmd: >
+          sestatus
+      register: _sestatus
+
+    - name: Ensure sestatus matches inventory
+      ansible.builtin.assert:
+        that:
+          - _sestatus.stdout is match('.*' ~ selinux_state ~ '$')
+...

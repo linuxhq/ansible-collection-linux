@@ -1,0 +1,8 @@
+---
+selinux_conf: /etc/selinux/config
+selinux_policy: targeted
+selinux_reboot: false
+selinux_reboot_timeout: 600
+selinux_state: enforcing
+selinux_update_kernel_param: false
+...
