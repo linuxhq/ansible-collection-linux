@@ -1,13 +1,12 @@
 ---
-- name: Ensure ansible preparation is present
+- name: Prepare
   hosts: all
   vars:
-    _prepare_packages:
+    packages:
       - sudo
-
   tasks:
-    - name: Ensure prepare packages are present
+    - name: Ensure packages are present
       ansible.builtin.package:
-        name: "{{ _prepare_packages }}"
+        name: "{{ packages }}"
         state: present
 ...

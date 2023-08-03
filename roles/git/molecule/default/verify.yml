@@ -1,5 +1,5 @@
 ---
-- name: Ensure ansible modifications are verified
+- name: Verify
   hosts: all
   tasks:
     - name: Ensure stat against git config directory is executed
@@ -11,4 +11,5 @@
       ansible.builtin.assert:
         that:
           - _stat.stat.exists | bool
+          - _stat.stat.isdir | bool
 ...
