@@ -1,0 +1,14 @@
+---
+- name: Ensure ansible modifications are verified
+  hosts: all
+  tasks:
+    - name: Ensure stat against git config directory is executed
+      ansible.builtin.stat:
+        path: /tmp/linuxhq.linux/.git
+      register: _stat
+
+    - name: Ensure git config directory exists
+      ansible.builtin.assert:
+        that:
+          - _stat.stat.exists | bool
+...
