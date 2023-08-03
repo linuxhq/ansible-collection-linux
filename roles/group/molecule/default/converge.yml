@@ -1,0 +1,12 @@
+---
+- name: Converge
+  hosts: all
+  vars:
+    groupadd:
+      - name: linuxhq
+        gid: 2000
+    groupdel:
+      - name: wheel
+  roles:
+    - linuxhq.linux.group
+...

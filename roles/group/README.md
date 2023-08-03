@@ -31,7 +31,6 @@ None
               gid: 2000
           groupdel:
             - name: linuxhq
-              force: true
 
 ## License
 

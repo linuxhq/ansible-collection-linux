@@ -22,7 +22,6 @@
     - group
   become: true
   ansible.builtin.group:
-    force: "{{ _group.force | default(false) }}"
     name: "{{ _group.name }}"
     state: absent
   loop: "{{ groupdel }}"
