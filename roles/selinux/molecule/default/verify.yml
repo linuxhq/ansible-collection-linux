@@ -9,6 +9,7 @@
         cmd: >
           sestatus
       register: _sestatus
+      changed_when: false
 
     - name: Ensure sestatus matches inventory
       ansible.builtin.assert:
