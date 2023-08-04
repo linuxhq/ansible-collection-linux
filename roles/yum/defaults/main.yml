@@ -1,0 +1,20 @@
+---
+yum_absent: []
+yum_cachedir: /var/cache/yum/$basearch/$releasever
+yum_debuglevel: 2
+yum_disablerepo: []
+yum_distroverpkg: centos-release
+yum_enablerepo: []
+yum_exactarch: true
+yum_gpgcheck: true
+yum_installonly_limit: 5
+yum_keepcache: false
+yum_logfile: /var/log/yum.log
+yum_obsoletes: true
+yum_override_install_langs: en_US.UTF-8
+yum_plugins: true
+yum_present: []
+yum_tsflags: nodocs
+yum_update: false
+yum_update_cache: false
+...

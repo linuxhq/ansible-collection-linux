@@ -1,5 +1,6 @@
 ---
 offline: false
 skip_list:
+  - package-latest
   - var-naming[no-role-prefix]
 ...

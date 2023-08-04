@@ -1,0 +1,11 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - role: linuxhq.linux.yum
+      yum_absent:
+        - python-lxml
+      yum_present:
+        - python-virtualenv
+      yum_update: true
+...
