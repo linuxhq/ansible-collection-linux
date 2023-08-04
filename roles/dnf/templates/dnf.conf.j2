@@ -1,0 +1,8 @@
+# {{ ansible_managed }}
+
+[main]
+best={{ '1' if dnf_best | bool else '0' }}
+clean_requirements_on_remove={{ '1' if dnf_clean_requirements_on_remove | bool else '0' }}
+gpgcheck={{ '1' if dnf_gpgcheck | bool else '0' }}
+installonly_limit={{ dnf_installonly_limit }}
+skip_if_unavailable={{ '1' if dnf_skip_if_unavailable | bool else '0' }}
