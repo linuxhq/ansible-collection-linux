@@ -1,0 +1,17 @@
+---
+dependencies:
+  - { role: linuxhq.linux.epel, tags: rssh }
+galaxy_info:
+  role_name: rssh
+  author: Taylor Kimball
+  description: Restricted shell for scp/sftp
+  license: GPLv3
+  min_ansible_version: 2.14.0
+  platforms:
+    - name: EL
+      versions:
+        - '7'
+  galaxy_tags:
+    - linux
+    - rssh
+...
