@@ -1,0 +1,17 @@
+---
+- name: Verify
+  hosts: all
+  vars:
+    _package: ansible
+  tasks:
+    - name: Ensure package facts are gathered
+      ansible.builtin.package_facts:
+        manager: rpm
+        strategy: first
+      register: _package_facts
+
+    - name: Ensure package is present in package facts
+      ansible.builtin.assert:
+        that:
+          - _package in ansible_facts.packages
+...
