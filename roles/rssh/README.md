@@ -31,6 +31,9 @@ Available variables are listed below, along with default values:
         - linuxhq.linux
       roles:
         - role: linuxhq.linux.rssh
+          rssh_allow:
+            - rsync
+            - sftp
           rssh_users:
             - name: linuxhq
               access_bits: '10000'

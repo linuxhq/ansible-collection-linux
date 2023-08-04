@@ -2,6 +2,9 @@
 - name: Converge
   hosts: all
   vars:
+    rssh_allow:
+      - rsync
+      - sftp
     rssh_users:
       - name: linuxhq
         access_bits: '10000'
