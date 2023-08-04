@@ -50,7 +50,7 @@
     - dst: /etc/yum.repos.d/epel-testing.repo
       src: "{{ 'epel-testing.repo.' ~ epel_releasever ~ '.j2' }}"
   loop_control:
-    label: "{{ _repo.dst.split('/')[0] | default(none) }}"
+    label: "{{ _repo.dst.split('/')[-1] | default(none) }}"
     loop_var: _repo
 
 - name: Ensure epel repository gpg key is present
