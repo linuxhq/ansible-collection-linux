@@ -1,0 +1,58 @@
+# {{ ansible_managed }}
+
+logfile			{{ nscd_logfile }}
+threads			{{ nscd_threads }}
+max-threads		{{ nscd_max_threads }}
+server-user		{{ nscd_server_user }}
+stat-user		{{ nscd_stat_user }}
+debug-level		{{ nscd_debug_level }}
+reload-count		{{ nscd_reload_count }}
+paranoia		{{ 'yes' if nscd_paranoia | bool else 'no' }}
+restart-interval	{{ nscd_restart_interval }}
+
+enable-cache		passwd		{{ 'yes' if nscd_passwd_enable_cache | bool else 'no' }}
+positive-time-to-live	passwd		{{ nscd_passwd_positive_time_to_live }}
+negative-time-to-live	passwd		{{ nscd_passwd_negative_time_to_live }}
+suggested-size		passwd		{{ nscd_passwd_suggested_size }}
+check-files		passwd		{{ 'yes' if nscd_passwd_check_files | bool else 'no' }}
+persistent		passwd		{{ 'yes' if nscd_passwd_persistent | bool else 'no' }}
+shared			passwd		{{ 'yes' if nscd_passwd_shared | bool else 'no' }}
+max-db-size		passwd		{{ nscd_passwd_max_db_size }}
+auto-propagate		passwd		{{ 'yes' if nscd_passwd_auto_propagate | bool else 'no' }}
+
+enable-cache		group		{{ 'yes' if nscd_group_enable_cache | bool else 'no' }}
+positive-time-to-live	group		{{ nscd_group_positive_time_to_live }}
+negative-time-to-live	group		{{ nscd_group_negative_time_to_live }}
+suggested-size		group		{{ nscd_group_suggested_size }}
+check-files		group		{{ 'yes' if nscd_group_check_files | bool else 'no' }}
+persistent		group		{{ 'yes' if nscd_group_persistent | bool else 'no' }}
+shared			group		{{ 'yes' if nscd_group_shared | bool else 'no' }}
+max-db-size		group		{{ nscd_group_max_db_size }}
+auto-propagate		group		{{ 'yes' if nscd_group_auto_propagate | bool else 'no' }}
+
+enable-cache		hosts		{{ 'yes' if nscd_hosts_enable_cache | bool else 'no' }}
+positive-time-to-live	hosts		{{ nscd_hosts_positive_time_to_live }}
+negative-time-to-live	hosts		{{ nscd_hosts_negative_time_to_live }}
+suggested-size		hosts		{{ nscd_hosts_suggested_size }}
+check-files		hosts		{{ 'yes' if nscd_hosts_check_files | bool else 'no' }}
+persistent		hosts		{{ 'yes' if nscd_hosts_persistent | bool else 'no' }}
+shared			hosts		{{ 'yes' if nscd_hosts_shared | bool else 'no' }}
+max-db-size		hosts		{{ nscd_hosts_max_db_size }}
+
+enable-cache		services	{{ 'yes' if nscd_services_enable_cache | bool else 'no' }}
+positive-time-to-live	services	{{ nscd_services_positive_time_to_live }}
+negative-time-to-live	services	{{ nscd_services_negative_time_to_live }}
+suggested-size		services	{{ nscd_services_suggested_size }}
+check-files		services	{{ 'yes' if nscd_services_check_files | bool else 'no' }}
+persistent		services	{{ 'yes' if nscd_services_persistent | bool else 'no' }}
+shared			services	{{ 'yes' if nscd_services_shared | bool else 'no' }}
+max-db-size		services	{{ nscd_services_max_db_size }}
+
+enable-cache		netgroup	{{ 'yes' if nscd_netgroup_enable_cache | bool else 'no' }}
+positive-time-to-live	netgroup	{{ nscd_netgroup_positive_time_to_live }}
+negative-time-to-live	netgroup	{{ nscd_netgroup_negative_time_to_live }}
+suggested-size		netgroup	{{ nscd_netgroup_suggested_size }}
+check-files		netgroup	{{ 'yes' if nscd_netgroup_check_files | bool else 'no' }}
+persistent		netgroup	{{ 'yes' if nscd_netgroup_persistent | bool else 'no' }}
+shared			netgroup	{{ 'yes' if nscd_netgroup_shared | bool else 'no' }}
+max-db-size		netgroup	{{ nscd_netgroup_max_db_size }}

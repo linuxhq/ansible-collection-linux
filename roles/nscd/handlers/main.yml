@@ -1,0 +1,9 @@
+---
+- name: Restart nscd
+  tags:
+    - nscd
+  become: true
+  ansible.builtin.service:
+    name: nscd
+    state: restarted
+...
