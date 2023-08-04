@@ -6,7 +6,7 @@ Manage docker containers
 
 ## Requirements
 
-None
+* [docker](https://www.docker.com)
 
 ## Role Variables
 

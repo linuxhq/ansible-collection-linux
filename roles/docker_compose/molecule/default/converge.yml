@@ -1,0 +1,33 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - role: linuxhq.linux.docker_compose
+      docker_compose:
+        - name: linuxhq
+          version: '3'
+          env:
+            LINUXHQ_TZ: America/Los_Angeles
+            LINUXHQ_UMASK: 2
+            LINUXHQ_WATCHTOWER_CLEANUP: 'true'
+            LINUXHQ_WATCHTOWER_POLL_INTERVAL: 3600
+          networks:
+            watchtower:
+              driver: bridge
+              ipam:
+                config:
+                  - subnet: 192.168.0.0/24
+          services:
+            watchtower:
+              container_name: watchtower
+              environment:
+                WATCHTOWER_CLEANUP: ${LINUXHQ_WATCHTOWER_CLEANUP}
+                WATCHTOWER_POLL_INTERVAL: ${LINUXHQ_WATCHTOWER_POLL_INTERVAL}
+                TZ: ${LINUXHQ_TZ}
+                UMASK: ${LINUXHQ_UMASK}
+              image: containrrr/watchtower:latest
+              networks:
+                - watchtower
+              volumes:
+                - /var/run/docker.sock:/var/run/docker.sock
+...

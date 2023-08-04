@@ -1,0 +1,130 @@
+---
+- name: Ensure docker compose packages are present
+  tags:
+    - docker_compose
+  become: true
+  ansible.builtin.yum:
+    enablerepo: docker-ce-stable
+    name: "{{ docker_compose_packages }}"
+    state: present
+  when:
+    - ansible_distribution_major_version | int == 7
+    - docker_packages | length > 0
+
+- name: Ensure docker compose packages are present
+  tags:
+    - docker_compose
+  become: true
+  ansible.builtin.dnf:
+    enablerepo: docker-ce-stable
+    name: "{{ docker_compose_packages }}"
+    state: present
+  when:
+    - ansible_distribution_major_version | int >= 8
+    - docker_packages | length > 0
+
+- name: Ensure docker-compose directory is present
+  tags:
+    - docker_compose
+  become: true
+  ansible.builtin.file:
+    group: docker
+    mode: '0750'
+    owner: root
+    path: "{{ docker_compose_dir }}"
+    state: directory
+
+- name: Ensure docker-compose project directories are present
+  tags:
+    - docker_compose
+  become: true
+  ansible.builtin.file:
+    group: docker
+    mode: '0750'
+    owner: root
+    path: "{{ docker_compose_dir }}/{{ _project.name }}"
+    state: directory
+  loop: "{{ docker_compose }}"
+  loop_control:
+    label: "{{ _project.name | default(none) }}"
+    loop_var: _project
+  when:
+    - _project.name is defined
+
+- name: Ensure docker-compose project environments are present
+  tags:
+    - docker_compose
+  become: true
+  ansible.builtin.template:
+    dest: "{{ docker_compose_dir }}/{{ _project.name }}/.env"
+    group: docker
+    mode: '0640'
+    owner: root
+    src: docker-compose.env.j2
+  loop: "{{ docker_compose }}"
+  loop_control:
+    label: "{{ _project.name }}"
+    loop_var: _project
+  when:
+    - _project.env is defined
+    - _project.env | length > 0
+    - _project.name is defined
+
+- name: Ensure docker-compose project services are present
+  tags:
+    - docker_compose
+  become: true
+  ansible.builtin.template:
+    dest: "{{ docker_compose_dir }}/{{ _project.name }}/docker-compose.yml"
+    group: docker
+    mode: '0640'
+    owner: root
+    src: docker-compose.yml.j2
+  loop: "{{ docker_compose }}"
+  loop_control:
+    label: "{{ _project.name }}"
+    loop_var: _project
+  when:
+    - _project.name is defined
+    - _project.version is defined
+
+- name: Ensure docker-compose systemd unit is present
+  tags:
+    - docker_compose
+  become: true
+  ansible.builtin.template:
+    dest: /usr/lib/systemd/system/docker-compose@.service
+    group: root
+    mode: '0644'
+    owner: root
+    src: docker-compose.systemd.j2
+
+- name: Ensure docker-compose systemd settings are reloaded
+  tags:
+    - docker_compose
+  become: true
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Ensure docker-compose services are started and enabled on boot
+  tags:
+    - docker_compose
+  become: true
+  ansible.builtin.systemd:
+    enabled: true
+    name: "{{ _name }}"
+    state: started
+  loop: "{{ docker_compose |
+            map(attribute='name') |
+            list |
+            default([]) }}"
+  loop_control:
+    label: "{{ _name | default(none) }}"
+    loop_var: _project
+  vars:
+    _name: "docker-compose@{{ _project }}.service"
+  when:
+    - docker_compose |
+      map(attribute='name') |
+      length > 0
+...
