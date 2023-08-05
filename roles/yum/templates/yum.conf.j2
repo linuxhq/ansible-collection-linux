@@ -1,15 +1,15 @@
 # {{ ansible_managed }}
 
 [main]
-cachedir={{ yum_cachedir }}
-debuglevel={{ yum_debuglevel }}
-distroverpkg={{ yum_distroverpkg }}
-exactarch={{ '1' if yum_exactarch | bool else '0' }}
-gpgcheck={{ '1' if yum_gpgcheck | bool else '0' }}
-installonly_limit={{ yum_installonly_limit }}
-keepcache={{ '1' if yum_keepcache | bool else '0' }}
-logfile={{ yum_logfile }}
-obsoletes={{ '1' if yum_obsoletes | bool else '0' }}
-override_install_langs={{ yum_override_install_langs }}
-plugins={{ '1' if yum_plugins | bool else '0' }}
-tsflags={{ yum_tsflags }}
+cachedir = {{ yum_cachedir }}
+debuglevel = {{ yum_debuglevel }}
+distroverpkg = {{ yum_distroverpkg }}
+exactarch = {{ '1' if yum_exactarch | bool else '0' }}
+gpgcheck = {{ '1' if yum_gpgcheck | bool else '0' }}
+installonly_limit = {{ yum_installonly_limit }}
+keepcache = {{ '1' if yum_keepcache | bool else '0' }}
+logfile = {{ yum_logfile }}
+obsoletes = {{ '1' if yum_obsoletes | bool else '0' }}
+override_install_langs = {{ yum_override_install_langs }}
+plugins = {{ '1' if yum_plugins | bool else '0' }}
+tsflags = {{ yum_tsflags }}
