@@ -1,0 +1,12 @@
+---
+fastestmirror_always_print_best_host: true
+fastestmirror_enabled: true
+fastestmirror_exclude: []
+fastestmirror_hostfilepath: timedhosts.txt
+fastestmirror_include_only: []
+fastestmirror_maxhostfileage: 10
+fastestmirror_maxthreads: 15
+fastestmirror_prefer: null
+fastestmirror_socket_timeout: 3
+fastestmirror_verbose: false
+...

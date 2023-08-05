@@ -1,7 +1,7 @@
 ---
 dependencies: []
 galaxy_info:
-  role_name: yum_plugin_fastestmirror
+  role_name: fastestmirror
   author: Taylor Kimball
   description: YUM Plugin - Fastest Mirror
   license: GPLv3
