@@ -1,0 +1,12 @@
+---
+- name: Ensure yum plugin fastestmirror configuration is present
+  tags:
+    - yum_plugin_fastestmirror
+  become: true
+  ansible.builtin.template:
+    dest: /etc/yum/pluginconf.d/fastestmirror.conf
+    group: root
+    mode: '0644'
+    owner: root
+    src: fastestmirror.conf.j2
+...
