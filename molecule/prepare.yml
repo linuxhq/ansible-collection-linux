@@ -1,0 +1,31 @@
+---
+- name: Prepare
+  hosts: all
+  gather_facts: true
+  tasks:
+    - name: Ensure prepare packages are present (Debian)
+      tags:
+        - prepare
+      become: true
+      ansible.builtin.package:
+        name:
+          - passwd
+          - python3
+          - sudo
+        state: present
+      when:
+        - ansible_os_family == 'Debian'
+
+    - name: Ensure prepare packages are present (RedHat)
+      tags:
+        - prepare
+      become: true
+      ansible.builtin.package:
+        name:
+          - python3
+          - shadow-utils
+          - sudo
+        state: present
+      when:
+        - ansible_os_family == 'RedHat'
+...
