@@ -16,7 +16,7 @@ platforms:
     instance_type: t2.micro
     key_inject_method: ec2
     key_name: molecule
-    vpc_subnet_id: subnet-091859127eb8de5f2
+    vpc_subnet_id: subnet-00d20739fc370ed5e
     tags:
       Name: *c7
 
@@ -28,7 +28,7 @@ platforms:
     instance_type: t2.micro
     key_inject_method: ec2
     key_name: molecule
-    vpc_subnet_id: subnet-091859127eb8de5f2
+    vpc_subnet_id: subnet-00d20739fc370ed5e
     tags:
       Name: *a8
 
@@ -40,7 +40,7 @@ platforms:
     instance_type: t2.micro
     key_inject_method: ec2
     key_name: molecule
-    vpc_subnet_id: subnet-091859127eb8de5f2
+    vpc_subnet_id: subnet-00d20739fc370ed5e
     tags:
       Name: *a9
 
@@ -52,7 +52,7 @@ platforms:
     instance_type: t2.micro
     key_inject_method: ec2
     key_name: molecule
-    vpc_subnet_id: subnet-091859127eb8de5f2
+    vpc_subnet_id: subnet-00d20739fc370ed5e
     tags:
       Name: *d11
 
@@ -64,7 +64,7 @@ platforms:
     instance_type: t2.micro
     key_inject_method: ec2
     key_name: molecule
-    vpc_subnet_id: subnet-091859127eb8de5f2
+    vpc_subnet_id: subnet-00d20739fc370ed5e
     tags:
       Name: *d12
 
