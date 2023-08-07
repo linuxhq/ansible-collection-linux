@@ -1,34 +1,44 @@
 ---
 dependency:
   name: galaxy
+  options:
+    requirements-file: ../../molecule/requirements.yml
 
 driver:
-  name: docker
+  name: ec2
 
 platforms:
-  - name: almalinux-8
-    image: almalinux:8
-    cgroupns_mode: host
-    command: /usr/sbin/init
-    pre_build_image: true
-    privileged: true
-    volumes:
-      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+  - name: &a8 almalinux-8
+    connection_options:
+      ansible_user: ec2-user
+    image_owner: '764336703387'
+    image_name: 'AlmaLinux OS 8.8.20230524 x86_64'
+    instance_type: t2.micro
+    key_inject_method: ec2
+    vpc_subnet_id: subnet-091859127eb8de5f2
+    tags:
+      Name: *a8
 
-  - name: almalinux-9
-    image: almalinux:9
-    cgroupns_mode: host
-    command: /usr/sbin/init
-    pre_build_image: true
-    privileged: true
-    volumes:
-      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+  - name: &a9 almalinux-9
+    connection_options:
+      ansible_user: ec2-user
+    image_owner: '764336703387'
+    image_name: 'AlmaLinux OS 9.2.20230804 x86_64'
+    instance_type: t2.micro
+    key_inject_method: ec2
+    vpc_subnet_id: subnet-091859127eb8de5f2
+    tags:
+      Name: *a9
 
 provisioner:
   name: ansible
   log: true
   options:
     diff: true
+  playbooks:
+    create: ../../../../molecule/create.yml
+    destroy: ../../../../molecule/destroy.yml
+    prepare: ../../../../molecule/prepare.yml
 
 verifier:
   name: ansible
