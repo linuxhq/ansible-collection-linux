@@ -9,24 +9,26 @@ driver:
 
 platforms:
   - name: &a8 almalinux-8
+    aws_profile: molecule
     connection_options:
       ansible_user: ec2-user
     image_owner: '764336703387'
     image_name: 'AlmaLinux OS 8.8.20230524 x86_64'
     instance_type: t2.micro
     key_inject_method: ec2
-    vpc_subnet_id: subnet-091859127eb8de5f2
+    vpc_subnet_id: subnet-00d20739fc370ed5e
     tags:
       Name: *a8
 
   - name: &a9 almalinux-9
+    aws_profile: molecule
     connection_options:
       ansible_user: ec2-user
     image_owner: '764336703387'
     image_name: 'AlmaLinux OS 9.2.20230804 x86_64'
     instance_type: t2.micro
     key_inject_method: ec2
-    vpc_subnet_id: subnet-091859127eb8de5f2
+    vpc_subnet_id: subnet-00d20739fc370ed5e
     tags:
       Name: *a9
 
