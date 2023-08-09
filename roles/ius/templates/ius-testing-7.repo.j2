@@ -1,0 +1,23 @@
+[ius-testing]
+name = IUS for Enterprise Linux 7 - Testing - $basearch
+baseurl = https://repo.ius.io/testing/7/$basearch/
+enabled = {{ '1' if ius_repository_ius_testing | bool else '0' }}
+repo_gpgcheck = 0
+gpgcheck = 1
+gpgkey = file:///etc/pki/rpm-gpg/RPM-GPG-KEY-IUS-7
+
+[ius-testing-debuginfo]
+name = IUS for Enterprise Linux 7 - Testing - $basearch - Debug
+baseurl = https://repo.ius.io/testing/7/$basearch/debug/
+enabled = {{ '1' if ius_repository_ius_testing_debuginfo | bool else '0' }}
+repo_gpgcheck = 0
+gpgcheck = 1
+gpgkey = file:///etc/pki/rpm-gpg/RPM-GPG-KEY-IUS-7
+
+[ius-testing-source]
+name = IUS for Enterprise Linux 7 - Testing - Source
+baseurl = https://repo.ius.io/testing/7/src/
+enabled = {{ '1' if ius_repository_ius_testing_source | bool else '0' }}
+repo_gpgcheck = 0
+gpgcheck = 1
+gpgkey = file:///etc/pki/rpm-gpg/RPM-GPG-KEY-IUS-7

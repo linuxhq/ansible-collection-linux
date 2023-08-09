@@ -1,0 +1,17 @@
+---
+dependencies:
+  - { role: linuxhq.linux.epel, tags: ius }
+galaxy_info:
+  role_name: ius
+  author: Taylor Kimball
+  description: Inline with Upstream Stable
+  license: GPLv3
+  min_ansible_version: 2.15.0
+  platforms:
+    - name: EL
+      versions:
+        - '7'
+  galaxy_tags:
+    - ius
+    - linux
+...
