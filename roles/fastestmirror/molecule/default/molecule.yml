@@ -10,12 +10,11 @@ driver:
 platforms:
   - name: &c7 centos-7
     aws_profile: molecule
-    connection_options:
-      ansible_user: centos
     image_owner: '125523088429'
     image_name: 'CentOS Linux 7 x86_64 - 2211'
     instance_type: t2.micro
     key_inject_method: ec2
+    ssh_user: centos
     vpc_subnet_id: subnet-00d20739fc370ed5e
     tags:
       Name: *c7
