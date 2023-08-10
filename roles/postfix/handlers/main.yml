@@ -1,0 +1,61 @@
+---
+- name: Postmap generic
+  tags:
+    - postfix
+  become: true
+  ansible.builtin.command:
+    cmd: >
+      postmap "{{ postfix_parameters.smtp_generic_maps }}"
+  when:
+    - _db in postfix_databases
+  vars:
+    _db: "{{ postfix_parameters.smtp_generic_maps.split(':')[0] }}"
+  changed_when: true
+
+- name: Postmap sasl_passwd
+  tags:
+    - postfix
+  become: true
+  ansible.builtin.command:
+    cmd: >
+      postmap "{{ postfix_parameters.smtp_sasl_password_maps }}"
+  when:
+    - _db in postfix_databases
+  vars:
+    _db: "{{ postfix_parameters.smtp_sasl_password_maps.split(':')[0] }}"
+  changed_when: true
+
+- name: Postmap sender_canonical
+  tags:
+    - postfix
+  become: true
+  ansible.builtin.command:
+    cmd: >
+      postmap "{{ postfix_parameters.sender_canonical_maps }}"
+  when:
+    - _db in postfix_databases
+  vars:
+    _db: "{{ postfix_parameters.sender_canonical_maps.split(':')[0] }}"
+  changed_when: true
+
+- name: Postmap recipient_canonical
+  tags:
+    - postfix
+  become: true
+  ansible.builtin.command:
+    cmd: >
+      postmap "{{ postfix_parameters.recipient_canonical_maps }}"
+  when:
+    - _db in postfix_databases
+  vars:
+    _db: "{{ postfix_parameters.recipient_canonical_maps.split(':')[0] }}"
+  changed_when: true
+
+- name: Restart postfix
+  tags:
+    - postfix
+  become: true
+  ansible.builtin.service:
+    name: postfix
+    state: restarted
+...

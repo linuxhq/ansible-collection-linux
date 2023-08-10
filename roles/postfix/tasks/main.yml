@@ -1,0 +1,104 @@
+---
+- name: Ensure postfix packages are present
+  tags:
+    - postfix
+  become: true
+  ansible.builtin.yum:
+    name: "{{ postfix_packages }}"
+    state: present
+  when:
+    - ansible_distribution_major_version | int == 7
+
+- name: Ensure postfix packages are present
+  tags:
+    - postfix
+  become: true
+  ansible.builtin.dnf:
+    name: "{{ postfix_packages }}"
+    state: present
+  when:
+    - ansible_distribution_major_version | int >= 8
+
+- name: Ensure postfix main configuration is present
+  tags:
+    - postfix
+  become: true
+  ansible.builtin.template:
+    dest: /etc/postfix/main.cf
+    group: root
+    mode: '0644'
+    owner: root
+    src: main.cf.j2
+  notify: Restart postfix
+
+- name: Ensure postfix generic maps are present
+  tags:
+    - postfix
+  become: true
+  ansible.builtin.template:
+    dest: "{{ postfix_parameters.smtp_generic_maps.split(':')[1] }}"
+    group: root
+    mode: '0644'
+    owner: root
+    src: generic.j2
+  notify: Postmap generic
+  when:
+    - postfix_parameters.smtp_generic_maps is defined
+    - postfix_generic_maps | length > 0
+
+- name: Ensure postfix sender canonical maps are present
+  tags:
+    - postfix
+  become: true
+  ansible.builtin.template:
+    dest: "{{ postfix_parameters.sender_canonical_maps.split(':')[1] }}"
+    group: root
+    mode: '0644'
+    owner: root
+    src: sender_canonical.j2
+  notify: Postmap sender_canonical
+  when:
+    - postfix_parameters.sender_canonical_maps is defined
+    - postfix_sender_canonical_maps | length > 0
+
+- name: Ensure postfix recipient canonical maps are present
+  tags:
+    - postfix
+  become: true
+  ansible.builtin.template:
+    dest: "{{ postfix_parameters.recipient_canonical_maps.split(':')[1] }}"
+    group: root
+    mode: '0644'
+    owner: root
+    src: recipient_canonical.j2
+  notify: Postmap recipient_canonical
+  when:
+    - postfix_parameters.recipient_canonical_maps is defined
+    - postfix_recipient_canonical_maps | length > 0
+
+- name: Ensure postmap sasl password maps are present
+  tags:
+    - postfix
+  become: true
+  ansible.builtin.template:
+    dest: "{{ postfix_parameters.smtp_sasl_password_maps.split(':')[1] }}"
+    group: root
+    mode: '0600'
+    owner: root
+    src: sasl_passwd.j2
+  notify: Postmap sasl_passwd
+  when:
+    - postfix_parameters.relayhost is defined
+    - postfix_parameters.smtp_sasl_password_maps is defined
+    - postfix_sasl_password is defined
+    - postfix_sasl_username is defined
+
+- name: Ensure postfix is started and enabled on boot
+  tags:
+    - postfix
+  become: true
+  ansible.builtin.service:
+    enabled: true
+    name: postfix
+    state: started
+...

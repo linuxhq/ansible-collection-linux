@@ -1,0 +1,36 @@
+---
+postfix_databases:
+  - btree
+  - cdb
+  - dbm
+  - hash
+  - fail
+  - sdbm
+postfix_packages:
+  - postfix
+postfix_parameters:
+  alias_database: hash:/etc/aliases'
+  alias_maps: hash:/etc/aliases'
+  command_directory: /usr/sbin
+  daemon_directory: /usr/libexec/postfix
+  data_directory: /var/lib/postfix
+  debug_peer_level: 2
+  html_directory: false
+  inet_interfaces: localhost
+  inet_protocols: all
+  mail_owner: postfix
+  mailq_path: /usr/bin/mailq.postfix
+  manpage_directory: /usr/share/man
+  mydestination:
+    - $myhostname
+    - localhost.$mydomain
+    - localhost
+  newaliases_path: /usr/bin/newaliases.postfix
+  sendmail_path: /usr/sbin/sendmail.postfix
+  setgid_group: postdrop
+  queue_directory: /var/spool/postfix
+  unknown_local_recipient_reject_code: 550
+postfix_generic_maps: []
+postfix_recipient_canonical_maps: []
+postfix_sender_canonical_maps: []
+...

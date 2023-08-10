@@ -1,0 +1,14 @@
+---
+- name: Verify
+  hosts: all
+  tasks:
+    - name: Ensure generic map db is present
+      ansible.builtin.stat:
+        path: /etc/postfix/generic.db
+      register: _stat
+
+    - name: Ensure postfix and mappings are present
+      ansible.builtin.assert:
+        that:
+          - _stat.stat.exists | bool
+...
