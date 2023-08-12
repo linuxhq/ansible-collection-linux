@@ -1,4 +1,6 @@
 ---
+exclude_paths:
+  - molecule/*.yml
 offline: false
 skip_list:
   - package-latest

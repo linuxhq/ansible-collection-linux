@@ -1,5 +1,8 @@
 ---
 extends: default
+ignore:
+  - venv
+  - molecule/*.yml
 rules:
   braces:
     min-spaces-inside: 1
