@@ -1,0 +1,67 @@
+---
+- name: Ensure docker repository is present
+  tags:
+    - docker
+  become: true
+  ansible.builtin.template:
+    dest: /etc/yum.repos.d/docker-ce.repo
+    group: root
+    mode: '0644'
+    owner: root
+    src: docker-ce.repo.j2
+
+- name: Ensure docker packages are present
+  tags:
+    - docker
+  become: true
+  ansible.builtin.yum:
+    enablerepo: docker-ce-stable
+    name: "{{ docker_packages }}"
+    state: present
+  when:
+    - ansible_distribution_major_version | int == 7
+    - docker_packages | length > 0
+
+- name: Ensure docker packages are present
+  tags:
+    - docker
+  become: true
+  ansible.builtin.dnf:
+    enablerepo: docker-ce-stable
+    name: "{{ docker_packages }}"
+    state: present
+  when:
+    - ansible_distribution_major_version | int >= 8
+    - docker_packages | length > 0
+
+- name: Ensure users are appended to docker group
+  tags:
+    - docker
+  become: true
+  ansible.builtin.user:
+    append: true
+    name: "{{ docker_user }}"
+    groups:
+      - docker
+  loop: "{{ docker_users }}"
+  loop_control:
+    label: "{{ docker_user }}"
+    loop_var: docker_user
+  when:
+    - docker_users | length > 0
+
+- name: Ensure docker is started and enabled on boot
+  tags:
+    - docker
+  become: true
+  ansible.builtin.systemd:
+    enabled: true
+    name: "{{ _service }}"
+    state: started
+  loop: "{{ docker_systemd }}"
+  loop_control:
+    label: "{{ _service | default(none) }}"
+    loop_var: _service
+  when:
+    - docker_systemd | length > 0
+...
