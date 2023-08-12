@@ -1,0 +1,13 @@
+---
+dnf_absent: []
+dnf_best: true
+dnf_clean_requirements_on_remove: true
+dnf_disablerepo: []
+dnf_enablerepo: []
+dnf_gpgcheck: true
+dnf_installonly_limit: 3
+dnf_present: []
+dnf_skip_if_unavailable: false
+dnf_update: false
+dnf_update_cache: false
+...

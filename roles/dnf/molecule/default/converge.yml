@@ -1,0 +1,11 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - role: linuxhq.linux.dnf
+      dnf_absent:
+        - python3-six
+      dnf_present:
+        - python3-pysocks
+      dnf_update: true
+...

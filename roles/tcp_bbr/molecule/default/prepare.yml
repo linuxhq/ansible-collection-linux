@@ -1,14 +1,12 @@
 ---
 - name: Prepare
   hosts: all
-  vars:
-    packages:
-      - kmod
-      - procps-ng
-      - sudo
   tasks:
-    - name: Ensure packages are present
+    - name: Ensure prepare packages are present
       ansible.builtin.package:
-        name: "{{ packages }}"
+        name:
+          - kmod
+          - procps-ng
+          - sudo
         state: present
 ...

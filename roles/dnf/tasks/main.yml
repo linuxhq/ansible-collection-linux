@@ -1,0 +1,57 @@
+---
+- name: Ensure dnf configuration is present
+  tags:
+    - dnf
+  become: true
+  ansible.builtin.template:
+    dest: /etc/dnf/dnf.conf
+    group: root
+    mode: '0644'
+    owner: root
+    src: dnf.conf.j2
+
+- name: Ensure dnf packages are present
+  tags:
+    - dnf
+  become: true
+  ansible.builtin.dnf:
+    disablerepo: "{{ dnf_disablerepo | join(',') }}"
+    enablerepo: "{{ dnf_disablerepo | join(',') }}"
+    name: "{{ _present }}"
+    state: present
+    update_cache: "{{ dnf_update_cache }}"
+    validate_certs: true
+  loop: "{{ dnf_present }}"
+  loop_control:
+    label: "{{ _present }}"
+    loop_var: _present
+
+- name: Ensure dnf packages are absent
+  tags:
+    - dnf
+  become: true
+  ansible.builtin.dnf:
+    disablerepo: "{{ dnf_disablerepo | join(',') }}"
+    enablerepo: "{{ dnf_disablerepo | join(',') }}"
+    name: "{{ _absent }}"
+    state: absent
+    validate_certs: true
+  loop: "{{ dnf_absent }}"
+  loop_control:
+    label: "{{ _absent }}"
+    loop_var: _absent
+
+- name: Ensure dnf packages are latest
+  tags:
+    - dnf
+  become: true
+  ansible.builtin.dnf:
+    disablerepo: "{{ dnf_disablerepo | join(',') }}"
+    enablerepo: "{{ dnf_disablerepo | join(',') }}"
+    name: '*'
+    state: latest
+    update_cache: "{{ dnf_update_cache }}"
+    validate_certs: true
+  when:
+    - dnf_update | bool
+...
