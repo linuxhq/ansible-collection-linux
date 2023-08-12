@@ -1,6 +1,7 @@
 ---
 exclude_paths:
-  - molecule/*.yml
+  - molecule
+  - venv
 offline: false
 skip_list:
   - package-latest
