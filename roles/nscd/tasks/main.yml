@@ -1,0 +1,42 @@
+---
+- name: Ensure nscd package is present
+  tags:
+    - nscd
+  become: true
+  ansible.builtin.yum:
+    name: nscd
+    state: present
+  when:
+    - ansible_distribution_major_version | int == 7
+
+- name: Ensure nscd package is present
+  tags:
+    - nscd
+  become: true
+  ansible.builtin.dnf:
+    name: nscd
+    state: present
+  when:
+    - ansible_distribution_major_version | int >= 8
+
+- name: Ensure nscd configuration is present
+  tags:
+    - nscd
+  become: true
+  ansible.builtin.template:
+    dest: /etc/nscd.conf
+    group: root
+    mode: '0644'
+    owner: root
+    src: nscd.conf.j2
+  notify: Restart nscd
+
+- name: Ensure nscd is started and enabled on boot
+  tags:
+    - nscd
+  become: true
+  ansible.builtin.service:
+    enabled: yes
+    name: nscd
+    state: started
+...

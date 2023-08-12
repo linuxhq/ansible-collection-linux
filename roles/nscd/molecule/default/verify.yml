@@ -1,0 +1,15 @@
+---
+- name: Verify
+  hosts: all
+  tasks:
+    - name: Ensure stat is executed against log file
+      ansible.builtin.stat:
+        path: /tmp/nscd.log
+      register: _stat
+
+    - name: Ensure nscd log file exists
+      ansible.builtin.assert:
+        that:
+          - _stat.stat.exists | bool
+          - not _stat.stat.isdir | bool
+...
