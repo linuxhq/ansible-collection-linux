@@ -6,18 +6,12 @@
       ansible.builtin.getent:
         database: passwd
         fail_key: false
-        key: "{{ _user }}"
       register: _getent
-      loop:
-        - linuxhq
-        - ftp
-      loop_control:
-        label: "{{ _user }}"
-        loop_var: _user
 
     - name: Ensure users are in expected state
       ansible.builtin.assert:
         that:
-          - _getent.results[0].ansible_facts.getent_passwd.linuxhq[1] == '2000'
-          - _getent.results[1].ansible_facts.getent_passwd.ftp is none
+          - "'linuxhq' in getent_passwd"
+          - "'ftp' not in getent_passwd"
+          - getent_passwd.linuxhq[1] == '2000'
 ...
