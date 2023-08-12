@@ -2,6 +2,7 @@
 - name: Ensure users are present
   tags:
     - user
+  become: true
   ansible.builtin.user:
     append: "{{ _user.append | default(false) }}"
     comment: "{{ _user.comment | default(omit) }}"
@@ -43,6 +44,7 @@
 - name: Ensure users are absent
   tags:
     - user
+  become: true
   ansible.builtin.user:
     force: "{{ _user.force | default(false) }}"
     name: "{{ _user.name }}"

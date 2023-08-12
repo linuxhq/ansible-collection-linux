@@ -2,6 +2,7 @@
 - name: Ensure authorized keys are present
   tags:
     - authorized_key
+  become: true
   ansible.posix.authorized_key:
     comment: "{{ _key.comment | default(omit) }}"
     exclusive: "{{ _key.exclusive | default(false) }}"
