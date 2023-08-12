@@ -1,0 +1,16 @@
+# {{ ansible_managed }}
+
+{% for _log in _logrotate.logs %}
+{%   if _log.path is defined and
+        _log.options is defined and
+        _log.options | length > 0  %}
+{{ _log.path }} {
+{%     for _option in _log.options %}
+    {{ _option }}
+{%     endfor %}
+}
+{% if not loop.last %}
+
+{% endif %}
+{%   endif %}
+{% endfor %}

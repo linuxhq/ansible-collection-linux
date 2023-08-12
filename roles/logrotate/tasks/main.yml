@@ -1,0 +1,39 @@
+---
+- name: Ensure logrotate package is present
+  tags:
+    - logrotate
+  become: true
+  ansible.builtin.yum:
+    name: logrotate
+    state: present
+
+- name: Ensure logrotate.conf is present
+  tags:
+    - logrotate
+  become: true
+  ansible.builtin.template:
+    dest: /etc/logrotate.conf
+    group: root
+    mode: '0644'
+    owner: root
+    src: logrotate.conf.j2
+
+- name: Ensure logrotate.d configurations are present
+  tags:
+    - logrotate
+  become: true
+  ansible.builtin.template:
+    dest: "{{ '/etc/logrotate.d/' ~ _logrotate.file }}"
+    group: root
+    mode: '0644'
+    owner: root
+    src: logrotate_d.j2
+  loop: "{{ logrotate_d }}"
+  loop_control:
+    label: "{{ _logrotate.file }}"
+    loop_var: _logrotate
+  when:
+    - _logrotate.file is defined
+    - _logrotate.logs is defined
+    - _logrotate.logs | length > 0
+...

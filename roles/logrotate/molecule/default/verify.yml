@@ -1,0 +1,10 @@
+---
+- name: Verify
+  hosts: all
+  tasks:
+    - name: Ensure logrotate debug exits successfully
+      ansible.builtin.command:
+        cmd: >
+          logrotate -d /etc/logrotate.conf
+      changed_when: false
+...
