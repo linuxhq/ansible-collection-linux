@@ -1,0 +1,7 @@
+---
+docker_compose: []
+docker_compose_bin: /usr/libexec/docker/cli-plugins/docker-compose
+docker_compose_dir: /etc/docker/compose
+docker_compose_packages:
+  - docker-compose-plugin
+...

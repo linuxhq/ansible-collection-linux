@@ -1,0 +1,14 @@
+[Unit]
+Description=%i service with docker compose
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+WorkingDirectory={{ docker_compose_dir }}/%i
+ExecStart={{ docker_compose_bin }} up -d --remove-orphans
+ExecStop={{ docker_compose_bin }} down
+
+[Install]
+WantedBy=multi-user.target

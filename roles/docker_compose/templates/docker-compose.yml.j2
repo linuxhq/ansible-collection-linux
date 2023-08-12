@@ -1,0 +1,11 @@
+---
+version: '{{ _project.version }}'
+{% if _project.networks is defined and _project.networks | length > 0 %}
+networks:
+  {{ _project.networks | to_nice_yaml(indent=2) | indent(2) }}
+{% endif %}
+{% if _project.services is defined and _project.services | length > 0 %}
+services:
+  {{ _project.services | to_nice_yaml(indent=2) | indent(2) }}
+{% endif %}
+...
