@@ -20,7 +20,7 @@ None
 
 ## Example Playbook
 
-    - hosts: linux
+    - hosts: server
       roles:
         - role: linuxhq.linux.authorized_key
           authorized_keys:

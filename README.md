@@ -21,7 +21,10 @@ A collection of linux roles
 
 An example playbook utilizing roles available in this collection
 
-    - hosts: linux
+    - hosts: server
+      collections:
+        - linuxhq.linux
+
       vars:
         authorized_keys:
           - key: 'ssh-rsa ...'

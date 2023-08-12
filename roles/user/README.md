@@ -21,7 +21,7 @@ None
 
 ## Example Playbook
 
-    - hosts: linux
+    - hosts: server
       roles:
         - role: linuxhq.linux.user
           useradd:
