@@ -6,6 +6,7 @@ build_ignore:
 description: A collection of linux roles
 dependencies:
   ansible.posix: '*'
+  community.docker: '*'
   community.general: '*'
 documentation: https://github.com/linuxhq/ansible-collection-linux/blob/main/README.md
 homepage: https://www.linuxhq.org

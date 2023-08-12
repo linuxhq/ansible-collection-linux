@@ -1,0 +1,36 @@
+---
+- name: Ensure docker networks are managed
+  tags:
+    - docker_network
+  community.docker.docker_network:
+    api_version: "{{ _network.api_version | default('auto') }}"
+    appends: "{{ _network.appends | default(false) }}"
+    attachable: "{{ _network.attachable | default(omit) }}"
+    connected: "{{ _network.connected | default([]) }}"
+    debug: "{{ _network.debug | default(false) }}"
+    docker_host: "{{ _network.docker_host | default('unix://var/run/docker.sock') }}"
+    driver: "{{ _network.driver | default('bridge') }}"
+    driver_options: "{{ _network.driver_options | default({}) }}"
+    enable_ipv6: "{{ _network.enable_ipv6 | default(omit) }}"
+    force: "{{ _network.force | default(false) }}"
+    internal: "{{ _network.internal | default(omit) }}"
+    ipam_config: "{{ _network.ipam_config | default(omit) }}"
+    ipam_driver: "{{ _network.ipam_driver | default(omit) }}"
+    ipam_driver_options: "{{ _network.ipam_driver_options | default(omit) }}"
+    labels: "{{ _network.labels | default({}) }}"
+    name: "{{ _network.name }}"
+    scope: "{{ _network.scope | default(omit) }}"
+    ssl_version: "{{ _network.ssl_version | default(omit) }}"
+    state: "{{ _network.state | default('present') }}"
+    timeout: "{{ _network.timeout | default(60) }}"
+    tls: "{{ _network.tls | default(false) }}"
+    tls_hostname: "{{ _network.tls_hostname | default(omit) }}"
+    use_ssh_client: "{{ _network.use_ssh_client | default(false) }}"
+    validate_certs: "{{ _network.validate_certs | default(false) }}"
+  loop: "{{ docker_networks }}"
+  loop_control:
+    label: "{{ _network.name }}"
+    loop_var: _network
+  when:
+    - _network.name is defined
+...

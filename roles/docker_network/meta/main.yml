@@ -1,0 +1,18 @@
+---
+dependencies:
+  - { role: linuxhq.linux.docker, tags: docker_network }
+galaxy_info:
+  role_name: docker_network
+  author: Taylor Kimball
+  description: Manage docker networks
+  license: GPLv3
+  min_ansible_version: 2.15.0
+  platforms:
+    - name: EL
+      versions:
+        - all
+  galaxy_tags:
+    - docker
+    - linux
+    - network
+...

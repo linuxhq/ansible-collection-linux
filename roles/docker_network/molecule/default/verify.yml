@@ -1,0 +1,15 @@
+---
+- name: Verify
+  hosts: all
+  tasks:
+    - name: Ensure docker network information is gathered
+      community.docker.docker_network_info:
+        name: linuxhq
+      register: _docker_network_info
+
+    - name: Ensure docker network exists
+      ansible.builtin.assert:
+        that:
+          - _docker_network_info.network.Name == 'linuxhq'
+          - _docker_network_info.network.IPAM.Config[0].Subnet == '192.168.0.0/24'
+...
