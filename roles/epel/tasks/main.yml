@@ -1,0 +1,91 @@
+---
+- name: Ensure epel repository package is present
+  tags:
+    - epel
+  become: true
+  ansible.builtin.yum:
+    name: epel-release
+    state: present
+  when:
+    - epel_releasever | int == 7
+
+- name: Ensure epel repository package is present
+  tags:
+    - epel
+  become: true
+  ansible.builtin.dnf:
+    name:
+      - dnf-plugins-core
+      - epel-release
+    state: present
+  when:
+    - epel_releasever | int >= 8
+
+- name: Ensure epel dependent repository is enabled
+  tags:
+    - epel
+  become: true
+  ansible.builtin.command:
+    cmd: >
+      dnf config-manager --set-enabled "{{ _repo }}"
+  vars:
+    _repo: "{{ 'crb' if epel_releasever | int >= 9 else 'powertools' }}"
+  when:
+    - epel_releasever | int >= 8
+  changed_when: false
+
+- name: Ensure epel repository templates are present
+  tags:
+    - epel
+  become: true
+  ansible.builtin.template:
+    dest: "{{ _repo.dst }}"
+    group: root
+    mode: '0644'
+    owner: root
+    src: "{{ _repo.src }}"
+  loop:
+    - dst: /etc/yum.repos.d/epel.repo
+      src: "{{ 'epel.repo.' ~ epel_releasever ~ '.j2' }}"
+    - dst: /etc/yum.repos.d/epel-testing.repo
+      src: "{{ 'epel-testing.repo.' ~ epel_releasever ~ '.j2' }}"
+  loop_control:
+    label: "{{ _repo.dst.split('/')[0] | default(none) }}"
+    loop_var: _repo
+
+- name: Ensure epel repository gpg key is present
+  tags:
+    - epel
+  become: true
+  ansible.builtin.rpm_key:
+    key: "{{ '/etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-' ~ epel_releasever }}"
+    state: present
+
+- name: Ensure epel repository packages are present
+  tags:
+    - epel
+  become: true
+  ansible.builtin.yum:
+    name: "{{ _package }}"
+    state: present
+  loop: "{{ epel_packages }}"
+  loop_control:
+    label: "{{ _package }}"
+    loop_var: _package
+  when:
+    - epel_releasever | int == 7
+
+- name: Ensure epel repository packages are present
+  tags:
+    - epel
+  become: true
+  ansible.builtin.dnf:
+    name: "{{ _package }}"
+    state: present
+  loop: "{{ epel_packages }}"
+  loop_control:
+    label: "{{ _package }}"
+    loop_var: _package
+  when:
+    - epel_releasever | int >= 8
+...
