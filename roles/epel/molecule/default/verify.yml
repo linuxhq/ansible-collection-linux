@@ -1,8 +1,6 @@
 ---
 - name: Verify
   hosts: all
-  vars:
-    _package: ansible
   tasks:
     - name: Ensure package facts are gathered
       ansible.builtin.package_facts:
@@ -14,4 +12,6 @@
       ansible.builtin.assert:
         that:
           - _package in ansible_facts.packages
+      vars:
+        _package: ansible
 ...

@@ -1,11 +1,10 @@
 ---
 - name: Converge
   hosts: all
-  vars:
-    epel_packages:
-      - ansible
-    epel_repository_epel: true
-    epel_repository_testing: true
   roles:
-    - linuxhq.linux.epel
+    - role: linuxhq.linux.epel
+      epel_packages:
+        - ansible
+      epel_repository_epel: true
+      epel_repository_testing: true
 ...
