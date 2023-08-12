@@ -21,6 +21,8 @@ None
 ## Example Playbook
 
     - hosts: server
+      collections:
+        - linuxhq.linux
       roles:
         - role: linuxhq.linux.authorized_key
           authorized_keys:
