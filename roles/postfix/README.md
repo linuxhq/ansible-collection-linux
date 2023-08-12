@@ -12,11 +12,18 @@ None
 
 Available variables are listed below, along with default values:
 
+    postfix_databases:
+      - btree
+      - cdb
+      - dbm
+      - hash
+      - fail
+      - sdbm
     postfix_packages:
       - postfix
     postfix_parameters:
-      alias_database: hash:/etc/aliases'
-      alias_maps: hash:/etc/aliases'
+      alias_database: hash:/etc/aliases
+      alias_maps: hash:/etc/aliases
       command_directory: /usr/sbin
       daemon_directory: /usr/libexec/postfix
       data_directory: /var/lib/postfix
