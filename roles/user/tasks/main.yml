@@ -1,0 +1,57 @@
+---
+- name: Ensure users are present
+  tags:
+    - user
+  ansible.builtin.user:
+    append: "{{ _user.append | default(false) }}"
+    comment: "{{ _user.comment | default(omit) }}"
+    create_home: "{{ _user.create_home | default(true) }}"
+    expires: "{{ _user.expires | default(omit) }}"
+    force: "{{ _user.force | default(false) }}"
+    generate_ssh_key: "{{ _user.generate_ssh_key | default(false) }}"
+    group: "{{ _user.group | default(omit) }}"
+    groups: "{{ _user.groups | default(omit) }}"
+    home: "{{ _user.home | default(omit) }}"
+    local: "{{ _user.local | default(false) }}"
+    move_home: "{{ _user.move_home | default(false) }}"
+    name: "{{ _user.name }}"
+    non_unique: "{{ _user.non_unique | default(false) }}"
+    password: "{{ _user.password | default(omit) }}"
+    password_expire_max: "{{ _user.password_expire_max | default(omit) }}"
+    password_expire_min: "{{ _user.password_expire_min | default(omit) }}"
+    password_lock: "{{ _user.password_lock | default(omit) }}"
+    seuser: "{{ _user.seuser | default(omit) }}"
+    shell: "{{ _user.shell | default(omit) }}"
+    skeleton: "{{ _user.skeleton | default(omit) }}"
+    ssh_key_bits: "{{ _user.ssh_key_bits | default(omit) }}"
+    ssh_key_comment: "{{ _user.ssh_key_comment | default(omit) }}"
+    ssh_key_file: "{{ _user.ssh_key_file | default(omit) }}"
+    ssh_key_passphrase: "{{ _user.ssh_key_passphrase | default(omit) }}"
+    ssh_key_type: "{{ _user.ssh_key_type | default(omit) }}"
+    state: present
+    system: "{{ _user.system | default(false) }}"
+    uid: "{{ _user.uid | default(omit) }}"
+    umask: "{{ _user.umask | default(omit) }}"
+    update_password: "{{ _user.update_password | default('always') }}"
+  loop: "{{ useradd }}"
+  loop_control:
+    label: "{{ _user.name | default(none) }}"
+    loop_var: _user
+  when:
+    - _user.name is defined
+
+- name: Ensure users are absent
+  tags:
+    - user
+  ansible.builtin.user:
+    force: "{{ _user.force | default(false) }}"
+    name: "{{ _user.name }}"
+    remove: "{{ _user.remove | default(false) }}"
+    state: absent
+  loop: "{{ userdel }}"
+  loop_control:
+    label: "{{ _user.name | default(none) }}"
+    loop_var: _user
+  when:
+    - _user.name is defined
+...
