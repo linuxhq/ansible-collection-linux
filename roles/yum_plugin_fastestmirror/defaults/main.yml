@@ -1,0 +1,12 @@
+---
+yum_plugin_fastestmirror_always_print_best_host: true
+yum_plugin_fastestmirror_enabled: true
+yum_plugin_fastestmirror_exclude: []
+yum_plugin_fastestmirror_hostfilepath: timedhosts.txt
+yum_plugin_fastestmirror_include_only: []
+yum_plugin_fastestmirror_maxhostfileage: 10
+yum_plugin_fastestmirror_maxthreads: 15
+yum_plugin_fastestmirror_prefer: null
+yum_plugin_fastestmirror_socket_timeout: 3
+yum_plugin_fastestmirror_verbose: false
+...
