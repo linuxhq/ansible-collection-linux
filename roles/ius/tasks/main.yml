@@ -1,0 +1,49 @@
+---
+- name: Ensure ius repository package is present
+  tags:
+    - ius
+  become: true
+  ansible.builtin.yum:
+    name: "{{ ius_release }}"
+    state: present
+    validate_certs: true
+
+- name: Ensure ius repository templates are present
+  tags:
+    - ius
+  become: true
+  ansible.builtin.template:
+    dest: "{{ '/etc/yum.repos.d/' ~ _repo ~ '.repo' }}"
+    group: root
+    mode: '0644'
+    owner: root
+    src: "{{ _repo ~ '-7.repo.j2' }}"
+  loop:
+    - ius
+    - ius-archive
+    - ius-testing
+  loop_control:
+    label: "{{ _repo }}"
+    loop_var: _repo
+
+- name: Ensure ius repository gpg key is present
+  tags:
+    - ius
+  become: true
+  ansible.builtin.rpm_key:
+    key: /etc/pki/rpm-gpg/RPM-GPG-KEY-IUS-7
+    state: present
+    validate_certs: true
+
+- name: Ensure ius packages are present
+  tags:
+    - ius
+  become: true
+  ansible.builtin.yum:
+    name: "{{ _package }}"
+    state: present
+  loop: "{{ ius_packages }}"
+  loop_control:
+    label: "{{ _package }}"
+    loop_var: _package
+...

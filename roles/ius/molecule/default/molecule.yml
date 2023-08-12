@@ -1,0 +1,36 @@
+---
+dependency:
+  name: galaxy
+  options:
+    requirements-file: ../../molecule/requirements.yml
+
+driver:
+  name: ec2
+
+platforms:
+  - name: &c7 centos-7
+    aws_profile: molecule
+    image_owner: '125523088429'
+    image_name: 'CentOS Linux 7 x86_64 - 2211'
+    instance_type: t2.micro
+    key_inject_method: ec2
+    ssh_user: centos
+    vpc_subnet_id: subnet-00d20739fc370ed5e
+    tags:
+      Name: *c7
+
+provisioner:
+  name: ansible
+  log: true
+  options:
+    diff: true
+  playbooks:
+    create: ../../../../molecule/create.yml
+    destroy: ../../../../molecule/destroy.yml
+    prepare: ../../../../molecule/prepare.yml
+
+verifier:
+  name: ansible
+  options:
+    diff: true
+...

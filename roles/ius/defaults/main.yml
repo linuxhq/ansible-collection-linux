@@ -1,0 +1,13 @@
+---
+ius_packages: []
+ius_release: https://repo.ius.io/ius-release-el7.rpm
+ius_repository_ius: true
+ius_repository_ius_debuginfo: false
+ius_repository_ius_source: false
+ius_repository_ius_archive: false
+ius_repository_ius_archive_debuginfo: false
+ius_repository_ius_archive_source: false
+ius_repository_ius_testing: false
+ius_repository_ius_testing_debuginfo: false
+ius_repository_ius_testing_source: false
+...
