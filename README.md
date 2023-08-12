@@ -19,7 +19,7 @@ A collection of linux roles
 
 ## Molecule
 
-    python3 -m venv venv
+    /usr/bin/python3 -m venv venv
     source venv/bin/activate
     pip3 install -r requirements.txt
 
