@@ -23,7 +23,6 @@ A collection of linux roles
     source venv/bin/activate
     pip3 install -r requirements.txt
 
-
 # Playbook
 
 An example playbook utilizing roles available in this collection
@@ -31,11 +30,7 @@ An example playbook utilizing roles available in this collection
     - hosts: server
       collections:
         - linuxhq.linux
-
       vars:
-        authorized_keys:
-          - key: 'ssh-rsa ...'
-            user: tkimball
         groupadd:
           - name: linuxhq
             gid: 2000
@@ -43,8 +38,6 @@ An example playbook utilizing roles available in this collection
           - name: tkimball
             group: linuxhq
             uid: 2001
-
       roles:
         - linuxhq.linux.group
         - linuxhq.linux.user
-        - linuxhq.linux.authorized_key
