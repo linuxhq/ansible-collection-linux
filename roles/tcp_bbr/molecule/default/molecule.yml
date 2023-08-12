@@ -35,6 +35,8 @@ platforms:
 
 provisioner:
   name: ansible
+  env:
+    ANSIBLE_VERBOSITY: 1
   log: true
   options:
     diff: true
