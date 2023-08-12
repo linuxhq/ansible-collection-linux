@@ -1,25 +1,34 @@
 ---
 dependency:
   name: galaxy
+  options:
+    requirements-file: ../../molecule/requirements.yml
 
 driver:
-  name: docker
+  name: ec2
 
 platforms:
-  - name: centos-7
-    image: centos:7
-    cgroupns_mode: host
-    command: /usr/sbin/init
-    pre_build_image: true
-    privileged: true
-    volumes:
-      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+  - name: &c7 centos-7
+    aws_profile: molecule
+    connection_options:
+      ansible_user: centos
+    image_owner: '125523088429'
+    image_name: 'CentOS Linux 7 x86_64 - 2211'
+    instance_type: t2.micro
+    key_inject_method: ec2
+    vpc_subnet_id: subnet-00d20739fc370ed5e
+    tags:
+      Name: *c7
 
 provisioner:
   name: ansible
   log: true
   options:
     diff: true
+  playbooks:
+    create: ../../../../molecule/create.yml
+    destroy: ../../../../molecule/destroy.yml
+    prepare: ../../../../molecule/prepare.yml
 
 verifier:
   name: ansible
