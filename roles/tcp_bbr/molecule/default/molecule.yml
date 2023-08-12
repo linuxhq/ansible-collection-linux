@@ -41,4 +41,6 @@ provisioner:
 
 verifier:
   name: ansible
+  options:
+    diff: true
 ...
