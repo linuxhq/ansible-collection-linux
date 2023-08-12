@@ -3,13 +3,18 @@
   hosts: all
   tasks:
     - name: Ensure output from ssh-keygen is gathered
+      tags:
+        - verify
+      become: true
       ansible.builtin.command:
         cmd: >
           ssh-keygen -l -f /root/.ssh/authorized_keys
       register: _command
       changed_when: false
 
-    - name: Ensure ssh-keygen out is expected
+    - name: Ensure output from ssh-keygen is verified
+      tags:
+        - verify
       ansible.builtin.assert:
         that:
           - _command.stdout is match('^[0-9]{3,4}')

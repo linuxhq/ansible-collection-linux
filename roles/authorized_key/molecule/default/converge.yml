@@ -1,25 +1,24 @@
 ---
 - name: Converge
   hosts: all
-  vars:
-    authorized_keys:
-      - user: root
-        exclusive: true
-        key: "{{ key_base64 | b64decode }}"
-    key_base64: |
-      c3NoLXJzYSBBQUFBQjNOemFDMXljMkVBQUFBREFRQUJBQUFDQVFDQWI2S09TL2NYeS9RTFMvMFB2
-      ODNHN1Z2eDM2ejJNWjlHR3J4QUtxeFV3TUgyT0wrbVpJcHMxaEJrcytvQ1ViSHlQVmFVQngvTEZQ
-      OHRmV2ZEenRJaE5peVJ6WWliUURqOWptZTV3ZkdHUUxFdkRCMTB2OGtNaFR2VUhBSjh3Rm9VMWNt
-      T1ZIRjJUS3NnNGdlMnhORlVrQUh4ZHhuSkFlRVlMTWdWbEQ0VHh3SDg1cGlUOWtjeXgwSHowSjc0
-      eGE3b3lRMEtwcm1LajN5SjN4L3paYXlGRW16dEpnZndhUUo1aGVmeWVsQ2hjSXRFS05wa0lyODUr
-      T1NjY1ZQb1dCSXd1RERhYkRLY0dsb2Z5WTlPWVNLakJ0Um9aTkRFUFFNTDIrcmRhd3FzRTZmQTYv
-      WHhQaWVLYzZGb01pampqaGRwa1BLZ2tYQVVvclRmZlg1Zng0T2NTc0RJOTRjd3JnN2N6VVJNWDRQ
-      TzdCSVdMYlpRcVVPOXIvTkdybjFvdjdyVTZuQXRqU0p3aVk1OU8rSCs1UGE1dHBjRnNCclBHZ0xB
-      SkFiNWlVSURjRHBxOEdhR0owSy93Q0tHak0vc2hXOCtaOU5HeVdqTmRyWCtQMXYyRGZ1U0pxbU0x
-      WDBnSXQ4TjNNaEdMbTBWVVVmem91Y2N0ZGVuOGhZVzBUNUxHTS9BYTVwbXdpcmRza0NuZ3lDN1Vm
-      MjRPUUpya2xXZHl2OGJSaUhOMmJjUXNjNDJVNEkvTzd1MGljZ1hpNUtVc05pK08raS9rdDU2bGpB
-      SitZWnlzNVlkT3NaWmYzTjM2MytWZ3lDbzd5UXpkMkF2SVhpOGJrL2NJSnJHVXUvZXhUZlVyQmN0
-      ZVBqMGFRNG1yN1hEMHVqZnd5Nm1pdVByeWtqVzNzRGZialFiTnc9PQo=
   roles:
-    - linuxhq.linux.authorized_key
+    - role: linuxhq.linux.authorized_key
+      authorized_keys:
+        - user: root
+          exclusive: true
+          key: "{{ key_base64 | b64decode }}"
+      key_base64: |
+        c3NoLXJzYSBBQUFBQjNOemFDMXljMkVBQUFBREFRQUJBQUFDQVFDQWI2S09TL2NYeS9RTFMvMFB2
+        ODNHN1Z2eDM2ejJNWjlHR3J4QUtxeFV3TUgyT0wrbVpJcHMxaEJrcytvQ1ViSHlQVmFVQngvTEZQ
+        OHRmV2ZEenRJaE5peVJ6WWliUURqOWptZTV3ZkdHUUxFdkRCMTB2OGtNaFR2VUhBSjh3Rm9VMWNt
+        T1ZIRjJUS3NnNGdlMnhORlVrQUh4ZHhuSkFlRVlMTWdWbEQ0VHh3SDg1cGlUOWtjeXgwSHowSjc0
+        eGE3b3lRMEtwcm1LajN5SjN4L3paYXlGRW16dEpnZndhUUo1aGVmeWVsQ2hjSXRFS05wa0lyODUr
+        T1NjY1ZQb1dCSXd1RERhYkRLY0dsb2Z5WTlPWVNLakJ0Um9aTkRFUFFNTDIrcmRhd3FzRTZmQTYv
+        WHhQaWVLYzZGb01pampqaGRwa1BLZ2tYQVVvclRmZlg1Zng0T2NTc0RJOTRjd3JnN2N6VVJNWDRQ
+        TzdCSVdMYlpRcVVPOXIvTkdybjFvdjdyVTZuQXRqU0p3aVk1OU8rSCs1UGE1dHBjRnNCclBHZ0xB
+        SkFiNWlVSURjRHBxOEdhR0owSy93Q0tHak0vc2hXOCtaOU5HeVdqTmRyWCtQMXYyRGZ1U0pxbU0x
+        WDBnSXQ4TjNNaEdMbTBWVVVmem91Y2N0ZGVuOGhZVzBUNUxHTS9BYTVwbXdpcmRza0NuZ3lDN1Vm
+        MjRPUUpya2xXZHl2OGJSaUhOMmJjUXNjNDJVNEkvTzd1MGljZ1hpNUtVc05pK08raS9rdDU2bGpB
+        SitZWnlzNVlkT3NaWmYzTjM2MytWZ3lDbzd5UXpkMkF2SVhpOGJrL2NJSnJHVXUvZXhUZlVyQmN0
+        ZVBqMGFRNG1yN1hEMHVqZnd5Nm1pdVByeWtqVzNzRGZialFiTnc9PQo=
 ...
