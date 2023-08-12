@@ -1,13 +1,12 @@
 ---
 - name: Converge
   hosts: all
-  vars:
-    useradd:
-      - name: linuxhq
-        uid: 2000
-    userdel:
-      - name: ftp
-        force: true
   roles:
-    - linuxhq.linux.user
+    - role: linuxhq.linux.user
+      useradd:
+        - name: linuxhq
+          uid: 2000
+      userdel:
+        - name: ftp
+          force: true
 ...
