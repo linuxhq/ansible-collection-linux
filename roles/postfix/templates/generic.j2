@@ -1,0 +1,7 @@
+# {{ ansible_managed }}
+
+{% for map in postfix_generic_maps %}
+{%   if map.pattern is defined and map.address is defined %}
+{{ map.pattern }}	{{ map.address }}
+{%   endif %}
+{% endfor %}
