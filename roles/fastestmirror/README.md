@@ -1,4 +1,4 @@
-# yum\_plugin\_fastestmirror
+# fastestmirror
 
 [![License](https://img.shields.io/badge/license-GPLv3-lightgreen)](https://www.gnu.org/licenses/gpl-3.0.en.html#license-text)
 
@@ -12,16 +12,16 @@ None
 
 Available variables are listed below, along with default values:
 
-    yum_plugin_fastestmirror_always_print_best_host: true
-    yum_plugin_fastestmirror_enabled: true
-    yum_plugin_fastestmirror_exclude: []
-    yum_plugin_fastestmirror_hostfilepath: timedhosts.txt
-    yum_plugin_fastestmirror_include_only: []
-    yum_plugin_fastestmirror_maxhostfileage: 10
-    yum_plugin_fastestmirror_maxthreads: 15
-    yum_plugin_fastestmirror_prefer: null
-    yum_plugin_fastestmirror_socket_timeout: 3
-    yum_plugin_fastestmirror_verbose: false
+    fastestmirror_always_print_best_host: true
+    fastestmirror_enabled: true
+    fastestmirror_exclude: []
+    fastestmirror_hostfilepath: timedhosts.txt
+    fastestmirror_include_only: []
+    fastestmirror_maxhostfileage: 10
+    fastestmirror_maxthreads: 15
+    fastestmirror_prefer: null
+    fastestmirror_socket_timeout: 3
+    fastestmirror_verbose: false
 
 ## Dependencies
 
@@ -33,16 +33,16 @@ None
       collections:
         - linuxhq.linux
       roles:
-        - role: linuxhq.linux.yum_plugin_fastestmirror
-          yum_plugin_fastestmirror_exclude:
+        - role: linuxhq.linux.fastestmirror
+          fastestmirror_exclude:
             - .gov
             - facebook
-          yum_plugin_fastestmirror_include_only:
+          fastestmirror_include_only:
             - .nl
             - .de
             - .uk
             - .ie
-          yum_plugin_fastestmirror_verbose: true
+          fastestmirror_verbose: true
 
 ## License
 

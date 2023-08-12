@@ -1,7 +1,7 @@
 ---
-- name: Ensure yum plugin fastestmirror configuration is present
+- name: Ensure fastestmirror configuration is present
   tags:
-    - yum_plugin_fastestmirror
+    - fastestmirror
   become: true
   ansible.builtin.template:
     dest: /etc/yum/pluginconf.d/fastestmirror.conf
