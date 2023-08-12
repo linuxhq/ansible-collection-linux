@@ -1,0 +1,13 @@
+---
+- name: Prepare
+  hosts: all
+  vars:
+    packages:
+      - openssh
+      - sudo
+  tasks:
+    - name: Ensure packages are present
+      ansible.builtin.package:
+        name: "{{ packages }}"
+        state: present
+...
