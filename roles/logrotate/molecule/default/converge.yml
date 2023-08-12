@@ -1,7 +1,6 @@
 ---
 - name: Converge
   hosts: all
-  vars:
   roles:
     - linuxhq.linux.logrotate
 ...
