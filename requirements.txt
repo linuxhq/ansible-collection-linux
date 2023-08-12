@@ -1,5 +1,5 @@
 ansible-core==2.15.0
-ansible-lint==6.11.0
+ansible-lint<7
 molecule==5.1.0
 molecule-docker==2.1.0
 requests<2.29
