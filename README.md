@@ -23,6 +23,9 @@ An example playbook utilizing roles available in this collection
 
     - hosts: linux
       vars:
+        authorized_keys:
+          - key: 'ssh-rsa ...'
+            user: tkimball
         groupadd:
           - name: linuxhq
             gid: 2000
@@ -34,3 +37,4 @@ An example playbook utilizing roles available in this collection
       roles:
         - linuxhq.linux.group
         - linuxhq.linux.user
+        - linuxhq.linux.authorized_key
