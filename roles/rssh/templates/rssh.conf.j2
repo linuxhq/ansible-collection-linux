@@ -1,0 +1,24 @@
+# {{ ansible_managed }}
+
+{% for allow in rssh_allow %}
+allow{{ allow }}
+{% endfor %}
+
+{% if rssh_chrootpath is not none %}
+chrootpath = "{{ rssh_chrootpath }}"
+{% endif %}
+
+logfacility = {{ rssh_logfacility }}
+umask = {{ rssh_umask }}
+
+{% if rssh_users | length > 0 %}
+{%   for _user in rssh_users %}
+{%   set access_bits = _user.access_bits if _user.access_bits is defined else '00000' %}
+{%   set chroot      = _user.chroot if _user.chroot is defined else '' %}
+{%   set umask       = _user.umask if _user.umask is defined else rssh_umask %}
+user = "{{ [ _user.name,
+             umask,
+             access_bits,
+             chroot ] | join(':') }}"
+{%   endfor %}
+{% endif %}

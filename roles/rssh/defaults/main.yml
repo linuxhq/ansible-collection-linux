@@ -1,0 +1,9 @@
+---
+rssh_allow: []
+rssh_chrootpath: null
+rssh_group: rsshusers
+rssh_logfacility: LOG_USER
+rssh_shell: /usr/bin/rssh
+rssh_umask: '022'
+rssh_users: []
+...

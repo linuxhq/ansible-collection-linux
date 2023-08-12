@@ -1,0 +1,15 @@
+---
+- name: Verify
+  hosts: all
+  tasks:
+    - name: Ensure stat of rssh shell is executed
+      ansible.builtin.stat:
+        path: /usr/bin/rssh
+      register: _stat
+
+    - name: Ensure rssh shell is present
+      ansible.builtin.assert:
+        that:
+          - _stat.stat.exists | bool
+          - not _stat.stat.isdir | bool
+...
