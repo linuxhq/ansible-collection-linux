@@ -1,0 +1,57 @@
+---
+- name: Ensure yum configuration is present
+  tags:
+    - yum
+  become: true
+  ansible.builtin.template:
+    dest: /etc/yum.conf
+    group: root
+    mode: '0644'
+    owner: root
+    src: yum.conf.j2
+
+- name: Ensure yum packages are present
+  tags:
+    - yum
+  become: true
+  ansible.builtin.yum:
+    disablerepo: "{{ yum_disablerepo | join(',') }}"
+    enablerepo: "{{ yum_disablerepo | join(',') }}"
+    name: "{{ _present }}"
+    state: present
+    update_cache: "{{ yum_update_cache }}"
+    validate_certs: true
+  loop: "{{ yum_present }}"
+  loop_control:
+    label: "{{ _present }}"
+    loop_var: _present
+
+- name: Ensure yum packages are absent
+  tags:
+    - yum
+  become: true
+  ansible.builtin.yum:
+    disablerepo: "{{ yum_disablerepo | join(',') }}"
+    enablerepo: "{{ yum_disablerepo | join(',') }}"
+    name: "{{ _absent }}"
+    state: absent
+    validate_certs: true
+  loop: "{{ yum_absent }}"
+  loop_control:
+    label: "{{ _absent }}"
+    loop_var: _absent
+
+- name: Ensure yum packages are latest
+  tags:
+    - yum
+  become: true
+  ansible.builtin.yum:
+    disablerepo: "{{ yum_disablerepo | join(',') }}"
+    enablerepo: "{{ yum_disablerepo | join(',') }}"
+    name: '*'
+    state: latest
+    update_cache: "{{ yum_update_cache }}"
+    validate_certs: true
+  when:
+    - yum_update | bool
+...

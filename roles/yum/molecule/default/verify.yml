@@ -1,0 +1,16 @@
+---
+- name: Verify
+  hosts: all
+  tasks:
+    - name: Ensure package facts are gathered
+      ansible.builtin.package_facts:
+        manager: auto
+        strategy: first
+      register: _package_facts
+
+    - name: Ensure packages are in correct state
+      ansible.builtin.assert:
+        that:
+          - "'python-lxml' not in ansible_facts.packages"
+          - "'python-virtualenv' in ansible_facts.packages"
+...
