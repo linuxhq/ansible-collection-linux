@@ -2,7 +2,7 @@
 
 [![License](https://img.shields.io/badge/license-GPLv3-lightgreen)](https://www.gnu.org/licenses/gpl-3.0.en.html#license-text)
 
-Add or update groups
+Manage presence of groups on a host
 
 ## Requirements
 
@@ -12,7 +12,8 @@ None
 
 Available variables are listed below, along with default values:
 
-    groups: []
+    groupadd: []
+    groupdel: []
 
 ## Dependencies
 
@@ -23,9 +24,12 @@ None
     - hosts: linux
       roles:
         - role: linuxhq.linux.group
-          groups:
+          groupadd:
             - name: linuxhq
               gid: 2000
+          groupdel:
+            - name: linuxhq
+              force: true
 
 ## License
 

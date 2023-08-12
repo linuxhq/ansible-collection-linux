@@ -3,17 +3,30 @@
   tags:
     - group
   ansible.builtin.group:
-    gid: "{{ _group.gid }}"
+    gid: "{{ _group.gid | default(omit) }}"
     local: "{{ _group.local | default(false) }}"
     name: "{{ _group.name }}"
     non_unique: "{{ _group.non_unique | default(false) }}"
     state: present
     system: "{{ _group.system | default(false) }}"
-  loop: "{{ groups }}"
+  loop: "{{ groupadd }}"
   loop_control:
     label: "{{ _group.name | default(none) }}"
     loop_var: _group
   when:
-    - _group.gid is defined
+    - _group.name is defined
+
+- name: Ensure groups are absent
+  tags:
+    - group
+  ansible.builtin.group:
+    force: "{{ _group.force | default(false) }}"
+    name: "{{ _group.name }}"
+    state: absent
+  loop: "{{ groupdel }}"
+  loop_control:
+    label: "{{ _group.name | default(none) }}"
+    loop_var: _group
+  when:
     - _group.name is defined
 ...
