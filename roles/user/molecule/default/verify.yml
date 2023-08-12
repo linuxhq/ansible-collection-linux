@@ -15,9 +15,6 @@
         label: "{{ _user }}"
         loop_var: _user
 
-    - debug:
-        msg: "{{ _getent }}"
-
     - name: Ensure users are in expected state
       ansible.builtin.assert:
         that:
