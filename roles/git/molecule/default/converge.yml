@@ -1,0 +1,12 @@
+---
+- name: Ensure ansible role is executed
+  hosts: all
+  vars:
+    git_become: true
+    git_repositories:
+      - repo: https://github.com/linuxhq/ansible-collection-linux.git
+        dest: /tmp/linuxhq.linux
+
+  roles:
+    - linuxhq.linux.git
+...

@@ -1,0 +1,13 @@
+---
+- name: Ensure ansible preparation is present
+  hosts: all
+  vars:
+    _prepare_packages:
+      - sudo
+
+  tasks:
+    - name: Ensure prepare packages are present
+      ansible.builtin.package:
+        name: "{{ _prepare_packages }}"
+        state: present
+...
