@@ -1,0 +1,7 @@
+---
+tunnel: {{ _tunnel.id }}
+credentials-file: {{ cloudflared_dir }}/{{ _tunnel.name }}.json
+
+ingress:
+  {{ _tunnel.ingress | to_nice_yaml(indent=2) | indent(2) }}
+...

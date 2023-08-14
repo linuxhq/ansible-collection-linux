@@ -1,0 +1,7 @@
+[cloudflared-stable]
+name=cloudflared-stable
+baseurl=https://pkg.cloudflare.com/cloudflared/rpm
+enabled={{ '1' if cloudflared_repository_stable | bool else '0' }}
+type=rpm
+gpgcheck=1
+gpgkey={{ cloudflared_rpm_key }}

@@ -1,0 +1,10 @@
+---
+cloudflared_dir: /etc/cloudflared
+cloudflared_group: root
+cloudflared_packages:
+  - cloudflared
+cloudflared_repository_stable: true
+cloudflared_rpm_key: https://pkg.cloudflare.com/cloudflare-ascii-pubkey.gpg
+cloudflared_tunnels: []
+cloudflared_user: root
+...

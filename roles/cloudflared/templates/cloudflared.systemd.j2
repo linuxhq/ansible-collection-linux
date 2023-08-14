@@ -1,0 +1,15 @@
+[Unit]
+Description=Cloudflare Tunnel (%i)
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/cloudflared --config /etc/cloudflared/%i.yml --no-autoupdate tunnel run
+Group={{ cloudflared_group }}
+Restart=always
+RestartSec=5s
+TimeoutStartSec=0
+Type=notify
+User={{ cloudflared_user }}
+
+[Install]
+WantedBy=multi-user.target

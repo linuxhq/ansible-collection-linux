@@ -1,0 +1,120 @@
+---
+- name: Ensure cloudflared package repository is present
+  tags:
+    - cloudflared
+  become: true
+  ansible.builtin.template:
+    dest: /etc/yum.repos.d/cloudflared-ascii.repo
+    group: root
+    mode: '0644'
+    owner: root
+    src: cloudflared-ascii.repo.j2
+
+- name: Ensure cloudflared rpm key is present
+  tags:
+    - cloudflared
+  become: true
+  ansible.builtin.rpm_key:
+    key: "{{ cloudflared_rpm_key }}"
+    state: present
+    validate_certs: true
+
+- name: Ensure cloudflared packages are present
+  tags:
+    - cloudflared
+  become: true
+  ansible.builtin.package:
+    name: "{{ cloudflared_packages }}"
+    state: present
+
+- name: Ensure cloudflared systemd unit is present
+  tags:
+    - cloudflared
+  become: true
+  ansible.builtin.template:
+    dest: /usr/lib/systemd/system/cloudflared@.service
+    group: root
+    mode: '0644'
+    owner: root
+    src: cloudflared.systemd.j2
+
+- name: Ensure systemd is reloaded
+  tags:
+    - cloudflared
+  become: true
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Ensure cloudflared configuration directory is present
+  tags:
+    - cloudflared
+  become: true
+  ansible.builtin.file:
+    group: "{{ cloudflared_group }}"
+    mode: '0700'
+    owner: "{{ cloudflared_user }}"
+    path: "{{ cloudflared_dir }}"
+    state: directory
+
+- name: Ensure cloudflared tunnel yml configurations are present
+  tags:
+    - cloudflared
+  become: true
+  ansible.builtin.template:
+    dest: "{{ cloudflared_dir }}/{{ _tunnel.name }}.yml"
+    group: "{{ cloudflared_group }}"
+    mode: '0600'
+    owner: "{{ cloudflared_user }}"
+    src: cloudflared.yml.j2
+  loop: "{{ cloudflared_tunnels }}"
+  loop_control:
+    label: "{{ _tunnel.name }}"
+    loop_var: _tunnel
+  when:
+    - _tunnel.ingress is defined
+    - _tunnel.ingress | length > 0
+    - _tunnel.id is defined
+    - _tunnel.name is defined
+
+- name: Ensure cloudflared tunnel json configurations are present
+  tags:
+    - cloudflared
+  become: true
+  ansible.builtin.template:
+    dest: "{{ cloudflared_dir }}/{{ _tunnel.name }}.json"
+    group: "{{ cloudflared_group }}"
+    mode: '0600'
+    owner: "{{ cloudflared_user }}"
+    src: cloudflared.json.j2
+  loop: "{{ cloudflared_tunnels }}"
+  loop_control:
+    label: "{{ _tunnel.name }}"
+    loop_var: _tunnel
+  vars:
+    _json:
+      AccountTag: "{{ _tunnel.account_tag }}"
+      TunnelID: "{{ _tunnel.id }}"
+      TunnelName: "{{ _tunnel.name }}"
+      TunnelSecret: "{{ _tunnel.secret }}"
+  when:
+    - _tunnel.account_tag is defined
+    - _tunnel.id is defined
+    - _tunnel.name is defined
+    - _tunnel.name is defined
+    - _tunnel.secret is defined
+
+- name: Ensure cloudflared tunnels are started and enabled on boot
+  tags:
+    - cloudflared
+  ansible.builtin.service:
+    enabled: true
+    name: "cloudflared@{{ _service }}.service"
+    state: started
+  loop: "{{ cloudflared_tunnels |
+            map(attribute='name') |
+            list |
+            default([], true) }}"
+  loop_control:
+    label: "{{ _service }}"
+    loop_var: _service
+...
