@@ -3,7 +3,7 @@ dependencies: []
 galaxy_info:
   role_name: cloudflared
   author: Taylor Kimball
-  description: Create and manage cloudflared tunnels
+  description: Manage cloudflared tunnels
   license: GPLv3
   min_ansible_version: 2.15.0
   platforms:
