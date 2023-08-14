@@ -16,7 +16,7 @@ Available variables are listed below, along with default values:
     cloudflared_group: root
     cloudflared_packages:
       - cloudflared
-    cloudflare_repository_stable: true
+    cloudflared_repository_stable: true
     cloudflared_rpm_key: https://pkg.cloudflare.com/cloudflare-ascii-pubkey.gpg
     cloudflared_tunnels: []
     cloudflared_user: root
