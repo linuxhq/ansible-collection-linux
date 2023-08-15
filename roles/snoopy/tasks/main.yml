@@ -1,0 +1,40 @@
+---
+- name: Ensure snoopy package repository is present
+  tags:
+    - snoopy
+  become: true
+  ansible.builtin.template:
+    dest: /etc/yum.repos.d/snoopy-stable.repo
+    group: root
+    mode: '0644'
+    owner: root
+    src: snoopy-stable.repo.j2
+
+- name: Ensure snoopy rpm key is present
+  tags:
+    - snoopy
+  become: true
+  ansible.builtin.rpm_key:
+    key: "{{ snoopy_rpm_key }}"
+    state: present
+    validate_certs: true
+
+- name: Ensure snoopy packages are present
+  tags:
+    - snoopy
+  become: true
+  ansible.builtin.package:
+    name: "{{ snoopy_packages }}"
+    state: present
+
+- name: Ensure snoopy configuration is present
+  tags:
+    - snoopy
+  become: true
+  ansible.builtin.template:
+    dest: /etc/snoopy.ini
+    group: root
+    mode: '0644'
+    owner: root
+    src: snoopy.ini.j2
+...

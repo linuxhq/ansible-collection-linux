@@ -1,0 +1,19 @@
+---
+snoopy_datasource_message_max_length: 2047
+snoopy_error_logging: false
+snoopy_filter_chain: []
+snoopy_log_message_max_length: 16383
+snoopy_message_format:
+  - uid=%{uid}
+  - tty=%{tty}
+  - cmdline=%{cmdline}
+snoopy_output: devlog
+snoopy_packages:
+  - snoopy
+snoopy_releasever: "{{ ansible_distribution_major_version }}"
+snoopy_repository_stable: true
+snoopy_rpm_key: https://a2o.github.io/snoopy-packages/snoopy-packages-key.pub
+snoopy_syslog_facility: LOG_AUTHPRIV
+snoopy_syslog_ident: snoopy
+snoopy_syslog_level: LOG_INFO
+...

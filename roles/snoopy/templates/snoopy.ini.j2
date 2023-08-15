@@ -1,0 +1,12 @@
+; {{ ansible_managed }}
+
+[snoopy]
+datasource_message_max_length = {{ snoopy_datasource_message_max_length | int }}
+error_logging = {{ 'yes' if snoopy_error_logging | bool else 'no' }}
+filter_chain = "{{ snoopy_filter_chain | join(';') }}"
+log_message_max_length = {{ snoopy_log_message_max_length | int }}
+message_format = "{{ snoopy_message_format | join(' ') }}"
+output = {{ snoopy_output }}
+syslog_facility = {{ snoopy_syslog_facility }}
+syslog_ident = {{ snoopy_syslog_ident }}
+syslog_level = {{ snoopy_syslog_level }}
