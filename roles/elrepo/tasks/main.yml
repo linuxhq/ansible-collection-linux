@@ -93,7 +93,7 @@
     - elrepo
   become: true
   ansible.builtin.command:
-    cmd:  >
+    cmd: >
       /usr/sbin/grub2-set-default 0
   changed_when: false
   when:
