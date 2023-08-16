@@ -1,0 +1,10 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - role: linuxhq.linux.elrepo
+      elrepo_kernel: true
+      elrepo_kernel_version: lt
+      elrepo_packages:
+        - kmod-a3818
+...

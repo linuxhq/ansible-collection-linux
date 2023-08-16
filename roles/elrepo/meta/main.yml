@@ -1,0 +1,18 @@
+---
+dependencies: []
+galaxy_info:
+  role_name: elrepo
+  author: Taylor Kimball
+  description: ELRepo Project
+  license: GPLv3
+  min_ansible_version: 2.15.0
+  platforms:
+    - name: EL
+      versions:
+        - '7'
+        - '8'
+        - '9'
+  galaxy_tags:
+    - elrepo
+    - linux
+...

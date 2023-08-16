@@ -1,0 +1,50 @@
+### Name: ELRepo.org Community Enterprise Linux Repository for el{{ elrepo_releasever }}
+### URL: https://elrepo.org/
+
+[elrepo]
+name=ELRepo.org Community Enterprise Linux Repository - el{{ elrepo_releasever }}
+baseurl=http://elrepo.org/linux/elrepo/el{{ elrepo_releasever }}/$basearch/
+	http://mirrors.coreix.net/elrepo/elrepo/el{{ elrepo_releasever }}/$basearch/
+	http://mirror.rackspace.com/elrepo/elrepo/el{{ elrepo_releasever }}/$basearch/
+	http://linux-mirrors.fnal.gov/linux/elrepo/elrepo/el{{ elrepo_releasever }}/$basearch/
+mirrorlist=http://mirrors.elrepo.org/mirrors-elrepo.el{{ elrepo_releasever }}
+enabled={{ '1' if elrepo_repository_elrepo | bool else '0' }}
+countme=1
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-elrepo.org
+
+[elrepo-testing]
+name=ELRepo.org Community Enterprise Linux Testing Repository - el{{ elrepo_releasever }}
+baseurl=http://elrepo.org/linux/testing/el{{ elrepo_releasever }}/$basearch/
+	http://mirrors.coreix.net/elrepo/testing/el{{ elrepo_releasever }}/$basearch/
+	http://mirror.rackspace.com/elrepo/testing/el{{ elrepo_releasever }}/$basearch/
+	http://linux-mirrors.fnal.gov/linux/elrepo/testing/el{{ elrepo_releasever }}/$basearch/
+mirrorlist=http://mirrors.elrepo.org/mirrors-elrepo-testing.el{{ elrepo_releasever }}
+enabled={{ '1' if elrepo_repository_elrepo_testing | bool else '0' }}
+countme=1
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-elrepo.org
+
+[elrepo-kernel]
+name=ELRepo.org Community Enterprise Linux Kernel Repository - el{{ elrepo_releasever }}
+baseurl=http://elrepo.org/linux/kernel/el{{ elrepo_releasever }}/$basearch/
+	http://mirrors.coreix.net/elrepo/kernel/el{{ elrepo_releasever }}/$basearch/
+	http://mirror.rackspace.com/elrepo/kernel/el{{ elrepo_releasever }}/$basearch/
+	http://linux-mirrors.fnal.gov/linux/elrepo/kernel/el{{ elrepo_releasever }}/$basearch/
+mirrorlist=http://mirrors.elrepo.org/mirrors-elrepo-kernel.el{{ elrepo_releasever }}
+enabled={{ '1' if elrepo_repository_elrepo_kernel | bool else '0' }}
+countme=1
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-elrepo.org
+
+[elrepo-extras]
+name=ELRepo.org Community Enterprise Linux Extras Repository - el{{ elrepo_releasever }}
+baseurl=http://elrepo.org/linux/extras/el{{ elrepo_releasever }}/$basearch/
+	http://mirrors.coreix.net/elrepo/extras/el{{ elrepo_releasever }}/$basearch/
+	http://mirror.rackspace.com/elrepo/extras/el{{ elrepo_releasever }}/$basearch/
+	http://linux-mirrors.fnal.gov/linux/elrepo/extras/el{{ elrepo_releasever }}/$basearch/
+mirrorlist=http://mirrors.elrepo.org/mirrors-elrepo-extras.el{{ elrepo_releasever }}
+enabled={{ '1' if elrepo_repository_elrepo_extras | bool else '0' }}
+countme=1
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-elrepo.org

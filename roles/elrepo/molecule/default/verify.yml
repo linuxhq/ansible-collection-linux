@@ -1,0 +1,16 @@
+---
+- name: Verify
+  hosts: all
+  tasks:
+    - name: Ensure package facts are gathered
+      ansible.builtin.package_facts:
+        manager: rpm
+        strategy: first
+      register: _package_facts
+
+    - name: Ensure packages are present in package facts
+      ansible.builtin.assert:
+        that:
+          - "'kernel-lt' in ansible_facts.packages"
+          - "'kmod-a3818' in ansible_facts.packages"
+...
