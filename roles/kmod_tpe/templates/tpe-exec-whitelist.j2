@@ -1,0 +1,7 @@
+# {{ ansible_managed }}
+
+{% if kmod_tpe_exec_whitelist | length > 0 %}
+{%   for whitelist in kmod_tpe_exec_whitelist | sort %}
+{{ whitelist }}
+{%   endfor %}
+{% endif %}

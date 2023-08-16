@@ -1,0 +1,32 @@
+# {{ ansible_managed }}
+
+kernel.dmesg_restrict = {{ '1' if kmod_tpe_kernel_dmesg_restrict | bool else '0' }}
+kernel.modules_disabled = {{ '1' if kmod_tpe_kernel_modules_disabled | bool else '0' }}
+tpe.admin_gid = {{ kmod_tpe_admin_gid | int }}
+tpe.check_file = {{ '1' if kmod_tpe_check_file | bool else '0' }}
+tpe.dmz_gid = {{ kmod_tpe_dmz_gid | int }}
+tpe.extras.harden_ptrace = {{ '1' if kmod_tpe_extras_harden_ptrace | bool else '0' }}
+tpe.extras.hide_uname = {{ '1' if kmod_tpe_extras_hide_uname | bool else '0' }}
+tpe.extras.ignore_softmode = {{ '1' if kmod_tpe_extras_ignore_softmode | bool else '0' }}
+tpe.extras.log = {{ '1' if kmod_tpe_extras_log | bool else '0' }}
+tpe.extras.lsmod = {{ '1' if kmod_tpe_extras_lsmod | bool else '0' }}
+tpe.extras.proc_kallsyms = {{ '1' if kmod_tpe_extras_proc_kallsyms | bool else '0' }}
+tpe.extras.ps = {{ '1' if kmod_tpe_extras_ps | bool else '0' }}
+tpe.extras.ps_gid = {{ kmod_tpe_extras_ps_gid | int }}
+tpe.extras.restrict_setuid = {{ '1' if kmod_tpe_extras_restrict_setuid | bool else '0' }}
+tpe.group_writable = {{ '1' if kmod_tpe_group_writable | bool else '0' }}
+tpe.hardcoded_path = {{ kmod_tpe_hardcoded_path | join(':') }}
+tpe.kill = {{ '1' if kmod_tpe_kill | bool else '0' }}
+tpe.lock = {{ '1' if kmod_tpe_lock | bool else '0' }}
+tpe.log = {{ '1' if kmod_tpe_log | bool else '0' }}
+tpe.log_floodburst = {{ kmod_tpe_log_floodburst | int }}
+tpe.log_floodtime = {{ kmod_tpe_log_floodtime | int }}
+tpe.log_max = {{ kmod_tpe_log_max | int }}
+tpe.log_verbose = {{ '1' if kmod_tpe_log_verbose | bool else '0' }}
+tpe.paranoid = {{ '1' if kmod_tpe_paranoid | bool else '0' }}
+tpe.softmode = {{ '1' if kmod_tpe_softmode | bool else '0' }}
+tpe.strict = {{ '1' if kmod_tpe_strict | bool else '0' }}
+tpe.trusted_apps = {{ kmod_tpe_trusted_apps | join(',') }}
+tpe.trusted_gid = {{ kmod_tpe_trusted_gid | int }}
+tpe.trusted_invert = {{ '1' if kmod_tpe_trusted_invert | bool else '0' }}
+tpe.xattr_soften = {{ '1' if kmod_tpe_xattr_soften | bool else '0' }}

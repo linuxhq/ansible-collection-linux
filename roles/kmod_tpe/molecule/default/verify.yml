@@ -1,0 +1,14 @@
+---
+- name: Verify
+  hosts: all
+  tasks:
+    - name: Ensure harden ptrace setting is gathered
+      ansible.builtin.slurp:
+        src: /proc/sys/tpe/extras/harden_ptrace
+      register: _harden_ptrace
+
+    - name: Ensure kmod-tpe kernel module is present
+      ansible.builtin.assert:
+        that:
+          - _harden_ptrace.content | b64decode | trim == '1'
+...
