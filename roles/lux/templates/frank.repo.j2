@@ -1,0 +1,9 @@
+[frank]
+name=EL $releasever - $basearch - Frank
+baseurl=http://repo.iotti.biz/Frank/$releasever
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-LUX
+# Frank should be manually enabled
+enabled={{ '1' if lux_repository_frank | bool else '0' }}
+# Frank packages should be explicitly included with includepkgs
+exclude=*

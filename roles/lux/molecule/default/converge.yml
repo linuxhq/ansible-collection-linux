@@ -1,0 +1,8 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - role: linuxhq.linux.lux
+      lux_packages:
+        - ppp
+...

@@ -1,0 +1,20 @@
+---
+dependencies:
+  - { role: linuxhq.linux.epel, tags: lux }
+galaxy_info:
+  role_name: lux
+  author: Taylor Kimball
+  description: Lux YUM repository
+  license: GPLv3
+  min_ansible_version: 2.15.0
+  platforms:
+    - name: EL
+      versions:
+        - '7'
+        - '8'
+        - '9'
+  galaxy_tags:
+    - frank
+    - linux
+    - lux
+...

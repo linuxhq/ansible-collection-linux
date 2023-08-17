@@ -1,0 +1,6 @@
+[lux]
+name=EL $releasever - $basearch - Lux
+baseurl=http://repo.iotti.biz/Lux/$releasever
+enabled={{ '1' if lux_repository_lux | bool else '0' }}
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-LUX
