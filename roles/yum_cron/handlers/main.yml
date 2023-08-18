@@ -1,0 +1,9 @@
+---
+- name: Restart yum-cron
+  tags:
+    - yum_cron
+  become: true
+  ansible.builtin.service:
+    name: yum-cron
+    state: restarted
+...

@@ -1,0 +1,27 @@
+# {{ ansible_managed }}
+
+[base]
+assumeyes = {{ yum_cron_hourly_assumeyes | bool | capitalize }}
+debuglevel = {{ yum_cron_hourly_debuglevel }}
+mdpolicy = {{ yum_cron_hourly_mdpolicy }}
+
+[commands]
+apply_updates = {{ 'yes' if yum_cron_hourly_apply_updates | bool else 'no' }}
+download_updates = {{ 'yes' if yum_cron_hourly_download_updates | bool else 'no' }}
+random_sleep = {{ yum_cron_hourly_random_sleep | int }}
+update_cmd = {{ yum_cron_hourly_update_cmd }}
+update_messages = {{ 'yes' if yum_cron_hourly_update_messages | bool else 'no' }}
+
+[email]
+email_from = {{ yum_cron_hourly_email_from }}
+email_host = {{ yum_cron_hourly_email_host }}
+email_to = {{ yum_cron_hourly_email_to }}
+
+[emitters]
+emit_via = {{ yum_cron_hourly_emit_via }}
+output_width = {{ yum_cron_hourly_output_width | int }}
+system_name = {{ yum_cron_hourly_system_name }}
+
+[groups]
+group_list = {{ yum_cron_hourly_group_list | join(', ') if yum_cron_hourly_group_list | length > 0 else 'None' }}
+group_package_types = {{ yum_cron_hourly_group_package_types | join(', ') }}

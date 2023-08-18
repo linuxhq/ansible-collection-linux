@@ -1,0 +1,38 @@
+---
+yum_cron_apply_updates: false
+yum_cron_assumeyes: false
+yum_cron_debuglevel: -2
+yum_cron_download_updates: true
+yum_cron_email_from: root@localhost
+yum_cron_email_host: localhost
+yum_cron_email_to: root
+yum_cron_emit_via: stdio
+yum_cron_group_list: []
+yum_cron_group_package_types:
+  - mandatory
+  - default
+yum_cron_hourly_apply_updates: false
+yum_cron_hourly_assumeyes: false
+yum_cron_hourly_debuglevel: -2
+yum_cron_hourly_download_updates: false
+yum_cron_hourly_email_from: root@localhost
+yum_cron_hourly_email_host: localhost
+yum_cron_hourly_email_to: root
+yum_cron_hourly_emit_via: stdio
+yum_cron_hourly_group_list: []
+yum_cron_hourly_group_package_types:
+  - mandatory
+  - default
+yum_cron_hourly_mdpolicy: 'group:main'
+yum_cron_hourly_output_width: 80
+yum_cron_hourly_random_sleep: 15
+yum_cron_hourly_system_name: "{{ inventory_hostname }}"
+yum_cron_hourly_update_cmd: default
+yum_cron_hourly_update_messages: false
+yum_cron_mdpolicy: 'group:main'
+yum_cron_output_width: 80
+yum_cron_random_sleep: 120
+yum_cron_system_name: "{{ inventory_hostname }}"
+yum_cron_update_cmd: default
+yum_cron_update_messages: true
+...
