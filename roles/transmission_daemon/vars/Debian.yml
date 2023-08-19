@@ -1,0 +1,6 @@
+---
+td_downloads: downloads
+td_home: /var/lib/transmission-daemon
+td_owner: debian-transmission
+td_settings: /etc/transmission-daemon/settings.json
+...

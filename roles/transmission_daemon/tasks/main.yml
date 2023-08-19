@@ -1,0 +1,81 @@
+---
+- name: Ensure transmission-daemon package is present
+  tags:
+    - transmission_daemon
+  become: true
+  ansible.builtin.apt:
+    name: transmission-daemon
+    state: present
+    update_cache: true
+  when:
+    - ansible_os_family == 'Debian'
+
+- name: Ensure transmission-daemon package is present
+  tags:
+    - transmission_daemon
+  become: true
+  ansible.builtin.yum:
+    name: transmission-daemon
+    state: present
+  when:
+    - ansible_os_family == 'RedHat'
+    - ansible_distribution_major_version | int == 7
+
+- name: Ensure transmission-daemon package is present
+  tags:
+    - transmission_daemon
+  become: true
+  ansible.builtin.dnf:
+    name: transmission-daemon
+    state: present
+  when:
+    - ansible_os_family == 'RedHat'
+    - ansible_distribution_major_version | int >= 8
+
+- name: Ensure transmission-daemon os specific vars are present
+  tags:
+    - transmission_daemon
+  ansible.builtin.include_vars:
+    file: "{{ ansible_os_family }}.yml"
+
+- name: Esnure transmission-daemon configuration directories are present
+  tags:
+    - transmission_daemon
+  become: true
+  ansible.builtin.file:
+    group: "{{ td_owner }}"
+    mode: '0700'
+    owner: "{{ td_owner }}"
+    path: "{{ _path }}"
+    recurse: false
+    state: directory
+  loop:
+    - "{{ td_home }}/.config"
+    - "{{ td_home }}/.config/transmission-daemon"
+  loop_control:
+    label: "{{ _path }}"
+    loop_var: _path
+  when:
+    - ansible_os_family == 'RedHat'
+
+- name: Ensure transmission-daemon settings are present
+  tags:
+    - transmission_daemon
+  become: true
+  ansible.builtin.template:
+    dest: "{{ td_settings }}"
+    group: "{{ td_owner }}"
+    mode: '0600'
+    owner: "{{ td_owner }}"
+    src: settings.json.j2
+  notify: Reload transmission-daemon
+
+- name: Ensure transmission-daemon is enabled and started on boot
+  tags:
+    - transmission_daemon
+  become: true
+  ansible.builtin.service:
+    enabled: true
+    name: transmission-daemon
+    state: started
+...

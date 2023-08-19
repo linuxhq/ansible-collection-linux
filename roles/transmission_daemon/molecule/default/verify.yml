@@ -1,0 +1,12 @@
+---
+- name: Verify
+  hosts: all
+  tasks:
+    - name: Ensure transmission-daemon is listening
+      ansible.builtin.wait_for:
+        delay: 0
+        host: localhost
+        port: 9091
+        state: started
+        timeout: 3
+...

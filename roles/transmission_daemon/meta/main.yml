@@ -1,0 +1,22 @@
+---
+dependencies:
+  - { role: linuxhq.linux.epel, tags: transmission_daemon, when: ansible_os_family == 'RedHat' }
+galaxy_info:
+  role_name: transmission_daemon
+  author: Taylor Kimball
+  description: A fast, easy, and free bittorrent client
+  license: GPLv3
+  min_ansible_version: 2.15.0
+  platforms:
+    - name: Debian
+      versions:
+        - all
+    - name: EL
+      versions:
+        - all
+  galaxy_tags:
+    - daemon
+    - linux
+    - torrent
+    - transmission
+...

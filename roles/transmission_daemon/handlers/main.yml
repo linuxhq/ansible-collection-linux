@@ -1,0 +1,9 @@
+---
+- name: Reload transmission-daemon
+  tags:
+    - transmission_daemon
+  become: true
+  ansible.builtin.service:
+    name: transmission-daemon
+    state: reloaded
+...
