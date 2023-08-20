@@ -15,6 +15,7 @@
     - transmission_daemon
   become: true
   ansible.builtin.yum:
+    enablerepo: epel
     name: transmission-daemon
     state: present
   when:
@@ -26,6 +27,7 @@
     - transmission_daemon
   become: true
   ansible.builtin.dnf:
+    enablerepo: epel
     name: transmission-daemon
     state: present
   when:
@@ -70,7 +72,7 @@
     src: settings.json.j2
   notify: Reload transmission-daemon
 
-- name: Ensure transmission-daemon is enabled and started on boot
+- name: Ensure transmission-daemon is started and enabled on boot
   tags:
     - transmission_daemon
   become: true
