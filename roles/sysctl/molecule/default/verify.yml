@@ -1,0 +1,19 @@
+---
+- name: Verify
+  hosts: all
+  tasks:
+    - name: Ensure sysctl parameter is present
+      become: true
+      ansible.posix.sysctl:
+        name: kernel.modules_disabled
+        state: present
+        value: '1'
+
+    - name: Ensure sysctl parameter is present
+      become: true
+      ansible.posix.sysctl:
+        name: vm.swappiness
+        state: present
+        sysctl_file: /etc/sysctl.d/98-ansible.conf
+        value: '5'
+...
