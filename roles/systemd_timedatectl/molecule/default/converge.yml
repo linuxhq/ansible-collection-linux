@@ -1,0 +1,7 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - role: linuxhq.linux.systemd_timedatectl
+      systemd_timedatectl_ntp: false
+...

@@ -1,0 +1,6 @@
+---
+systemd_timedatectl_local_rtc: false
+systemd_timedatectl_ntp: true
+systemd_timedatectl_time: null
+systemd_timedatectl_timezone: UTC
+...

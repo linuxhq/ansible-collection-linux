@@ -1,0 +1,19 @@
+---
+- name: Verify
+  hosts: all
+  tasks:
+    - name: Ensure timedatectl status is gathered
+      become: true
+      ansible.builtin.command:
+        cmd: >
+          timedatectl show
+      register: _show
+      changed_when: false
+
+    - name: Esnure timedatectl configuration matches
+      ansible.builtin.assert:
+        that:
+          - "'LocalRTC=no' in _show.stdout"
+          - "'NTP=no' in _show.stdout"
+          - "'Timezone=UTC' in _show.stdout"
+...

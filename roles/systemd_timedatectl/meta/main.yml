@@ -1,0 +1,21 @@
+---
+dependencies: []
+galaxy_info:
+  role_name: systemd_timedatectl
+  author: Taylor Kimball
+  description: Control the system time and date
+  license: GPLv3
+  min_ansible_version: 2.15.0
+  platforms:
+    - name: Debian
+      versions:
+        - all
+    - name: EL
+      versions:
+        - all
+  galaxy_tags:
+    - date
+    - linux
+    - systemd
+    - time
+...
