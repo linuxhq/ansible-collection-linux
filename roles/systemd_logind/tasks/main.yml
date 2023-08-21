@@ -1,0 +1,55 @@
+---
+- name: Ensure systemd package is present
+  tags:
+    - systemd_logind
+  become: true
+  ansible.builtin.apt:
+    name: systemd
+    state: present
+    update_cache: true
+  when:
+    - ansible_os_family == 'Debian'
+
+- name: Ensure systemd package is present
+  tags:
+    - systemd_logind
+  become: true
+  ansible.builtin.yum:
+    name: systemd
+    state: present
+  when:
+    - ansible_os_family == 'RedHat'
+    - ansible_distribution_major_version | int == 7
+
+- name: Ensure systemd package is present
+  tags:
+    - systemd_logind
+  become: true
+  ansible.builtin.dnf:
+    name: systemd
+    state: present
+  when:
+    - ansible_os_family == 'RedHat'
+    - ansible_distribution_major_version | int >= 8
+
+- name: Ensure systemd-logind template is present
+  tags:
+    - systemd-logind
+  become: true
+  ansible.builtin.template:
+    dest: /etc/systemd/logind.conf
+    group: root
+    mode: '0644'
+    owner: root
+    src: logind.conf.j2
+  notify: Restart systemd-logind
+
+- name: Ensure systemd-logind is started and enabled on boot
+  tags:
+    - systemd-logind
+  become: true
+  ansible.builtin.systemd:
+    enabled: true
+    name: systemd-logind
+    state: started
+...
