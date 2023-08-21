@@ -1,0 +1,65 @@
+---
+- name: Ensure systemd package is present
+  tags:
+    - systemd_localectl
+  become: true
+  ansible.builtin.apt:
+    name: systemd
+    state: present
+    update_cache: true
+  when:
+    - ansible_os_family == 'Debian'
+
+- name: Ensure systemd package is present
+  tags:
+    - systemd_localectl
+  become: true
+  ansible.builtin.yum:
+    name: systemd
+    state: present
+  when:
+    - ansible_os_family == 'RedHat'
+    - ansible_distribution_major_version | int == 7
+
+- name: Ensure systemd package is present
+  tags:
+    - systemd_localectl
+  become: true
+  ansible.builtin.dnf:
+    name: systemd
+    state: present
+  when:
+    - ansible_os_family == 'RedHat'
+    - ansible_distribution_major_version | int >= 8
+
+- name: Ensure localectl keymap is present
+  tags:
+    - systemd_localectl
+  become: true
+  ansible.builtin.command:
+    cmd: >
+      localectl set-keymap {{ systemd_localectl_keymap }}
+  when:
+    - systemd_localectl_keymap is not none
+  changed_when: false
+
+- name: Ensure localectl locale is present
+  tags:
+    - systemd_localectl
+  become: true
+  ansible.builtin.command:
+    cmd: >
+      localectl set-locale {{ systemd_localectl_locale }}
+  changed_when: false
+
+- name: Ensure localectl x11 keymap is present
+  tags:
+    - systemd_localectl
+  become: true
+  ansible.builtin.command:
+    cmd: >
+      localectl set-x11-keymap {{ systemd_localectl_x11_keymap }}
+  when:
+    - systemd_localectl_x11_keymap is not none
+  changed_when: false
+...

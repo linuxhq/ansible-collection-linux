@@ -1,0 +1,8 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - role: linuxhq.linux.systemd_localectl
+      systemd_localectl_keymap: us
+      systemd_localectl_x11_keymap: us
+...

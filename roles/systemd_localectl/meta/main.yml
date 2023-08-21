@@ -1,0 +1,20 @@
+---
+dependencies: []
+galaxy_info:
+  role_name: systemd_localectl
+  author: Taylor Kimball
+  description: Control the system locale and keyboard layout settings
+  license: GPLv3
+  min_ansible_version: 2.15.0
+  platforms:
+    - name: Debian
+      versions:
+        - all
+    - name: EL
+      versions:
+        - all
+  galaxy_tags:
+    - linux
+    - locale
+    - systemd
+...

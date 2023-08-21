@@ -1,0 +1,18 @@
+---
+- name: Verify
+  hosts: all
+  tasks:
+    - name: Ensure localectl status is gathered
+      become: true
+      ansible.builtin.command:
+        cmd: >
+          localectl status
+      register: _status
+      changed_when: false
+
+    - name: Esnure localectl configuration matches
+      ansible.builtin.assert:
+        that:
+          - "'VC Keymap: us' in _status.stdout"
+          - "'X11 Layout: us' in _status.stdout"
+...
