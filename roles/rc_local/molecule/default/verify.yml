@@ -6,9 +6,13 @@
       ansible.builtin.service_facts:
       register: _service_facts
 
+    - debug:
+        msg: "{{ _service_facts }}"
+
     - name: Ensure service is present in service facts
       ansible.builtin.assert:
         that:
-          - services['systemd-logind.service'] is defined
-          - services['systemd-logind.service'].status == 'static'
+          - services['rc-local.service'] is defined
+          - services['rc-local.service'].status == 'enabled-runtime' or
+            services['rc-local.service'].status == 'static'
 ...

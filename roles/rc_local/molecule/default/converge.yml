@@ -1,0 +1,8 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - role: linuxhq.linux.rc_local
+      rc_local:
+        - echo 1 > /proc/sys/kernel/modules_disabled
+...

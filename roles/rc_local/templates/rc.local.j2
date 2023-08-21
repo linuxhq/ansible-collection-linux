@@ -1,0 +1,9 @@
+#!/bin/bash
+#
+# {{ ansible_managed }}
+
+touch /var/lock/subsys/local
+
+{% for command in rc_local %}
+{{ command }}
+{% endfor %}

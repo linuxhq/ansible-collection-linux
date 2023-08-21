@@ -1,7 +1,7 @@
 ---
 - name: Ensure systemd package is present
   tags:
-    - systemd_logind
+    - rc_local
   become: true
   ansible.builtin.apt:
     name: systemd
@@ -12,7 +12,7 @@
 
 - name: Ensure systemd package is present
   tags:
-    - systemd_logind
+    - rc_local
   become: true
   ansible.builtin.yum:
     name: systemd
@@ -23,7 +23,7 @@
 
 - name: Ensure systemd package is present
   tags:
-    - systemd_logind
+    - rc_local
   become: true
   ansible.builtin.dnf:
     name: systemd
@@ -32,24 +32,43 @@
     - ansible_os_family == 'RedHat'
     - ansible_distribution_major_version | int >= 8
 
-- name: Ensure systemd-logind template is present
+- name: Ensure rc.local os specific vars are present
   tags:
-    - systemd-logind
+    - rc_local
+  ansible.builtin.include_vars:
+    file: "{{ ansible_os_family }}.yml"
+
+- name: Ensure rc.local template is present
+  tags:
+    - rc_local
   become: true
   ansible.builtin.template:
-    dest: /etc/systemd/logind.conf
+    dest: "{{ rc_local_path }}"
     group: root
-    mode: '0644'
+    mode: '0755'
     owner: root
-    src: logind.conf.j2
-  notify: Restart systemd-logind
+    src: rc.local.j2
+  notify: Restart rc-local
+  when:
+    - rc_local | length > 0
 
-- name: Ensure systemd-logind is started and enabled on boot
+- name: Ensure systemd is reloaded
   tags:
-    - systemd-logind
+    - rc_local
+  become: true
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when:
+    - rc_local | length > 0
+
+- name: Ensure rc-local is started and enabled on boot
+  tags:
+    - rc_local
   become: true
   ansible.builtin.systemd_service:
     enabled: true
-    name: systemd-logind
+    name: rc-local
     state: started
+  when:
+    - rc_local | length > 0
 ...
