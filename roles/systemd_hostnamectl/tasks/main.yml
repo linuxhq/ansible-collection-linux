@@ -1,0 +1,81 @@
+---
+- name: Ensure systemd package is present
+  tags:
+    - systemd_hostnamectl
+  become: true
+  ansible.builtin.apt:
+    name: systemd
+    state: present
+    update_cache: true
+  when:
+    - ansible_os_family == 'Debian'
+
+- name: Ensure systemd package is present
+  tags:
+    - systemd_hostnamectl
+  become: true
+  ansible.builtin.yum:
+    name: systemd
+    state: present
+  when:
+    - ansible_os_family == 'RedHat'
+    - ansible_distribution_major_version | int == 7
+
+- name: Ensure systemd package is present
+  tags:
+    - systemd_hostnamectl
+  become: true
+  ansible.builtin.dnf:
+    name: systemd
+    state: present
+  when:
+    - ansible_os_family == 'RedHat'
+    - ansible_distribution_major_version | int >= 8
+
+- name: Ensure hostnamectl chassis is present
+  tags:
+    - systemd_hostnamectl
+  become: true
+  ansible.builtin.command:
+    cmd: >
+      hostnamectl set-chassis {{ systemd_hostnamectl_chassis }}
+  changed_when: false
+
+- name: Ensure hostnamectl deployment is present
+  tags:
+    - systemd_hostnamectl
+  become: true
+  ansible.builtin.command:
+    cmd: >
+      hostnamectl set-deployment {{ systemd_hostnamectl_deployment }}
+  changed_when: false
+
+- name: Ensure hostnamectl hostname is present
+  tags:
+    - systemd_hostnamectl
+  become: true
+  ansible.builtin.command:
+    cmd: >
+      hostnamectl set-hostname {{ systemd_hostnamectl_hostname }}
+  changed_when: false
+
+- name: Ensure hostnamectl icon name is present
+  tags:
+    - systemd_hostnamectl
+  become: true
+  ansible.builtin.command:
+    cmd: >
+      hostnamectl set-icon-name {{ systemd_hostnamectl_icon_name }}
+  changed_when: false
+
+- name: Ensure hostnamectl location is present
+  tags:
+    - systemd_hostnamectl
+  become: true
+  ansible.builtin.command:
+    cmd: >
+      hostnamectl set-location {{ systemd_hostnamectl_location }}
+  when:
+    - systemd_hostnamectl_location is not none
+  changed_when: false
+...

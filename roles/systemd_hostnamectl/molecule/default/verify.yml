@@ -1,0 +1,17 @@
+---
+- name: Verify
+  hosts: all
+  tasks:
+    - name: Ensure hostnamectl status is gathered
+      become: true
+      ansible.builtin.command:
+        cmd: >
+          hostnamectl status
+      register: _status
+      changed_when: false
+
+    - name: Esnure hostnamectl configuration matches
+      ansible.builtin.assert:
+        that:
+          - "'Location: AWS' in _status.stdout"
+...
