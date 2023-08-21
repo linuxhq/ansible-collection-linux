@@ -1,4 +1,4 @@
-# rc\_local
+# systemd\_rc\_local
 
 [![License](https://img.shields.io/badge/license-GPLv3-lightgreen)](https://www.gnu.org/licenses/gpl-3.0.en.html#license-text)
 
@@ -12,7 +12,7 @@ None
 
 Available variables are listed below, along with default values:
 
-    rc_local: []
+    systemd_rc_local: []
 
 ## Dependencies
 
@@ -24,8 +24,8 @@ None
       collections:
         - linuxhq.linux
       roles:
-        - role: linuxhq.linux.rc_local
-          rc_local:
+        - role: linuxhq.linux.systemd_rc_local
+          systemd_rc_local:
             - echo 1 > /proc/sys/kernel/modules_disabled
 
 ## License
