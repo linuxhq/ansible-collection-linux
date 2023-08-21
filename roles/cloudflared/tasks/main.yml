@@ -42,7 +42,7 @@
   tags:
     - cloudflared
   become: true
-  ansible.builtin.systemd:
+  ansible.builtin.systemd_service:
     daemon_reload: true
 
 - name: Ensure cloudflared configuration directory is present
