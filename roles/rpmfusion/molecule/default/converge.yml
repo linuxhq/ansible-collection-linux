@@ -1,0 +1,19 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - role: linuxhq.linux.rpmfusion
+      rpmfusion_package_dist:
+        '7':
+          - kmod-VirtualBox
+          - unrar
+        '8':
+          - kmod-VirtualBox
+          - lpf-spotify-client
+        '9':
+          - kmod-VirtualBox
+          - lpf-spotify-client
+      rpmfusion_packages: "{{ rpmfusion_package_dist[rpmfusion_releasever] }}"
+      rpmfusion_repository_free_updates_source: true
+      rpmfusion_repository_nonfree_updates_source: true
+...

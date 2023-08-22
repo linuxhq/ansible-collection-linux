@@ -1,0 +1,47 @@
+[rpmfusion-free-updates-testing]
+name=RPM Fusion for EL {{ rpmfusion_releasever }} - Free - Test Updates
+#baseurl=http://download1.rpmfusion.org/free/el/updates/testing/{{ rpmfusion_releasever }}/$basearch/
+{% if rpmfusion_releasever | int >= 9 %}
+metalink=http://mirrors.rpmfusion.org/metalink?repo=free-el-updates-testing-{{ rpmfusion_releasever }}&arch=$basearch
+{% else %}
+mirrorlist=http://mirrors.rpmfusion.org/mirrorlist?repo=free-el-updates-testing-{{ rpmfusion_releasever }}&arch=$basearch
+{% endif %}
+enabled={{ '1' if rpmfusion_repository_free_updates_testing | bool else '0' }}
+{% if rpmfusion_releasever | int > 7 %}
+type=rpm-md
+{% endif %}
+gpgcheck=1
+repo_gpgcheck=0
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-rpmfusion-free-el-{{ rpmfusion_releasever }}
+
+[rpmfusion-free-updates-testing-debuginfo]
+name=RPM Fusion for EL {{ rpmfusion_releasever }} - Free - Test Updates Debug
+#baseurl=http://download1.rpmfusion.org/free/el/updates/testing/{{ rpmfusion_releasever }}/$basearch/debug/
+{% if rpmfusion_releasever | int >= 9 %}
+metalink=http://mirrors.rpmfusion.org/metalink?repo=free-el-updates-testing-debug-{{ rpmfusion_releasever }}&arch=$basearch
+{% else %}
+mirrorlist=http://mirrors.rpmfusion.org/mirrorlist?repo=free-el-updates-testing-debug-{{ rpmfusion_releasever }}&arch=$basearch
+{% endif %}
+enabled={{ '1' if rpmfusion_repository_free_updates_testing_debuginfo | bool else '0' }}
+{% if rpmfusion_releasever | int > 7 %}
+type=rpm-md
+{% endif %}
+gpgcheck=1
+repo_gpgcheck=0
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-rpmfusion-free-el-{{ rpmfusion_releasever }}
+
+[rpmfusion-free-updates-testing-source]
+name=RPM Fusion for EL {{ rpmfusion_releasever }} - Free - Test Updates Source
+#baseurl=http://download1.rpmfusion.org/free/el/updates/testing/{{ rpmfusion_releasever }}/SRPMS/
+{% if rpmfusion_releasever | int >= 9 %}
+metalink=http://mirrors.rpmfusion.org/metalink?repo=free-el-updates-testing-source-{{ rpmfusion_releasever }}&arch=$basearch
+{% else %}
+mirrorlist=http://mirrors.rpmfusion.org/mirrorlist?repo=free-el-updates-testing-source-{{ rpmfusion_releasever }}&arch=$basearch
+{% endif %}
+enabled={{ '1' if rpmfusion_repository_free_updates_testing_source | bool else '0' }}
+{% if rpmfusion_releasever | int > 7 %}
+type=rpm-md
+{% endif %}
+gpgcheck=1
+repo_gpgcheck=0
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-rpmfusion-free-el-{{ rpmfusion_releasever }}

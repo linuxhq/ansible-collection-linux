@@ -40,10 +40,6 @@
     - ius
   become: true
   ansible.builtin.yum:
-    name: "{{ _package }}"
+    name: "{{ ius_packages }}"
     state: present
-  loop: "{{ ius_packages }}"
-  loop_control:
-    label: "{{ _package }}"
-    loop_var: _package
 ...

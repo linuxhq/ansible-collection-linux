@@ -66,12 +66,8 @@
     - epel
   become: true
   ansible.builtin.yum:
-    name: "{{ _package }}"
+    name: "{{ epel_packages }}"
     state: present
-  loop: "{{ epel_packages }}"
-  loop_control:
-    label: "{{ _package }}"
-    loop_var: _package
   when:
     - epel_releasever | int == 7
 
@@ -80,12 +76,8 @@
     - epel
   become: true
   ansible.builtin.dnf:
-    name: "{{ _package }}"
+    name: "{{ epel_packages }}"
     state: present
-  loop: "{{ epel_packages }}"
-  loop_control:
-    label: "{{ _package }}"
-    loop_var: _package
   when:
     - epel_releasever | int >= 8
 ...
