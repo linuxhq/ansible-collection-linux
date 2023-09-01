@@ -1,0 +1,40 @@
+---
+- name: Ensure ookla speedtest rpm key is present
+  tags:
+    - speedtest
+  become: true
+  ansible.builtin.rpm_key:
+    key: https://packagecloud.io/ookla/speedtest-cli/gpgkey
+    state: present
+
+- name: Ensure ookla speedtest repository is present
+  tags:
+    - speedtest
+  become: true
+  ansible.builtin.template:
+    dest: /etc/yum.repos.d/ookla_speedtest-cli.repo
+    group: root
+    mode: '0644'
+    owner: root
+    src: ookla_speedtest-cli.repo.j2
+
+- name: Ensure ookla speedtest packages are present
+  tags:
+    - speedtest
+  become: true
+  ansible.builtin.yum:
+    name: "{{ speedtest_packages }}"
+    state: present
+  when:
+    - speedtest_releasever | int == 7
+
+- name: Ensure ookla speedtest packages are present
+  tags:
+    - speedtest
+  become: true
+  ansible.builtin.dnf:
+    name: "{{ speedtest_packages }}"
+    state: present
+  when:
+    - speedtest_releasever | int >= 8
+...

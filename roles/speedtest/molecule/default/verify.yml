@@ -1,0 +1,27 @@
+---
+- name: Verify
+  hosts: all
+  tasks:
+    - name: Ensure package facts are gathered
+      ansible.builtin.package_facts:
+        manager: rpm
+        strategy: first
+      register: _package_facts
+
+    - name: Ensure speedtest is present in package facts
+      ansible.builtin.assert:
+        that:
+          - "'speedtest' in packages"
+
+    - name: Ensure speedtest is executed
+      ansible.builtin.command:
+        cmd: >
+          speedtest --accept-license
+      register: _speedtest
+      changed_when: false
+
+    - name: Ensure speedtest output is debugged
+      ansible.builtin.debug:
+        msg: |
+          {{ _speedtest.stdout }}
+...

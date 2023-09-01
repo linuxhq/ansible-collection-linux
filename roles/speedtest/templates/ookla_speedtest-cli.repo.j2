@@ -1,0 +1,21 @@
+[ookla_speedtest-cli]
+name=ookla_speedtest-cli
+baseurl=https://packagecloud.io/ookla/speedtest-cli/el/{{ speedtest_releasever }}/$basearch
+repo_gpgcheck=1
+gpgcheck=0
+enabled={{ '1' if speedtest_repository_cli | bool else '0' }}
+gpgkey=https://packagecloud.io/ookla/speedtest-cli/gpgkey
+sslverify=1
+sslcacert=/etc/pki/tls/certs/ca-bundle.crt
+metadata_expire=300
+
+[ookla_speedtest-cli-source]
+name=ookla_speedtest-cli-source
+baseurl=https://packagecloud.io/ookla/speedtest-cli/el/{{ speedtest_releasever }}/SRPMS
+repo_gpgcheck=1
+gpgcheck=0
+enabled={{ '1' if speedtest_repository_cli_source | bool else '0' }}
+gpgkey=https://packagecloud.io/ookla/speedtest-cli/gpgkey
+sslverify=1
+sslcacert=/etc/pki/tls/certs/ca-bundle.crt
+metadata_expire=300
