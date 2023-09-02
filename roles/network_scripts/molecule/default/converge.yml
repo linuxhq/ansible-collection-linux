@@ -1,0 +1,42 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - role: linuxhq.linux.network_scripts
+      network:
+        - key: forward_ipv4
+          value: 'yes'
+        - key: hostname
+          value: "{{ inventory_hostname }}"
+        - key: networking
+          value: 'yes'
+        - key: networking_ipv6
+          value: 'no'
+      network_scripts:
+        - device: eno1
+          settings:
+            - key: bootproto
+              value: 'none'
+            - key: defroute
+              value: 'yes'
+            - key: device
+              value: eno1
+            - key: dns1
+              value: 1.1.1.1
+            - key: dns2
+              value: 1.1.1.2
+            - key: gateway
+              value: 10.0.0.1
+            - key: ipaddr
+              value: 10.0.0.2
+            - key: ipv6init
+              value: 'no'
+            - key: name
+              value: eno1
+            - key: onboot
+              value: 'yes'
+            - key: prefix
+              value: 29
+            - key: type
+              value: ethernet
+...
