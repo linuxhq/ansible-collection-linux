@@ -1,0 +1,12 @@
+---
+setup_aliases:
+  - key: mailer-daemon
+    value: postmaster
+  - key: postmaster
+    value: root
+setup_environment: []
+setup_hosts: []
+setup_hostname: "{{ inventory_hostname }}"
+setup_motd: null
+setup_profile_d: []
+...

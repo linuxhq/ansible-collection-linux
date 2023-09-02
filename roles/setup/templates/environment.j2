@@ -1,0 +1,7 @@
+# {{ ansible_managed }}
+
+{% for env in setup_environment %}
+{%   if env.key is defined and env.value is defined %}
+{{ env.key | upper }}="{{ env.value }}"
+{%   endif %}
+{% endfor %}

@@ -1,0 +1,21 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - role: linuxhq.linux.setup
+      setup_environment:
+        - key: linuxhq
+          value: development
+      setup_hostname: linuxhq.net
+      setup_hosts:
+        - ip: 1.1.1.1
+          hosts:
+            - linuxhq.net
+            - linuxhq.org
+      setup_motd: |
+        bW90ZAo=
+      setup_profile_d:
+        - name: linuxhq.sh
+          script: |
+            ZXhwb3J0IFRNT1VUPTMwMAo=
+...

@@ -1,0 +1,104 @@
+---
+- name: Ensure setup package is present
+  tags:
+    - setup
+  become: true
+  ansible.builtin.yum:
+    name: setup
+    state: present
+  when:
+    - ansible_distribution_major_version | int == 7
+
+- name: Ensure setup package is present
+  tags:
+    - setup
+  become: true
+  ansible.builtin.dnf:
+    name: setup
+    state: present
+  when:
+    - ansible_distribution_major_version | int >= 8
+
+- name: Ensure setup aliases configuration is present
+  tags:
+    - setup
+  become: true
+  ansible.builtin.template:
+    dest: /etc/aliases
+    group: root
+    mode: '0644'
+    owner: root
+    src: aliases.j2
+  when:
+    - setup_aliases | length > 0
+
+- name: Ensure setup environment configuration is present
+  tags:
+    - setup
+  become: true
+  ansible.builtin.template:
+    dest: /etc/environment
+    group: root
+    mode: '0644'
+    owner: root
+    src: environment.j2
+  when:
+    - setup_environment | length > 0
+
+- name: Ensure setup hostname configuration is present
+  tags:
+    - setup
+  become: true
+  ansible.builtin.template:
+    dest: /etc/hostname
+    group: root
+    mode: '0644'
+    owner: root
+    src: hostname.j2
+  when:
+    - setup_hostname | length > 0
+
+- name: Ensure setup hosts configuration is present
+  tags:
+    - setup
+  become: true
+  ansible.builtin.template:
+    dest: /etc/hosts
+    group: root
+    mode: '0644'
+    owner: root
+    src: hosts.j2
+  when:
+    - setup_hosts | length > 0
+
+- name: Ensure setup motd configuration is present
+  tags:
+    - setup
+  become: true
+  ansible.builtin.template:
+    dest: /etc/motd
+    group: root
+    mode: '0644'
+    owner: root
+    src: motd.j2
+  when:
+    - setup_motd is not none
+
+- name: Ensure setup profile.d configurations are present
+  tags:
+    - setup
+  become: true
+  ansible.builtin.template:
+    dest: "/etc/profile.d/{{ _profile.name }}"
+    group: root
+    mode: '0644'
+    owner: root
+    src: profile_d.j2
+  loop: "{{ setup_profile_d }}"
+  loop_control:
+    label: "{{ _profile.name | default(none) }}"
+    loop_var: _profile
+  when:
+    - _profile.name is defined
+    - _profile.script is defined
+...
