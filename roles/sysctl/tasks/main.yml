@@ -43,8 +43,6 @@
     owner: root
     src: sysctl.conf.j2
   notify: Reload sysctl
-  when:
-    - sysctl_conf | length > 0
 
 - name: Ensure sysctl.d templates are present
   tags:
