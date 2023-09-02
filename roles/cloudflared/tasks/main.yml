@@ -106,6 +106,7 @@
 - name: Ensure cloudflared tunnels are started and enabled on boot
   tags:
     - cloudflared
+  become: true
   ansible.builtin.service:
     enabled: true
     name: "cloudflared@{{ _service }}.service"
