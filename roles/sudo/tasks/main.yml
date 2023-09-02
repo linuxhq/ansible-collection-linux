@@ -1,0 +1,56 @@
+---
+- name: Ensure sudo package is present
+  tags:
+    - sudo
+  become: true
+  ansible.builtin.yum:
+    name: sudo
+    state: present
+  when:
+    - ansible_distribution_major_version | int == 7
+
+- name: Ensure sudo package is present
+  tags:
+    - sudo
+  become: true
+  ansible.builtin.dnf:
+    name: sudo
+    state: present
+  when:
+    - ansible_distribution_major_version | int >= 8
+
+- name: Ensure sudoers configuration is present
+  tags:
+    - sudo
+  become: true
+  ansible.builtin.template:
+    dest: /etc/sudoers
+    group: root
+    mode: '0440'
+    owner: root
+    src: sudoers.j2
+    validate: '/usr/sbin/visudo -cf %s'
+
+- name: Ensure sudoers.d configurations are present
+  tags:
+    - sudo
+  become: true
+  ansible.builtin.template:
+    dest: "/etc/sudoers.d/{{ _sudoers.file }}"
+    group: root
+    mode: '0440'
+    owner: root
+    src: sudoers_d.j2
+    validate: '/usr/sbin/visudo -cf %s'
+  loop: "{{ sudoers_d }}"
+  loop_control:
+    label: "{{ _sudoers.file | default(none) }}"
+    loop_var: _sudoers
+  when:
+    - _sudoers.file is defined
+    - _sudoers.user is defined
+    - _sudoers.host is defined
+    - _sudoers.runas is defined
+    - _sudoers.cmnds is defined
+    - _sudoers.cmnds | length > 0
+...

@@ -1,0 +1,14 @@
+---
+sudoers_alias_cmnds: []
+sudoers_alias_hosts: []
+sudoers_alias_runas: []
+sudoers_alias_users: []
+sudoers_always_set_home: true
+sudoers_env_keep: []
+sudoers_env_reset: true
+sudoers_d: []
+sudoers_includedir: /etc/sudoers.d
+sudoers_match_group_by_gid: true
+sudoers_requiretty: false
+sudoers_visiblepw: false
+...
