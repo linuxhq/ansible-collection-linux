@@ -1,0 +1,11 @@
+---
+- name: Verify
+  hosts: all
+  tasks:
+    - name: Ensure virtualenv package is present
+      ansible.builtin.command:
+        cmd: >
+          /opt/ansible/bin/ansible --version
+      register: _command
+      changed_when: false
+...
