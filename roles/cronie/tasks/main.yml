@@ -43,7 +43,6 @@
 - name: Ensure cronie jobs are present
   tags:
     - cronie
-    - cronie_system
   become: true
   ansible.builtin.cron:
     backup: "{{ _cron.0.backup | default(false) }}"
