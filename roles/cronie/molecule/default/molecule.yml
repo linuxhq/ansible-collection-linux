@@ -41,28 +41,6 @@ platforms:
     tags:
       Name: *a9
 
-  - name: &d11 debian-11
-    aws_profile: molecule
-    image_owner: '136693071363'
-    image_name: 'debian-11-amd64*'
-    instance_type: t2.micro
-    key_inject_method: ec2
-    ssh_user: admin
-    vpc_subnet_id: subnet-00d20739fc370ed5e
-    tags:
-      Name: *d11
-
-  - name: &d12 debian-12
-    aws_profile: molecule
-    image_owner: '136693071363'
-    image_name: 'debian-12-amd64*'
-    instance_type: t2.micro
-    key_inject_method: ec2
-    ssh_user: admin
-    vpc_subnet_id: subnet-00d20739fc370ed5e
-    tags:
-      Name: *d12
-
 provisioner:
   name: ansible
   log: true
