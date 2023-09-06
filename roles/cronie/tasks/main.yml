@@ -1,0 +1,82 @@
+---
+- name: Ensure cronie package is present
+  tags:
+    - cronie
+  become: true
+  ansible.builtin.yum:
+    name: cronie
+    state: present
+    update_cache: true
+  when:
+    - ansible_distribution_major_version | int == 7
+
+- name: Ensure cronie package is present
+  tags:
+    - cronie
+  become: true
+  ansible.builtin.dnf:
+    name: cronie
+    state: present
+    update_cache: true
+  when:
+    - ansible_distribution_major_version | int >= 8
+
+- name: Ensure cronie templates are present
+  tags:
+    - cronie
+  become: true
+  ansible.builtin.template:
+    dest: "{{ _template.dest }}"
+    group: root
+    mode: "{{ _template.mode }}"
+    owner: root
+    src: "{{ _template.src }}"
+  notify: Restart crond
+  loop:
+    - { src: cron.allow.j2, dest: /etc/cron.allow, mode: '0600' }
+    - { src: cron.deny.j2, dest: /etc/cron.deny, mode: '0600' }
+    - { src: cron.sysconfig.j2, dest: /etc/sysconfig/crond, mode: '0644' }
+  loop_control:
+    label: "{{ _template.dest }}"
+    loop_var: _template
+
+- name: Ensure cronie jobs are present
+  tags:
+    - cronie
+    - cronie_system
+  become: true
+  ansible.builtin.cron:
+    backup: "{{ _cron.0.backup | default(false) }}"
+    cron_file: "{{ _cron.0.cron_file | default(omit) }}"
+    day: "{{ _cron.1.day | default('*') }}"
+    hour: "{{ _cron.1.hour | default('*') }}"
+    insertafter: "{{ _cron.1.insertafter | default(omit) }}"
+    insertbefore: "{{ _cron.1.insertbefore | default(omit) }}"
+    job: "{{ _cron.1.job }}"
+    minute: "{{ _cron.1.minute | default('*') }}"
+    month: "{{ _cron.1.month | default('*') }}"
+    name: "{{ _cron.1.name }}"
+    special_time: "{{ _cron.1.special_time | default(omit) }}"
+    state: present
+    user: "{{ _cron.1.user }}"
+    weekday: "{{ _cron.weekday | default('*') }}"
+  notify: Restart crond
+  loop: "{{ q('ansible.builtin.subelements', cronie_jobs, 'jobs', {'skip_missing': true}) }}"
+  loop_control:
+    label: "{{ _cron.0.cron_file | default(omit) }}"
+    loop_var: _cron
+  when:
+    - _cron.0.cron_file is defined
+    - _cron.1.job is defined
+    - _cron.1.name is defined
+    - _cron.1.user is defined
+
+- name: Ensure cronie is started and enabled on boot
+  tags:
+    - cronie
+  become: true
+  ansible.builtin.service:
+    enabled: true
+    name: crond
+    state: started
+...

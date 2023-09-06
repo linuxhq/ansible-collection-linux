@@ -1,0 +1,14 @@
+---
+- name: Verify
+  hosts: all
+  tasks:
+    - name: Ensure stat information is gathered
+      ansible.builtin.stat:
+        path: /tmp/cronie
+      register: _stat
+
+    - name: Ensure file is present
+      ansible.builtin.assert:
+        that:
+          - _stat.stat.exists | bool
+...

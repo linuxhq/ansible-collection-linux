@@ -1,0 +1,17 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - role: linuxhq.linux.cronie
+      cronie_allow:
+        - tkimball
+      cronie_deny:
+        - linuxhq
+      cronie_jobs:
+        - cron_file: ansible
+          jobs:
+            - name: Create temporary file
+              minute: '*/1'
+              job: echo 1 > /tmp/cronie
+              user: root
+...
