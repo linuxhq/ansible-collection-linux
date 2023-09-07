@@ -1,0 +1,7 @@
+# {{ ansible_managed }}
+
+{% if chrony_conf | length > 0 %}
+{%   for cfg in chrony_conf | sort %}
+{{ cfg }}
+{%   endfor %}
+{% endif %}

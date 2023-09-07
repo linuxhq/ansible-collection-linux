@@ -1,0 +1,48 @@
+---
+- name: Ensure chrony package is present
+  tags:
+    - chrony
+  become: true
+  ansible.builtin.yum:
+    name: chrony
+    state: present
+  when:
+    - ansible_distribution_major_version | int == 7
+
+- name: Ensure chrony package is present
+  tags:
+    - chrony
+  become: true
+  ansible.builtin.dnf:
+    name: chrony
+    state: present
+  when:
+    - ansible_distribution_major_version | int >= 8
+
+- name: Ensure chrony templates are present
+  tags:
+    - chrony
+  become: true
+  ansible.builtin.template:
+    dest: "{{ _chrony.dst }}"
+    group: root
+    mode: "{{ _chrony.mode }}"
+    owner: root
+    src: "{{ _chrony.src }}"
+  notify: Restart chronyd
+  loop:
+    - { src: chrony.conf.j2, dst: /etc/chrony.conf, mode: '0644' }
+    - { src: chronyd.sysconfig.j2, dst: /etc/sysconfig/chronyd, mode: '0644' }
+  loop_control:
+    label: "{{ _chrony.dst }}"
+    loop_var: _chrony
+
+- name: Ensure chrony is started and enabled on boot
+  tags:
+    - chrony
+  become: true
+  ansible.builtin.service:
+    enabled: true
+    name: chronyd
+    state: started
+...

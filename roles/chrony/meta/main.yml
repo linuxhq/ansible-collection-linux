@@ -1,0 +1,17 @@
+---
+dependencies: []
+galaxy_info:
+  role_name: user
+  author: Taylor Kimball
+  description: Programs for keeping computer clocks accurate
+  license: GPLv3
+  min_ansible_version: 2.15.0
+  platforms:
+    - name: EL
+      versions:
+        - all
+  galaxy_tags:
+    - chrony
+    - linux
+    - ntp
+...
