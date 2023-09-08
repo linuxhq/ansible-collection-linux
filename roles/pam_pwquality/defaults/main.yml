@@ -1,0 +1,22 @@
+---
+pam_pwquality_badwords: []
+pam_pwquality_dcredit: 0
+pam_pwquality_dictcheck: 1
+pam_pwquality_dictpath: null
+pam_pwquality_difok: 1
+pam_pwquality_enforce_for_root: false
+pam_pwquality_enforcing: 1
+pam_pwquality_gecoscheck: 0
+pam_pwquality_lcredit: 0
+pam_pwquality_local_users_only: false
+pam_pwquality_maxclassrepeat: 0
+pam_pwquality_maxrepeat: 0
+pam_pwquality_maxsequence: 0
+pam_pwquality_minclass: 0
+pam_pwquality_minlen: 8
+pam_pwquality_ocredit: 0
+pam_pwquality_retry: 1
+pam_pwquality_ucredit: 0
+pam_pwquality_usercheck: 1
+pam_pwquality_usersubstr: 0
+...

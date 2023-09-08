@@ -1,0 +1,34 @@
+# {{ ansible_managed }}
+
+dcredit = {{ pam_pwquality_dcredit | int }}
+dictcheck = {{ pam_pwquality_dictcheck | int }}
+difok = {{ pam_pwquality_difok | int }}
+enforcing = {{ pam_pwquality_enforcing | int }}
+gecoscheck = {{ pam_pwquality_gecoscheck | int }}
+lcredit = {{ pam_pwquality_lcredit | int }}
+maxclassrepeat = {{ pam_pwquality_maxclassrepeat | int }}
+maxrepeat = {{ pam_pwquality_maxrepeat | int }}
+maxsequence = {{ pam_pwquality_maxsequence | int }}
+minclass = {{ pam_pwquality_minclass | int }}
+minlen = {{ pam_pwquality_minlen | int }}
+ocredit = {{ pam_pwquality_ocredit | int }}
+retry = {{ pam_pwquality_retry | int }}
+ucredit = {{ pam_pwquality_ucredit | int }}
+usercheck = {{ pam_pwquality_usercheck | int }}
+usersubstr = {{ pam_pwquality_usersubstr | int }}
+
+{% if pam_pwquality_badwords | length > 0 %}
+badwords {{ pam_pwquality_badwords | join(' ') }}
+{% endif %}
+
+{% if pam_pwquality_dictpath is not none %}
+dictpath {{ pam_pwquality_dictpath }}
+{% endif %}
+
+{% if pam_pwquality_enforce_for_root | bool %}
+enforce_for_root
+{% endif %}
+
+{% if pam_pwquality_local_users_only | bool %}
+local_users_only
+{% endif %}

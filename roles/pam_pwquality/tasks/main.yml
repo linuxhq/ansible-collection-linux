@@ -1,0 +1,32 @@
+---
+- name: Ensure libpwquality package is present
+  tags:
+    - pam_pwquality
+  become: true
+  ansible.builtin.yum:
+    name: libpwquality
+    state: present
+  when:
+    - ansible_distribution_major_version | int == 7
+
+- name: Ensure libpwquality package is present
+  tags:
+    - pam_pwquality
+  become: true
+  ansible.builtin.dnf:
+    name: libpwquality
+    state: present
+  when:
+    - ansible_distribution_major_version | int >= 8
+
+- name: Ensure libpwquality template is present
+  tags:
+    - pam_pwquality
+  become: true
+  ansible.builtin.template:
+    dest: /etc/security/pwquality.conf
+    group: root
+    mode: '0644'
+    owner: root
+    src: pwquality.conf.j2
+...
