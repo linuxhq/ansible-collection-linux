@@ -12,6 +12,7 @@ None
 
 Available variables are listed below, along with default values:
 
+    docker_daemon: {}
     docker_packages:
       - containerd.io
       - docker-ce

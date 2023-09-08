@@ -1,4 +1,5 @@
 ---
+docker_daemon: {}
 docker_packages:
   - containerd.io
   - docker-ce

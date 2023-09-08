@@ -1,0 +1,9 @@
+---
+- name: Reload docker
+  tags:
+    - docker
+  become: true
+  ansible.builtin.service:
+    name: docker
+    state: reloaded
+...

@@ -50,6 +50,20 @@
   when:
     - docker_users | length > 0
 
+- name: Ensure docker daemon template is present
+  tags:
+    - docker
+  become: true
+  ansible.builtin.template:
+    dest: /etc/docker/daemon.json
+    group: docker
+    mode: '0640'
+    owner: root
+    src: daemon.json.j2
+  notify: Reload docker
+  when:
+    - docker_daemon | length > 0
+
 - name: Ensure docker is started and enabled on boot
   tags:
     - docker
