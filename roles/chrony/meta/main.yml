@@ -9,7 +9,9 @@ galaxy_info:
   platforms:
     - name: EL
       versions:
-        - all
+        - '7'
+        - '8'
+        - '9'
   galaxy_tags:
     - chrony
     - linux
