@@ -1,0 +1,13 @@
+---
+chrony_conf:
+  - driftfile /var/lib/chrony/drift
+  - keyfile /etc/chrony.keys
+  - leapsectz right/UTC
+  - logdir /var/log/chrony
+  - makestep 1.0 3
+  - pool 1.pool.ntp.org iburst
+  - pool 2.pool.ntp.org iburst
+  - pool 3.pool.ntp.org iburst
+  - rtcsync
+chrony_options: []
+...

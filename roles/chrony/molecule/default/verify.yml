@@ -1,0 +1,17 @@
+---
+- name: Verify
+  hosts: all
+  tasks:
+    - name: Ensure chrony tracking is executed
+      become: true
+      ansible.builtin.command:
+        cmd: >
+          chronyc tracking
+      register: _tracking
+      changed_when: false
+
+    - name: Ensure chrony tracking is success
+      ansible.builtin.assert:
+        that:
+          - _tracking.rc == 0
+...
