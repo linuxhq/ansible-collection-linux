@@ -1,0 +1,16 @@
+---
+- name: Verify
+  hosts: all
+  tasks:
+    - name: Ensure service facts are gathered
+      ansible.builtin.service_facts:
+      register: _service_facts
+
+    - name: Ensure service is present in service facts
+      ansible.builtin.assert:
+        that:
+          - services['dnf-automatic-download.service'] is defined
+          - services['dnf-automatic-install.service'] is defined
+          - services['dnf-automatic-notifyonly.service'] is defined
+          - services['dnf-automatic.service'] is defined
+...

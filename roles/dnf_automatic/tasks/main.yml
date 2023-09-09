@@ -1,0 +1,39 @@
+---
+- name: Ensure dnf-automatic package is installed
+  tags:
+    - dnf_automatic
+  become: true
+  ansible.builtin.yum:
+    name: dnf-automatic
+    state: present
+
+- name: Esnure dnf-automatic template is present
+  tags:
+    - dnf_automatic
+  become: true
+  ansible.builtin.template:
+    dest: /etc/dnf/automatic.conf
+    group: root
+    mode: '0644'
+    owner: root
+    src: automatic.conf.j2
+
+- name: Ensure dnf-automatic is started and enabled on boot
+  tags:
+    - dnf_automatic
+  become: true
+  ansible.builtin.service:
+    enabled: "{{ _enabled }}"
+    name: "{{ _timer }}"
+    state: "{{ 'started' if _enabled | bool else 'stopped' }}"
+  loop:
+    - dnf-automatic.timer
+    - dnf-automatic-download.timer
+    - dnf-automatic-install.timer
+    - dnf-automatic-notifyonly.timer
+  loop_control:
+    label: "{{ _timer }}"
+    loop_var: _timer
+  vars:
+    _enabled: "{{ true if _timer == dnf_automatic_timer else false }}"
+...

@@ -1,0 +1,18 @@
+---
+dependencies: []
+galaxy_info:
+  role_name: dnf_automatic
+  author: Taylor Kimball
+  description: DNF Automatic
+  license: GPLv3
+  min_ansible_version: 2.15.0
+  platforms:
+    - name: EL
+      versions:
+        - '8'
+        - '9'
+  galaxy_tags:
+    - automatic
+    - dnf
+    - linux
+...

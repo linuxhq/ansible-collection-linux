@@ -1,0 +1,31 @@
+[base]
+debuglevel = {{ dnf_automatic_base_debuglevel | int }}
+
+[command]
+command_format = {{ dnf_automatic_command_command_format }}
+stdin_format = {{ dnf_automatic_command_stdin_format }}
+
+[command_email]
+command_format = {{ dnf_automatic_command_email_command_format }}
+email_from = {{ dnf_automatic_command_email_email_from }}
+email_to = {{ dnf_automatic_command_email_email_to }}
+stdin_format = {{ dnf_automatic_command_email_stdin_format }}
+
+[commands]
+apply_updates = {{ 'yes' if dnf_automatic_commands_apply_updates | bool else 'no' }}
+download_updates = {{ 'yes' if dnf_automatic_commands_download_updates | bool else 'no' }}
+network_online_timeout = {{ dnf_automatic_commands_network_online_timeout | int }}
+random_sleep = {{ dnf_automatic_commands_random_sleep | int }}
+reboot = {{ dnf_automatic_commands_reboot }}
+reboot_command = {{ dnf_automatic_commands_reboot_command }}
+upgrade_type = {{ dnf_automatic_commands_upgrade_type }}
+
+[email]
+email_from = {{ dnf_automatic_email_email_from }}
+email_host = {{ dnf_automatic_email_email_host }}
+email_port = {{ dnf_automatic_email_email_port | int }}
+email_to = {{ dnf_automatic_email_email_to }}
+
+[emitters]
+emit_via = {{ dnf_automatic_emitters_emit_via }}
+system_name = {{ dnf_automatic_emitters_system_name }}
