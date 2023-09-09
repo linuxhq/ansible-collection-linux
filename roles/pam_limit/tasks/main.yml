@@ -1,0 +1,54 @@
+---
+- name: Ensure pam package is present
+  tags:
+    - pam_limit
+  become: true
+  ansible.builtin.yum:
+    name: pam
+    state: present
+  when:
+    - ansible_distribution_major_version | int == 7
+
+- name: Ensure pam package is present
+  tags:
+    - pam_limit
+  become: true
+  ansible.builtin.dnf:
+    name: pam
+    state: present
+  when:
+    - ansible_distribution_major_version | int >= 8
+
+- name: Ensure pam limits template is present
+  tags:
+    - pam_limit
+  become: true
+  ansible.builtin.template:
+    dest: /etc/security/limits.conf
+    group: root
+    mode: '0644'
+    owner: root
+    src: limits.conf.j2
+  when:
+    - pam_limits | length > 0
+
+- name: Ensure pam limits.d templates are present
+  tags:
+    - pam_limit
+  become: true
+  ansible.builtin.template:
+    dest: "/etc/security/limits.d/{{ _limit_d.file }}.conf"
+    group: root
+    mode: '0644'
+    owner: root
+    src: limits_d.j2
+  loop: "{{ pam_limits_d }}"
+  loop_control:
+    label: "{{ _limit_d.file | default(none) }}"
+    loop_var: _limit_d
+  when:
+    - pam_limits_d | length > 0
+    - _limit_d.file is defined
+    - _limit_d.limits is defined
+    - _limit_d.limits | length > 0
+...

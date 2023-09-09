@@ -1,0 +1,10 @@
+# {{ ansible_managed }}
+
+{% for limit in pam_limits %}
+{%   if limit.domain is defined and
+        limit.limit_item is defined and
+        limit.limit_type is defined and
+        limit.value is defined %}
+{{ limit.domain }}	{{ limit.limit_item }}	{{ limit.limit_type }}	{{ limit.value }}
+{%   endif %}
+{% endfor %}

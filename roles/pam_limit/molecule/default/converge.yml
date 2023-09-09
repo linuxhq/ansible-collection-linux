@@ -1,0 +1,27 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - role: linuxhq.linux.pam_limit
+      pam_limits:
+        - domain: '*'
+          limit_item: core
+          limit_type: hard
+          value: 0
+        - domain: '*'
+          limit_item: nofile
+          limit_type: hard
+          value: 39693561
+
+      pam_limits_d:
+        - file: 99-linuxhq
+          limits:
+            - domain: joe
+              limit_item: soft
+              limit_type: nofile
+              value: 64000
+            - domain: smith
+              limit_type: hard
+              limit_item: fsize
+              value: 1000000
+...
