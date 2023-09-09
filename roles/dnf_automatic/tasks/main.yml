@@ -3,7 +3,7 @@
   tags:
     - dnf_automatic
   become: true
-  ansible.builtin.yum:
+  ansible.builtin.dnf:
     name: dnf-automatic
     state: present
 
