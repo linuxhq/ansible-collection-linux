@@ -17,6 +17,8 @@
     owner: root
     path: "{{ nr_package_dir }}"
     state: directory
+  when:
+    - nr_packages | length > 0
 
 - name: Ensure needs restarting packages are present
   tags:
