@@ -1,0 +1,10 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - role: linuxhq.linux.needs_restarting
+      nr_crontab: '*/5 * * * *'
+      nr_packages:
+        - kernel-lt
+        - kernel-ml
+...

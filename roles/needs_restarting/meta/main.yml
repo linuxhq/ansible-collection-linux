@@ -1,0 +1,19 @@
+---
+dependencies: []
+galaxy_info:
+  role_name: needs_restarting
+  author: Taylor Kimball
+  description: DNF needs-restarting Plugin
+  license: GPLv3
+  min_ansible_version: 2.15.0
+  platforms:
+    - name: EL
+      versions:
+        - '8'
+        - '9'
+  galaxy_tags:
+    - dnf
+    - linux
+    - needs
+    - restarting
+...

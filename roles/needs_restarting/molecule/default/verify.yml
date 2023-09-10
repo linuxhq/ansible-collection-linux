@@ -1,0 +1,23 @@
+---
+- name: Verify
+  hosts: all
+  tasks:
+    - name: Ensure kernel package is latest
+      become: true
+      ansible.builtin.dnf:
+        name: kernel
+        state: latest
+
+    - name: Ensure pause is present
+      ansible.builtin.pause:
+        seconds: 300
+
+    - name: Ensure fact gathering is present
+      ansible.builtin.setup:
+        gather_subset: hardware
+
+    - name: Ensure system has rebooted
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.uptime_seconds < 300
+...

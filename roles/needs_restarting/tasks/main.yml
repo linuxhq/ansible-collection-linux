@@ -1,0 +1,50 @@
+---
+- name: Ensure needs restarting package is present
+  tags:
+    - needs_restarting
+  become: true
+  ansible.builtin.dnf:
+    name: python3-dnf-plugins-core
+    state: present
+
+- name: Ensure needs restarting package dir is present
+  tags:
+    - needs_restarting
+  become: true
+  ansible.builtin.file:
+    group: root
+    mode: '0755'
+    owner: root
+    path: "{{ nr_package_dir }}"
+    state: directory
+
+- name: Ensure needs restarting packages are present
+  tags:
+    - needs_restarting
+  become: true
+  ansible.builtin.template:
+    dest: "{{ nr_package_dir }}/{{ _pkgname }}.conf"
+    group: root
+    mode: '0644'
+    owner: root
+    src: pkgname.conf.j2
+  loop: "{{ nr_packages }}"
+  loop_control:
+    label: "{{ _pkgname | default(none) }}"
+    loop_var: _pkgname
+  when:
+    - nr_packages | length > 0
+
+- name: Ensure needs restarting crontab is present
+  tags:
+    - needs_restarting
+  become: true
+  ansible.builtin.template:
+    dest: /etc/cron.d/needs-restarting
+    group: root
+    mode: '0644'
+    owner: root
+    src: crontab.j2
+  when:
+    - nr_crontab is not none
+...

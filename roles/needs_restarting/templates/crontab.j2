@@ -1,0 +1,3 @@
+# {{ ansible_managed }}
+
+{{ nr_crontab }} {{ nr_user }} /usr/bin/dnf needs-restarting -r >/dev/null || /usr/bin/systemctl reboot
