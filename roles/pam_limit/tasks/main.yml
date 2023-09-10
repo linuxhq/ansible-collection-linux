@@ -29,8 +29,6 @@
     mode: '0644'
     owner: root
     src: limits.conf.j2
-  when:
-    - pam_limits | length > 0
 
 - name: Ensure pam limits.d templates are present
   tags:
@@ -47,7 +45,6 @@
     label: "{{ _limit_d.file | default(none) }}"
     loop_var: _limit_d
   when:
-    - pam_limits_d | length > 0
     - _limit_d.file is defined
     - _limit_d.limits is defined
     - _limit_d.limits | length > 0
