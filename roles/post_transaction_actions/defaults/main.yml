@@ -1,0 +1,5 @@
+---
+pta_actiondir: /etc/dnf/plugins/post-transaction-actions.d/
+pta_actions: []
+pta_enabled: true
+...

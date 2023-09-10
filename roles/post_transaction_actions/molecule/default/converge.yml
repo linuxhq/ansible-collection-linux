@@ -1,0 +1,10 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - role: linuxhq.linux.post_transaction_actions
+      pta_actions:
+        - package_filter: kernel
+          transaction_state: in
+          command: /usr/sbin/grub2-set-default 0
+...

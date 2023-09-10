@@ -1,0 +1,39 @@
+---
+- name: Ensure post transaction actions package is present
+  tags:
+    - post_transaction_actions
+  become: true
+  ansible.builtin.dnf:
+    name: python3-dnf-plugin-post-transaction-actions
+    state: present
+
+- name: Ensure post transaction actions template is present
+  tags:
+    - post_transaction_actions
+  become: true
+  ansible.builtin.template:
+    dest: /etc/dnf/plugins/post-transaction-actions.conf
+    group: root
+    mode: '0644'
+    owner: root
+    src: post-transaction-actions.conf.j2
+
+- name: Ensure post transaction actions filters are present
+  tags:
+    - post_transaction_actions
+  become: true
+  ansible.builtin.template:
+    dest: "/etc/dnf/plugins/post-transaction-actions.d/{{ _pta.package_filter }}.conf"
+    group: root
+    mode: '0644'
+    owner: root
+    src: package_filter.conf.j2
+  loop: "{{ pta_actions }}"
+  loop_control:
+    label: "{{ _pta.package_filter | default(none) }}"
+    loop_var: _pta
+  when:
+    - _pta.package_filter is defined
+    - _pta.transaction_state is defined
+    - _pta.command is defined
+...

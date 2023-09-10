@@ -1,0 +1,38 @@
+---
+- name: Verify
+  hosts: all
+  tasks:
+    - name: Ensure kernel package is latest
+      become: true
+      ansible.builtin.dnf:
+        name: kernel
+        state: latest
+
+    - name: Ensure grub information is gathered
+      become: true
+      ansible.builtin.shell:
+        cmd: >
+          /usr/sbin/grubby --info DEFAULT
+      register: _grub
+      changed_when: false
+
+    - name: Ensure kernel information is gathered
+      ansible.builtin.shell:
+        cmd: >
+          /usr/bin/rpm -q kernel | sort -V | tail -1
+      register: _kernel
+      changed_when: false
+
+    - name: Ensure grub and kernel facts are present
+      ansible.builtin.set_fact:
+        _grub_ver: "{{ _grub.stdout_lines[1].split('-')[1:] |
+                       join('-') |
+                       regex_replace('\"') }}"
+        _kernel_ver: "{{ _kernel.stdout.split('-')[1:]
+                         | join('-') }}"
+
+    - name: Ensure grub default kernel is latest
+      ansible.builtin.assert:
+        that:
+          - _grub_ver == _kernel_ver
+...
