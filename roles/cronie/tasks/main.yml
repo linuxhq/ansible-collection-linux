@@ -58,7 +58,7 @@
     special_time: "{{ _cron.1.special_time | default(omit) }}"
     state: present
     user: "{{ _cron.1.user }}"
-    weekday: "{{ _cron.weekday | default('*') }}"
+    weekday: "{{ _cron.1.weekday | default('*') }}"
   notify: Restart crond
   loop: "{{ q('ansible.builtin.subelements', cronie_jobs, 'jobs', {'skip_missing': true}) }}"
   loop_control:
