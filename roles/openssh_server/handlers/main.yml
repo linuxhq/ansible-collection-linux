@@ -1,0 +1,9 @@
+---
+- name: Restart sshd
+  tags:
+    - openssh_server
+  become: true
+  ansible.builtin.service:
+    name: sshd
+    state: restarted
+...

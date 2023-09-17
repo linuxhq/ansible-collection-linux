@@ -1,0 +1,75 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - role: linuxhq.linux.openssh_server
+      openssh_server:
+        - key: AddressFamily
+          value: inet
+        - key: AllowAgentForwarding
+          value: 'no'
+        - key: ChallengeResponseAuthentication
+          value: 'no'
+        - key: Ciphers
+          value: aes128-ctr,aes192-ctr,aes256-ctr
+        - key: ClientAliveCountMax
+          value: '0'
+        - key: ClientAliveInterval
+          value: '300'
+        - key: Compression
+          value: delayed
+        - key: GSSAPIAuthentication
+          value: 'no'
+        - key: GSSAPICleanupCredentials
+          value: 'yes'
+        - key: HostbasedAuthentication
+          value: 'no'
+        - key: HostKey
+          value: /etc/ssh/ssh_host_rsa_key
+        - key: HostKey
+          value: /etc/ssh/ssh_host_ecdsa_key
+        - key: HostKey
+          value: /etc/ssh/ssh_host_ed25519_key
+        - key: IgnoreRhosts
+          value: 'yes'
+        - key: KerberosAuthentication
+          value: 'no'
+        - key: LogLevel
+          value: INFO
+        - key: LoginGraceTime
+          value: '30'
+        - key: MACs
+          value: hmac-sha2-256,hmac-sha2-512
+        - key: PasswordAuthentication
+          value: 'no'
+        - key: PermitEmptyPasswords
+          value: 'no'
+        - key: PermitRootLogin
+          value: 'no'
+        - key: PermitUserEnvironment
+          value: 'no'
+        - key: PrintLastLog
+          value: 'yes'
+        - key: PrintMotd
+          value: 'yes'
+        - key: Port
+          value: '22'
+        - key: Protocol
+          value: '2'
+        - key: PubkeyAuthentication
+          value: 'yes'
+        - key: StrictModes
+          value: 'yes'
+        - key: Subsystem
+          value: sftp internal-sftp -p close,lstat,mkdir,open,realpath,write
+        - key: SyslogFacility
+          value: AUTHPRIV
+        - key: TCPKeepAlive
+          value: 'yes'
+        - key: UseDNS
+          value: 'no'
+        - key: UsePAM
+          value: 'yes'
+        - key: X11Forwarding
+          value: 'no'
+...

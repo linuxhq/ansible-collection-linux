@@ -1,0 +1,8 @@
+# {{ ansible_managed }}
+
+{% for option in openssh_server | sort(attribute='key') %}
+{%   if option.key is defined and
+        option.value is defined %}
+{{ option.key }} {{ option.value }}
+{%   endif %}
+{% endfor %}
