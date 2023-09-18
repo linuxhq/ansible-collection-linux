@@ -1,0 +1,9 @@
+# {{ ansible_managed }}
+
+Host {{ _client.host }}
+{% for option in _client.options | sort(attribute='key') %}
+{%   if option.key is defined and
+        option.value is defined %}
+  {{ option.key }} {{ option.value }}
+{%   endif %}
+{% endfor %}

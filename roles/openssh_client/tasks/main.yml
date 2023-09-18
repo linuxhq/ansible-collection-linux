@@ -1,0 +1,65 @@
+---
+- name: Ensure openssh-clients package is present
+  tags:
+    - openssh_client
+  become: true
+  ansible.builtin.yum:
+    name: openssh-clients
+    state: present
+  when:
+    - ansible_distribution_major_version | int == 7
+
+- name: Ensure openssh-clients package is present
+  tags:
+    - openssh_client
+  become: true
+  ansible.builtin.dnf:
+    name: openssh-clients
+    state: present
+  when:
+    - ansible_distribution_major_version | int >= 8
+
+- name: Ensure openssh-clients template is present
+  tags:
+    - openssh_client
+  become: true
+  ansible.builtin.template:
+    dest: /etc/ssh/ssh_config
+    group: root
+    mode: '0644'
+    owner: root
+    src: ssh_config.j2
+
+- name: Ensure openssh-clients include directory is present
+  tags:
+    - openssh_client
+  become: true
+  ansible.builtin.file:
+    group: root
+    mode: '0755'
+    owner: root
+    path: "{{ openssh_client_include | ansible.builtin.dirname }}"
+    state: directory
+
+- name: Ensure openssh-clients include templates are present
+  tags:
+    - openssh_client
+  become: true
+  ansible.builtin.template:
+    dest: "{{ _dir }}/{{ _client.file }}.conf"
+    group: root
+    mode: '0644'
+    owner: root
+    src: ssh_config_d.j2
+  loop: "{{ openssh_client_d }}"
+  loop_control:
+    label: "{{ _client.file | default(none) }}"
+    loop_var: _client
+  vars:
+    _dir: "{{ openssh_client_include | ansible.builtin.dirname }}"
+  when:
+    - _client.file is defined
+    - _client.host is defined
+    - _client.options is defined
+    - _client.options | length > 0
+...

@@ -1,0 +1,13 @@
+# {{ ansible_managed }}
+
+{% if openssh_client | length > 0 %}
+Host *
+{%   for option in openssh_client | sort(attribute='key') %}
+{%     if option.key is defined and
+          option.value is defined %}
+  {{ option.key }} {{ option.value }}
+{%     endif %}
+{%   endfor %}
+{% endif %}
+
+Include {{ openssh_client_include }}

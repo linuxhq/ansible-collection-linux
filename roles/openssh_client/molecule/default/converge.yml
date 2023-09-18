@@ -1,0 +1,40 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - role: linuxhq.linux.openssh_client
+      openssh_client:
+        - key: AddressFamily
+          value: inet
+        - key: Ciphers
+          value: aes128-ctr,aes192-ctr,aes256-ctr
+        - key: ForwardAgent
+          value: 'no'
+        - key: ForwardX11
+          value: 'no'
+        - key: HashKnownHosts
+          value: 'yes'
+        - key: LogLevel
+          value: ERROR
+        - key: MACs
+          value: hmac-sha2-256,hmac-sha2-512
+        - key: StrictHostKeyChecking
+          value: 'no'
+        - key: UserKnownHostsFile
+          value: /dev/null
+      openssh_client_d:
+        - file: linuxhq
+          host: linuxhq.net
+          options:
+            - key: HashKnownHosts
+              value: 'no'
+            - key: LogLevel
+              value: QUIET
+        - file: tkimball
+          host: taylorkimball.com
+          options:
+            - key: ForwardAgent
+              value: 'yes'
+            - key: ForwardX11
+              value: 'yes'
+...
