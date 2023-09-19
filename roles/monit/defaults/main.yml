@@ -1,0 +1,32 @@
+---
+monit_alert:
+  - name: root@localhost
+monit_daemon: 30
+monit_eventqueue_basedir: /tmp
+monit_eventqueue_slots: 1024
+monit_filesystem: []
+monit_httpd:
+  - port 2812
+  - use address localhost
+  - allow localhost
+  - allow admin:monit
+monit_httpd_ssl: {}
+monit_host: []
+monit_include: /etc/monit.d/*
+monit_log: syslog
+monit_mailformat:
+  from: Monit <monit@$HOST>
+  subject: monit alert -- $EVENT $SERVICE
+  message: |-
+    $EVENT Service $SERVICE
+         Date:        $DATE
+         Action:      $ACTION
+         Host:        $HOST
+         Description: $DESCRIPTION
+
+    Your faithful employee,
+    Monit
+monit_mailserver: localhost
+monit_program: []
+monit_start_delay: 0
+...

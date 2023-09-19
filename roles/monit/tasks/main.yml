@@ -1,0 +1,43 @@
+---
+- name: Ensure monit package is present
+  tags:
+    - monit
+  become: true
+  ansible.builtin.yum:
+    name: monit
+    state: present
+  when:
+    - ansible_distribution_major_version | int == 7
+
+- name: Ensure monit package is present
+  tags:
+    - monit
+  become: true
+  ansible.builtin.dnf:
+    name: monit
+    state: present
+  when:
+    - ansible_distribution_major_version | int >= 8
+
+- name: Ensure monit template is present
+  tags:
+    - monit
+  become: true
+  ansible.builtin.template:
+    dest: /etc/monitrc
+    group: root
+    mode: '0600'
+    owner: root
+    src: monitrc.j2
+    validate: '/bin/monit -t -c %s'
+  notify: Reload monit
+
+- name: Ensure monit is started and enabled on boot
+  tags:
+    - monit
+  become: true
+  ansible.builtin.service:
+    enabled: true
+    name: monit
+    state: started
+...

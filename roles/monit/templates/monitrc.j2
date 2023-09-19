@@ -1,0 +1,72 @@
+# {{ ansible_managed }}
+
+set daemon {{ monit_daemon }} with start delay {{ monit_start_delay }}
+set log {{ monit_log }}
+set mailserver {{ monit_mailserver }}
+
+set mail-format {
+{% for key, value in monit_mailformat.items() %}
+    {{ key }}: {{ value | indent(13) }}
+{% endfor -%}
+}
+
+{% for alert in monit_alert %}
+{%   if alert.name is defined %}
+set alert {{ alert.name }}
+{%     if alert.rules is defined and
+          alert.rules | length > 0 %}
+{%       for rule in alert.rules %}
+    {{ rule }}
+{%       endfor %}
+{%     endif %}
+{%   endif %}
+{% endfor %}
+
+set eventqueue basedir {{ monit_eventqueue_basedir }} slots {{ monit_eventqueue_slots }}
+
+set httpd
+{% for httpd in monit_httpd %}
+    {{ httpd }}
+{% endfor %}
+{% if monit_httpd_ssl | length > 0 %}
+    with ssl {
+{%   for key, value in monit_httpd_ssl.items() %}
+         {{ key }}: {{ value }}
+{%   endfor %}
+    }
+{% endif %}
+
+{% for filesystem in monit_filesystem | sort(attribute='name') %}
+{%   if filesystem.name is defined and
+        filesystem.rules is defined and
+        filesystem.rules | length > 0 %}
+check filesystem {{ filesystem.name }}
+{%     for rule in filesystem.rules %}
+      {{ rule }}
+{%     endfor %}
+{%   endif %}
+{% endfor %}
+
+{% for host in monit_host | sort(attribute='name') %}
+{%   if host.name is defined and
+        host.rules is defined and
+        host.rules | length > 0 %}
+check host {{ host.name }}
+{%     for rule in host.rules %}
+      {{ rule }}
+{%     endfor %}
+{%   endif %}
+{% endfor %}
+
+{% for program in monit_program | sort(attribute='name') %}
+{%   if program.name is defined and
+        program.rules is defined and
+        program.rules | length > 0 %}
+check program {{ program.name }}
+{%     for rule in program.rules %}
+      {{ rule }}
+{%     endfor %}
+{%   endif %}
+{% endfor %}
+
+include {{ monit_include }}
