@@ -39,7 +39,7 @@ set httpd
     }
 {% endif %}
 
-{% for filesystem in monit_filesystem | sort(attribute='name') %}
+{% for filesystem in monit_filesystem %}
 {%   if filesystem.name is defined and
         filesystem.rules is defined and
         filesystem.rules | length > 0 %}
@@ -53,7 +53,7 @@ check filesystem {{ filesystem.name }}
 {%   endif %}
 {% endfor %}
 
-{% for host in monit_host | sort(attribute='name') %}
+{% for host in monit_host %}
 {%   if host.name is defined and
         host.rules is defined and
         host.rules | length > 0 %}
@@ -67,7 +67,7 @@ check host {{ host.name }}
 {%   endif %}
 {% endfor %}
 
-{% for program in monit_program | sort(attribute='name') %}
+{% for program in monit_program %}
 {%   if program.name is defined and
         program.rules is defined and
         program.rules | length > 0 %}
