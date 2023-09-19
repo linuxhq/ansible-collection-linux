@@ -47,14 +47,14 @@ None
             - key: UserKnownHostsFile
               value: /dev/null
           openssh_client_d:
-            - file: linuxhq
+            - file: 01-linuxhq
               host: linuxhq.net
               options:
                 - key: HashKnownHosts
                   value: 'no'
                 - key: LogLevel
                   value: QUIET
-            - file: tkimball
+            - file: 02-tkimball
               host: taylorkimball.com
               options:
                 - key: ForwardAgent
