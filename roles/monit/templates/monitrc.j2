@@ -20,6 +20,9 @@ set alert {{ alert.name }}
 {%       endfor %}
 {%     endif %}
 {%   endif %}
+{%   if not loop.last %}
+
+{%   endif %}
 {% endfor %}
 
 set eventqueue basedir {{ monit_eventqueue_basedir }} slots {{ monit_eventqueue_slots }}
@@ -45,6 +48,9 @@ check filesystem {{ filesystem.name }}
       {{ rule }}
 {%     endfor %}
 {%   endif %}
+{%   if not loop.last %}
+
+{%   endif %}
 {% endfor %}
 
 {% for host in monit_host | sort(attribute='name') %}
@@ -56,6 +62,9 @@ check host {{ host.name }}
       {{ rule }}
 {%     endfor %}
 {%   endif %}
+{%   if not loop.last %}
+
+{%   endif %}
 {% endfor %}
 
 {% for program in monit_program | sort(attribute='name') %}
@@ -66,6 +75,9 @@ check program {{ program.name }}
 {%     for rule in program.rules %}
       {{ rule }}
 {%     endfor %}
+{%   endif %}
+{%   if not loop.last %}
+
 {%   endif %}
 {% endfor %}
 
