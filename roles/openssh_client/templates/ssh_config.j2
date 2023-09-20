@@ -2,10 +2,21 @@
 
 {% if openssh_client | length > 0 %}
 Host *
-{%   for option in openssh_client | sort(attribute='key') %}
-{%     if option.key is defined and
-          option.value is defined %}
-  {{ option.key }} {{ option.value }}
+{%   for key, value in openssh_client | dictsort %}
+{%     if value is sameas true %}
+  {{ key }} yes
+{%     elif value is sameas false %}
+  {{ key }} no
+{%     elif value is string %}
+  {{ key }} {{ value | string }}
+{%     elif value is number %}
+  {{ key }} {{ value | int }}
+{%     elif value is iterable %}
+{%       for i in value %}
+  {{ key }} {{ i }}
+{%       endfor %}
+{%     else %}
+  {{ key }} {{ value }}
 {%     endif %}
 {%   endfor %}
 {% endif %}
