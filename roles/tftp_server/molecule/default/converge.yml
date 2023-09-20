@@ -1,0 +1,7 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - role: linuxhq.linux.tftp_server
+      tftp_server_exec_start: /usr/sbin/in.tftpd -c -p -s /var/lib/tftpboot
+...

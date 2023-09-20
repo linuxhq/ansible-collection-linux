@@ -1,0 +1,66 @@
+---
+- name: Ensure tftp-server package is present
+  tags:
+    - tftp_server
+  become: true
+  ansible.builtin.yum:
+    name: "{{ tftp_server_packages }}"
+    state: present
+  when:
+    - ansible_distribution_major_version | int == 7
+
+- name: Ensure tftp-server package is present
+  tags:
+    - tftp_server
+  become: true
+  ansible.builtin.dnf:
+    name: "{{ tftp_server_packages }}"
+    state: present
+  when:
+    - ansible_distribution_major_version | int >= 8
+
+- name: Ensure tftp-server systemd override directory is present
+  tags:
+    - tftp_server
+  become: true
+  ansible.builtin.file:
+    group: root
+    mode: '0755'
+    owner: root
+    path: /etc/systemd/system/tftp.service.d
+    state: directory
+  when:
+    - tftp_server_exec_start is not none
+
+- name: Ensure tftp-server systemd override template is present
+  tags:
+    - tftp_server
+  become: true
+  ansible.builtin.template:
+    dest: /etc/systemd/system/tftp.service.d/override.conf
+    group: root
+    mode: '0644'
+    owner: root
+    src: override.conf.j2
+  notify: Restart tftp-server
+  when:
+    - tftp_server_exec_start is not none
+
+- name: Ensure systemd is reloaded
+  tags:
+    - tftp_server
+  become: true
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  when:
+    - tftp_server_exec_start is not none
+
+- name: Ensure tftp-server is started and enabled on boot
+  tags:
+    - tftp_server
+  become: true
+  ansible.builtin.systemd_service:
+    enabled: true
+    name: tftp.service
+    state: started
+...
