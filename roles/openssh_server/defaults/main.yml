@@ -6,20 +6,20 @@ openssh_server:
     - LC_PAPER LC_NAME LC_ADDRESS LC_TELEPHONE LC_MEASUREMENT
     - XMODIFIERS
   AuthorizedKeysFile: .ssh/authorized_keys
-  ChallengeResponseAuthentication: no
-  GSSAPIAuthentication: yes
-  GSSAPICleanupCredentials: no
+  ChallengeResponseAuthentication: false
+  GSSAPIAuthentication: true
+  GSSAPICleanupCredentials: false
   HostKey:
     - /etc/ssh/ssh_host_ecdsa_key
     - /etc/ssh/ssh_host_ed25519_key
     - /etc/ssh/ssh_host_rsa_key
-  PasswordAuthentication: no
-  PermitRootLogin: yes
-  PrintMotd: no
+  PasswordAuthentication: false
+  PermitRootLogin: true
+  PrintMotd: false
   Subsystem: sftp /usr/libexec/openssh/sftp-server
   SyslogFacility: AUTHPRIV
-  UsePAM: yes
-  X11Forwarding: yes
+  UsePAM: true
+  X11Forwarding: true
 openssh_server_autocreate_server_keys: []
 openssh_server_crypto_policy: null
 openssh_server_use_strong_rng: false

@@ -19,20 +19,20 @@ Available variables are listed below, along with default values:
         - LC_PAPER LC_NAME LC_ADDRESS LC_TELEPHONE LC_MEASUREMENT
         - XMODIFIERS
       AuthorizedKeysFile: .ssh/authorized_keys
-      ChallengeResponseAuthentication: no
-      GSSAPIAuthentication: yes
-      GSSAPICleanupCredentials: no
+      ChallengeResponseAuthentication: false
+      GSSAPIAuthentication: true
+      GSSAPICleanupCredentials: false
       HostKey:
         - /etc/ssh/ssh_host_ecdsa_key
         - /etc/ssh/ssh_host_ed25519_key
         - /etc/ssh/ssh_host_rsa_key
-      PasswordAuthentication: no
-      PermitRootLogin: yes
-      PrintMotd: no
+      PasswordAuthentication: false
+      PermitRootLogin: true
+      PrintMotd: false
       Subsystem: sftp /usr/libexec/openssh/sftp-server
       SyslogFacility: AUTHPRIV
-      UsePAM: yes
-      X11Forwarding: yes
+      UsePAM: true
+      X11Forwarding: true
     openssh_server_autocreate_server_keys: []
     openssh_server_crypto_policy: null
     openssh_server_use_strong_rng: false
@@ -50,40 +50,40 @@ None
         - role: linuxhq.linux.openssh_server
           openssh_server:
             AddressFamily: inet
-            AllowAgentForwarding: no
-            ChallengeResponseAuthentication: no
+            AllowAgentForwarding: false
+            ChallengeResponseAuthentication: false
             Ciphers: aes128-ctr,aes192-ctr,aes256-ctr
             ClientAliveCountMax: 0
             ClientAliveInterval: 300
             Compression: delayed
-            GSSAPIAuthentication: no
-            GSSAPICleanupCredentials: yes
-            HostbasedAuthentication: no
+            GSSAPIAuthentication: false
+            GSSAPICleanupCredentials: true
+            HostbasedAuthentication: false
             HostKey:
               - /etc/ssh/ssh_host_rsa_key
               - /etc/ssh/ssh_host_ecdsa_key
               - /etc/ssh/ssh_host_ed25519_key
-            IgnoreRhosts: yes
-            KerberosAuthentication: no
+            IgnoreRhosts: true
+            KerberosAuthentication: false
             LogLevel: INFO
             LoginGraceTime: 30
             MACs: hmac-sha2-256,hmac-sha2-512
-            PasswordAuthentication: no
-            PermitEmptyPasswords: no
-            PermitRootLogin: no
-            PermitUserEnvironment: no
-            PrintLastLog: yes
-            PrintMotd: yes
+            PasswordAuthentication: false
+            PermitEmptyPasswords: false
+            PermitRootLogin: false
+            PermitUserEnvironment: false
+            PrintLastLog: true
+            PrintMotd: true
             Port: 22
             Protocol: 2
-            PubkeyAuthentication: yes
-            StrictModes: yes
+            PubkeyAuthentication: true
+            StrictModes: true
             Subsystem: sftp internal-sftp -p close,lstat,mkdir,open,realpath,write
             SyslogFacility: AUTHPRIV
-            TCPKeepAlive: yes
-            UseDNS: no
-            UsePAM: yes
-            X11Forwarding: no
+            TCPKeepAlive: true
+            UseDNS: false
+            UsePAM: true
+            X11Forwarding: false
 
 ## License
 
