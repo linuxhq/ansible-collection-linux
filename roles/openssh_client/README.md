@@ -12,7 +12,7 @@ None
 
 Available variables are listed below, along with default values:
 
-    openssh_client: []
+    openssh_client: {}
     openssh_client_d: []
     openssh_client_include: /etc/ssh/ssh_config.d/*.conf
 
