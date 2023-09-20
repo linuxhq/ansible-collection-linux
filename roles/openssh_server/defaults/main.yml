@@ -1,41 +1,25 @@
 ---
 openssh_server:
-  - key: AcceptEnv
-    value: LANG LC_CTYPE LC_NUMERIC LC_TIME LC_COLLATE LC_MONETARY LC_MESSAGES
-  - key: AcceptEnv
-    value: LC_IDENTIFICATION LC_ALL LANGUAGE
-  - key: AcceptEnv
-    value: LC_PAPER LC_NAME LC_ADDRESS LC_TELEPHONE LC_MEASUREMENT
-  - key: AcceptEnv
-    value: XMODIFIERS
-  - key: AuthorizedKeysFile
-    value: .ssh/authorized_keys
-  - key: ChallengeResponseAuthentication
-    value: 'no'
-  - key: GSSAPIAuthentication
-    value: 'yes'
-  - key: GSSAPICleanupCredentials
-    value: 'no'
-  - key: HostKey
-    value: /etc/ssh/ssh_host_ecdsa_key
-  - key: HostKey
-    value: /etc/ssh/ssh_host_ed25519_key
-  - key: HostKey
-    value: /etc/ssh/ssh_host_rsa_key
-  - key: PasswordAuthentication
-    value: 'no'
-  - key: PermitRootLogin
-    value: 'yes'
-  - key: PrintMotd
-    value: 'no'
-  - key: Subsystem
-    value: sftp /usr/libexec/openssh/sftp-server
-  - key: SyslogFacility
-    value: AUTHPRIV
-  - key: UsePAM
-    value: 'yes'
-  - key: X11Forwarding
-    value: 'yes'
+  AcceptEnv:
+    - LANG LC_CTYPE LC_NUMERIC LC_TIME LC_COLLATE LC_MONETARY LC_MESSAGES
+    - LC_IDENTIFICATION LC_ALL LANGUAGE
+    - LC_PAPER LC_NAME LC_ADDRESS LC_TELEPHONE LC_MEASUREMENT
+    - XMODIFIERS
+  AuthorizedKeysFile: .ssh/authorized_keys
+  ChallengeResponseAuthentication: no
+  GSSAPIAuthentication: yes
+  GSSAPICleanupCredentials: no
+  HostKey:
+    - /etc/ssh/ssh_host_ecdsa_key
+    - /etc/ssh/ssh_host_ed25519_key
+    - /etc/ssh/ssh_host_rsa_key
+  PasswordAuthentication: no
+  PermitRootLogin: yes
+  PrintMotd: no
+  Subsystem: sftp /usr/libexec/openssh/sftp-server
+  SyslogFacility: AUTHPRIV
+  UsePAM: yes
+  X11Forwarding: yes
 openssh_server_autocreate_server_keys: []
 openssh_server_crypto_policy: null
 openssh_server_use_strong_rng: false
