@@ -2,18 +2,18 @@
 
 {% for key, value in openssh_server | dictsort %}
 {%   if value is sameas true %}
-  {{ key }} yes
+{{ key }} yes
 {%   elif value is sameas false %}
-  {{ key }} no
+{{ key }} no
 {%   elif value is string %}
-  {{ key }} {{ value | string }}
+{{ key }} {{ value | string }}
 {%   elif value is number %}
-  {{ key }} {{ value | int }}
+{{ key }} {{ value | int }}
 {%   elif value is iterable %}
 {%     for i in value %}
-  {{ key }} {{ i }}
+{{ key }} {{ i }}
 {%     endfor %}
 {%   else %}
-  {{ key }} {{ value }}
+{{ key }} {{ value }}
 {%   endif %}
 {% endfor %}
