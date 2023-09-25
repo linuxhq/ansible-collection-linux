@@ -40,6 +40,7 @@ Available variables are listed below, along with default values:
         Your faithful employee,
         Monit
     monit_mailserver: localhost
+    monit_process: []
     monit_program: []
     monit_start_delay: 0
 

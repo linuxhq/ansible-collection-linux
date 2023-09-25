@@ -67,6 +67,20 @@ check host {{ host.name }}
 {%   endif %}
 {% endfor %}
 
+{% for process in monit_process %}
+{%   if process.name is defined and
+        process.rules is defined and
+        process.rules | length > 0 %}
+check process {{ process.name }}
+{%     for rule in process.rules %}
+      {{ rule }}
+{%     endfor %}
+{%   endif %}
+{%   if not loop.last %}
+
+{%   endif %}
+{% endfor %}
+
 {% for program in monit_program %}
 {%   if program.name is defined and
         program.rules is defined and
