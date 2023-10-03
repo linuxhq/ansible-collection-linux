@@ -12,6 +12,7 @@ None
 
 Available variables are listed below, along with default values:
 
+    cloudflared_command: tunnel run
     cloudflared_dir: /etc/cloudflared
     cloudflared_group: root
     cloudflared_packages:
@@ -32,6 +33,7 @@ None
         - linuxhq.linux
       roles:
         - role: linuxhq.linux.cloudflared
+          cloudflared_command: tunnel run -p http2
           cloudflared_tunnels:
             - name: linuxhq.net
               account_tag: 68b329da9893e34099c7d8ad5cb9c940

@@ -3,7 +3,7 @@ Description=Cloudflare Tunnel (%i)
 After=network.target
 
 [Service]
-ExecStart=/usr/bin/cloudflared --config /etc/cloudflared/%i.yml --no-autoupdate tunnel run
+ExecStart=/usr/bin/cloudflared --config /etc/cloudflared/%i.yml --no-autoupdate {{ cloudflared_command }}
 Group={{ cloudflared_group }}
 Restart=always
 RestartSec=5s

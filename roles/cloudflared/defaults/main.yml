@@ -1,4 +1,5 @@
 ---
+cloudflared_command: tunnel run
 cloudflared_dir: /etc/cloudflared
 cloudflared_group: root
 cloudflared_packages:
