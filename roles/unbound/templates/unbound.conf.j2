@@ -3,10 +3,10 @@
 {% if unbound_auth_zones | length > 0 %}
 {%   for zone in unbound_auth_zones.keys() | sort %}
 {%     for key, value in unbound_auth_zones[zone] | dictsort %}
-{%     if loop.index == 1 %}
+{%       if loop.index == 1 %}
 auth-zone:
   name: "{{ zone }}"
-{%     endif %}
+{%       endif %}
 {%       if value is sameas true %}
   {{ key }}: yes
 {%       elif value is sameas false %}
@@ -52,10 +52,10 @@ dynlib:
 {% if unbound_forward_zones | length > 0 %}
 {%   for zone in unbound_forward_zones.keys() | sort %}
 {%     for key, value in unbound_forward_zones[zone] | dictsort %}
-{%     if loop.index == 1 %}
+{%       if loop.index == 1 %}
 forward-zone:
   name: "{{ zone }}"
-{%     endif %}
+{%       endif %}
 {%       if value is sameas true %}
   {{ key }}: yes
 {%       elif value is sameas false %}
@@ -98,10 +98,10 @@ remote-control:
 {% if unbound_rpzs | length > 0 %}
 {%   for rpz in unbound_rpzs.keys() | sort %}
 {%     for key, value in unbound_rpzs[rpz] | dictsort %}
-{%     if loop.index == 1 %}
+{%       if loop.index == 1 %}
 rpz:
   name: "{{ rpz }}"
-{%     endif %}
+{%       endif %}
 {%       if value is sameas true %}
   {{ key }}: yes
 {%       elif value is sameas false %}
@@ -132,10 +132,10 @@ server:
 {% if unbound_stub_zones | length > 0 %}
 {%   for zone in unbound_stub_zones.keys() | sort %}
 {%     for key, value in unbound_stub_zones[zone] | dictsort %}
-{%     if loop.index == 1 %}
+{%       if loop.index == 1 %}
 stub-zone:
   name: "{{ zone }}"
-{%     endif %}
+{%       endif %}
 {%       if value is sameas true %}
   {{ key }}: yes
 {%       elif value is sameas false %}
@@ -159,10 +159,30 @@ stub-zone:
 {% endif %}
 
 {% if unbound_views | length > 0 %}
-{%   for key, value in unbound_views | dictsort %}
-{%     if loop.index == 1 %}
+{%   for view in unbound_views.keys() | sort %}
+{%     for key, value in unbound_views[view] | dictsort %}
+{%       if loop.index == 1 %}
 view:
-{%     endif %}
+  name: "{{ view }}"
+{%       endif %}
+{%       if value is sameas true %}
+  {{ key }}: yes
+{%       elif value is sameas false %}
+  {{ key }}: no
+{%       elif value is string %}
+  {{ key }}: {{ value | string }}
+{%       elif value is number %}
+  {{ key }}: {{ value | int }}
+{%       elif value is iterable %}
+{%         for i in value %}
+  {{ key }}: {{ i }}
+{%         endfor %}
+{%       else %}
   {{ key }}: {{ value }}
+{%       endif %}
+{%     endfor %}
+{%   if not loop.last %}
+
+{%   endif %}
 {%   endfor %}
 {% endif %}
