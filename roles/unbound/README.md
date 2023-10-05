@@ -24,7 +24,7 @@ Available variables are listed below, along with default values:
     unbound_remote_control: {}
     unbound_rpzs: {}
     unbound_server: {}
-    unbound_stub_zones: []
+    unbound_stub_zones: {}
     unbound_views: {}
 
 ## Dependencies
