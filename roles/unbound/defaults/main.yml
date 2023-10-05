@@ -1,0 +1,16 @@
+---
+unbound_auth_zones: {}
+unbound_cachedb: {}
+unbound_dnscrypt: {}
+unbound_dnstap: {}
+unbound_dynlib: {}
+unbound_forward_zones: {}
+unbound_include: /etc/unbound/conf.d/*.conf
+unbound_ipset: {}
+unbound_python: {}
+unbound_remote_control: {}
+unbound_rpzs: {}
+unbound_server: {}
+unbound_stub_zones: []
+unbound_views: {}
+...

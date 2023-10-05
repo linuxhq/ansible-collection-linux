@@ -1,0 +1,168 @@
+# {{ ansible_managed }}
+
+{% if unbound_auth_zones | length > 0 %}
+{%   for zone in unbound_auth_zones.keys() | sort %}
+{%     for key, value in unbound_auth_zones[zone] | dictsort %}
+{%     if loop.index == 1 %}
+auth-zone:
+  name: "{{ zone }}"
+{%     endif %}
+{%       if value is sameas true %}
+  {{ key }}: yes
+{%       elif value is sameas false %}
+  {{ key }}: no
+{%       elif value is string %}
+  {{ key }}: {{ value | string }}
+{%       elif value is number %}
+  {{ key }}: {{ value | int }}
+{%       elif value is iterable %}
+{%         for i in value %}
+  {{ key }}: {{ i }}
+{%         endfor %}
+{%       else %}
+  {{ key }}: {{ value }}
+{%       endif %}
+{%     endfor %}
+{%   if not loop.last %}
+
+{%   endif %}
+{%   endfor %}
+{% endif %}
+
+{% if unbound_cachedb | length > 0 %}
+cachedb:
+  {{ unbound_cachedb | to_nice_yaml(indent=2) | indent(2) }}
+{% endif %}
+
+{% if unbound_dnscrypt | length > 0 %}
+dnscrypt:
+  {{ unbound_dnscrypt | to_nice_yaml(indent=2) | indent(2) }}
+{% endif %}
+
+{% if unbound_dnstap | length > 0 %}
+dnstap:
+  {{ unbound_dnstap | to_nice_yaml(indent=2) | indent(2) }}
+{% endif %}
+
+{% if unbound_dynlib | length > 0 %}
+dynlib:
+  {{ unbound_dynlib | to_nice_yaml(indent=2) | indent(2) }}
+{% endif %}
+
+{% if unbound_forward_zones | length > 0 %}
+{%   for zone in unbound_forward_zones.keys() | sort %}
+{%     for key, value in unbound_forward_zones[zone] | dictsort %}
+{%     if loop.index == 1 %}
+forward-zone:
+  name: "{{ zone }}"
+{%     endif %}
+{%       if value is sameas true %}
+  {{ key }}: yes
+{%       elif value is sameas false %}
+  {{ key }}: no
+{%       elif value is string %}
+  {{ key }}: {{ value | string }}
+{%       elif value is number %}
+  {{ key }}: {{ value | int }}
+{%       elif value is iterable %}
+{%         for i in value %}
+  {{ key }}: {{ i }}
+{%         endfor %}
+{%       else %}
+  {{ key }}: {{ value }}
+{%       endif %}
+{%     endfor %}
+{%   if not loop.last %}
+
+{%   endif %}
+{%   endfor %}
+{% endif %}
+
+include: {{ unbound_include }}
+
+{% if unbound_ipset | length > 0 %}
+ipset:
+  {{ unbound_ipset | to_nice_yaml(indent=2) | indent(2) }}
+{% endif %}
+
+{% if unbound_python | length > 0 %}
+python:
+  {{ unbound_python | to_nice_yaml(indent=2) | indent(2) }}
+{% endif %}
+
+{% if unbound_remote_control | length > 0 %}
+remote-control:
+  {{ unbound_remote_control | to_nice_yaml(indent=2) | indent(2) }}
+{% endif %}
+
+{% if unbound_rpzs | length > 0 %}
+{%   for rpz in unbound_rpzs.keys() | sort %}
+{%     for key, value in unbound_rpzs[rpz] | dictsort %}
+{%     if loop.index == 1 %}
+rpz:
+  name: "{{ rpz }}"
+{%     endif %}
+{%       if value is sameas true %}
+  {{ key }}: yes
+{%       elif value is sameas false %}
+  {{ key }}: no
+{%       elif value is string %}
+  {{ key }}: {{ value | string }}
+{%       elif value is number %}
+  {{ key }}: {{ value | int }}
+{%       elif value is iterable %}
+{%         for i in value %}
+  {{ key }}: {{ i }}
+{%         endfor %}
+{%       else %}
+  {{ key }}: {{ value }}
+{%       endif %}
+{%     endfor %}
+{%   if not loop.last %}
+
+{%   endif %}
+{%   endfor %}
+{% endif %}
+
+{% if unbound_server | length > 0 %}
+server:
+  {{ unbound_server | to_nice_yaml(indent=2) | indent(2) }}
+{% endif %}
+
+{% if unbound_stub_zones | length > 0 %}
+{%   for zone in unbound_stub_zones.keys() | sort %}
+{%     for key, value in unbound_stub_zones[zone] | dictsort %}
+{%     if loop.index == 1 %}
+stub-zone:
+  name: "{{ zone }}"
+{%     endif %}
+{%       if value is sameas true %}
+  {{ key }}: yes
+{%       elif value is sameas false %}
+  {{ key }}: no
+{%       elif value is string %}
+  {{ key }}: {{ value | string }}
+{%       elif value is number %}
+  {{ key }}: {{ value | int }}
+{%       elif value is iterable %}
+{%         for i in value %}
+  {{ key }}: {{ i }}
+{%         endfor %}
+{%       else %}
+  {{ key }}: {{ value }}
+{%       endif %}
+{%     endfor %}
+{%   if not loop.last %}
+
+{%   endif %}
+{%   endfor %}
+{% endif %}
+
+{% if unbound_views | length > 0 %}
+{%   for key, value in unbound_views | dictsort %}
+{%     if loop.index == 1 %}
+view:
+{%     endif %}
+  {{ key }}: {{ value }}
+{%   endfor %}
+{% endif %}

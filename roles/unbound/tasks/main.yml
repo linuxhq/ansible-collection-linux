@@ -1,0 +1,45 @@
+---
+- name: Ensure unbound package is present
+  tags:
+    - unbound
+  become: true
+  ansible.builtin.yum:
+    name: unbound
+    state: present
+  when:
+    - ansible_distribution_major_version | int == 7
+
+- name: Ensure unbound package is present
+  tags:
+    - unbound
+  become: true
+  ansible.builtin.dnf:
+    name: unbound
+    state: present
+  when:
+    - ansible_distribution_major_version | int >= 8
+
+- name: Ensure unbound template is present
+  tags:
+    - unbound
+  become: true
+  ansible.builtin.template:
+    dest: /etc/unbound/unbound.conf
+    group: root
+    mode: '0644'
+    owner: root
+    src: unbound.conf.j2
+    validate: '/usr/sbin/unbound-checkconf -f %s'
+  notify: Restart unbound
+  when:
+    - unbound_server | length > 0
+
+- name: Ensure unbound is started and enabled on boot
+  tags:
+    - unbound
+  become: true
+  ansible.builtin.systemd_service:
+    enabled: true
+    name: unbound.service
+    state: started
+...
