@@ -1,0 +1,24 @@
+---
+- name: Ensure directories are present
+  tags:
+    - directory
+  become: true
+  ansible.builtin.file:
+    group: "{{ _directory.1.group | default(_directory.0.group) }}"
+    mode: "{{ _directory.1.mode | default(_directory.0.mode) }}"
+    owner: "{{ _directory.1.owner | default(_directory.0.owner) }}"
+    path: "{{ _directory.1.path }}"
+    state: directory
+  loop: "{{ q('ansible.builtin.subelements', directories, 'paths', {'skip_missing': true}) }}"
+  loop_control:
+    label: "{{ _directory.1.path | default(none) }}"
+    loop_var: _directory
+  when:
+    - _directory.0.group or
+      _directory.1.group is defined
+    - _directory.0.mode or
+      _directory.1.mode is defined
+    - _directory.0.owner or
+      _directory.1.owner is defined
+    - _directory.1.path is defined
+...
