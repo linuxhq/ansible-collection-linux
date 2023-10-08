@@ -19,49 +19,49 @@ platforms:
     tags:
       Name: *c7
 
-#  - name: &a8 almalinux-8
-#    aws_profile: molecule
-#    image_owner: '764336703387'
-#    image_name: 'AlmaLinux OS 8.8.20230524 x86_64'
-#    instance_type: t2.micro
-#    key_inject_method: ec2
-#    ssh_user: ec2-user
-#    vpc_subnet_id: subnet-00d20739fc370ed5e
-#    tags:
-#      Name: *a8
-#
-#  - name: &a9 almalinux-9
-#    aws_profile: molecule
-#    image_owner: '764336703387'
-#    image_name: 'AlmaLinux OS 9.2.20230804 x86_64'
-#    instance_type: t2.micro
-#    key_inject_method: ec2
-#    ssh_user: ec2-user
-#    vpc_subnet_id: subnet-00d20739fc370ed5e
-#    tags:
-#      Name: *a9
-#
-#  - name: &d11 debian-11
-#    aws_profile: molecule
-#    image_owner: '136693071363'
-#    image_name: 'debian-11-amd64*'
-#    instance_type: t2.micro
-#    key_inject_method: ec2
-#    ssh_user: admin
-#    vpc_subnet_id: subnet-00d20739fc370ed5e
-#    tags:
-#      Name: *d11
-#
-#  - name: &d12 debian-12
-#    aws_profile: molecule
-#    image_owner: '136693071363'
-#    image_name: 'debian-12-amd64*'
-#    instance_type: t2.micro
-#    key_inject_method: ec2
-#    ssh_user: admin
-#    vpc_subnet_id: subnet-00d20739fc370ed5e
-#    tags:
-#      Name: *d12
+  - name: &a8 almalinux-8
+    aws_profile: molecule
+    image_owner: '764336703387'
+    image_name: 'AlmaLinux OS 8.8.20230524 x86_64'
+    instance_type: t2.micro
+    key_inject_method: ec2
+    ssh_user: ec2-user
+    vpc_subnet_id: subnet-00d20739fc370ed5e
+    tags:
+      Name: *a8
+
+  - name: &a9 almalinux-9
+    aws_profile: molecule
+    image_owner: '764336703387'
+    image_name: 'AlmaLinux OS 9.2.20230804 x86_64'
+    instance_type: t2.micro
+    key_inject_method: ec2
+    ssh_user: ec2-user
+    vpc_subnet_id: subnet-00d20739fc370ed5e
+    tags:
+      Name: *a9
+
+  - name: &d11 debian-11
+    aws_profile: molecule
+    image_owner: '136693071363'
+    image_name: 'debian-11-amd64*'
+    instance_type: t2.micro
+    key_inject_method: ec2
+    ssh_user: admin
+    vpc_subnet_id: subnet-00d20739fc370ed5e
+    tags:
+      Name: *d11
+
+  - name: &d12 debian-12
+    aws_profile: molecule
+    image_owner: '136693071363'
+    image_name: 'debian-12-amd64*'
+    instance_type: t2.micro
+    key_inject_method: ec2
+    ssh_user: admin
+    vpc_subnet_id: subnet-00d20739fc370ed5e
+    tags:
+      Name: *d12
 
 provisioner:
   name: ansible
