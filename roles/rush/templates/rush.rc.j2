@@ -1,0 +1,22 @@
+# {{ ansible_managed }}
+
+rush 2.0
+
+global
+{% for rule in rush_global %}
+  {{ rule }}
+{% endfor %}
+
+{% for rule in rush_rules %}
+{%   if rule.name is defined and
+        rule.rules is defined and
+        rule.rules | length > 0 %}
+rule {{ rule.name }}
+{%     for r in rule.rules %}
+  {{ r }}
+{%     endfor %}
+{%   endif %}
+{%   if not loop.last %}
+
+{%   endif %}
+{% endfor %}

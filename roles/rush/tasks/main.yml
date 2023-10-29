@@ -1,0 +1,107 @@
+---
+- name: Ensure rush build dependencies are present
+  tags:
+    - rush
+  become: true
+  ansible.builtin.package:
+    name:
+      - gcc
+      - make
+    state: present
+
+- name: Ensure rush build directory is present
+  tags:
+    - rush
+  ansible.builtin.tempfile:
+    prefix: "{{ role_name ~ '.' }}"
+    state: directory
+  register: _tmpdir
+  changed_when: false
+
+- name: Ensure rush tarball is fetched and extracted
+  tags:
+    - rush
+  ansible.builtin.unarchive:
+    dest: "{{ _tmpdir.path }}"
+    extra_opts:
+      - --strip-components=1
+    remote_src: true
+    src: "{{ _url }}/{{ _tarball }}"
+  vars:
+    _tarball: "rush-{{ rush_version }}.tar.gz"
+    _url: 'https://download.gnu.org.ua/pub/release/rush'
+  changed_when: false
+
+- name: Ensure rush configure is executed
+  tags:
+    - rush
+  ansible.builtin.command:
+    chdir: "{{ _tmpdir.path }}"
+    cmd: >
+      ./configure
+      --program-prefix=
+      --disable-dependency-tracking
+      --prefix=/usr
+      --exec-prefix=/usr
+      --bindir=/usr/bin
+      --sbindir=/usr/sbin
+      --sysconfdir=/etc
+      --datadir=/usr/share
+      --includedir=/usr/include
+      --libdir=/usr/{{ _libdir }}
+      --libexecdir=/usr/libexec
+      --localstatedir=/var
+      --sharedstatedir=/var/lib
+      --mandir=/usr/share/man
+      --infodir=/usr/share/info
+  vars:
+    _libdir: "{{ 'lib64' if ansible_architecture == 'x86_64' else 'lib' }}"
+  changed_when: false
+
+- name: Ensure rush make is executed
+  tags:
+    - rush
+  ansible.builtin.command:
+    chdir: "{{ _tmpdir.path }}"
+    cmd: >
+      make
+  changed_when: false
+
+- name: Ensure rush make install is executed
+  tags:
+    - rush
+  become: true
+  ansible.builtin.command:
+    chdir: "{{ _tmpdir.path }}"
+    cmd: >
+      make install
+  changed_when: false
+
+- name: Ensure rush build directory is absent
+  tags:
+    - rush
+  diff: false
+  ansible.builtin.file:
+    path: "{{ _tmpdir.path }}"
+    state: absent
+  changed_when: false
+
+- name: Ensure rush is present in /etc/shells
+  tags:
+    - rush
+  become: true
+  ansible.builtin.lineinfile:
+    path: /etc/shells
+    line: /usr/sbin/rush
+
+- name: Ensure rush configuration template is present
+  tags:
+    - rush
+  become: true
+  ansible.builtin.template:
+    dest: /etc/rush.rc
+    group: root
+    mode: '0644'
+    owner: root
+    src: rush.rc.j2
+...

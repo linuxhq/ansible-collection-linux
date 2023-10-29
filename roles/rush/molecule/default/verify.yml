@@ -1,0 +1,14 @@
+---
+- name: Verify
+  hosts: all
+  tasks:
+    - name: Ensure stat is executed
+      ansible.builtin.stat:
+        path: /usr/sbin/rush
+      register: _stat
+
+    - name: Ensure rush binary is present
+      ansible.builtin.assert:
+        that:
+          - _stat.stat.exists | bool
+...
