@@ -27,13 +27,13 @@ None
       roles:
         - role: linuxhq.linux.sysctl
           sysctl_conf:
-            - key: kernel.modules_disabled
-              value: '1'
+            kernel.dmesg_restrict: 1
+            kernel.modules_disabled: 1
           sysctl_d:
             - name: 98-ansible
               parameters:
-                - key: vm.swappiness
-                  value: '5'
+                kernel.panic: 1
+                vm.swappiness: 5
 
 ## License
 

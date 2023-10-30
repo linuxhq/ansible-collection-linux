@@ -1,7 +1,5 @@
 # {{ ansible_managed }}
 
-{% for parameter in _d.parameters | sort(attribute='key') %}
-{%   if parameter.key is defined and parameter.value is defined %}
-{{ parameter.key }} = {{ parameter.value | string }}
-{%   endif %}
+{% for key, value in _d.parameters | dictsort %}
+{{ key }} = {{ value | string }}
 {% endfor %}
