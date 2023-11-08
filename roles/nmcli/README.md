@@ -12,6 +12,8 @@ None
 
 Available variables are listed below, along with default values:
 
+    nmcli: []
+
 ## Dependencies
 
 None
