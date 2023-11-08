@@ -32,6 +32,43 @@
     validate: '/bin/monit -t -c %s'
   notify: Reload monit
 
+- name: Ensure monit exec scripts directory is present
+  tags:
+    - monit
+  become: true
+  ansible.builtin.file:
+    group: root
+    mode: '0700'
+    owner: root
+    path: "{{ _path }}"
+    state: directory
+  loop:
+    - /opt/monit
+    - /opt/monit/bin
+  loop_control:
+    label: "{{ _path }}"
+    loop_var: _path
+  when:
+    - monit_exec | length > 0
+
+- name: Ensure monit exec scripts are present
+  tags:
+    - monit
+  become: true
+  ansible.builtin.template:
+    dest: "/opt/monit/bin/{{ _exec.name }}"
+    group: root
+    mode: '0700'
+    owner: root
+    src: exec.j2
+  loop: "{{ monit_exec }}"
+  loop_control:
+    label: "{{ _exec.name | default(none) }}"
+    loop_var: _exec
+  when:
+    - _exec.name is defined
+    - _exec.base64 is defined
+
 - name: Ensure monit is started and enabled on boot
   tags:
     - monit

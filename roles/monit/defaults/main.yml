@@ -1,9 +1,9 @@
 ---
-monit_alert:
-  - name: root@localhost
+monit_alert: []
 monit_daemon: 30
 monit_eventqueue_basedir: /tmp
 monit_eventqueue_slots: 1024
+monit_exec: []
 monit_filesystem: []
 monit_httpd:
   - port 2812

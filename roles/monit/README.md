@@ -12,11 +12,11 @@ None
 
 Available variables are listed below, along with default values:
 
-    monit_alert:
-      - name: root@localhost
+    monit_alert: []
     monit_daemon: 30
     monit_eventqueue_basedir: /tmp
     monit_eventqueue_slots: 1024
+    monit_exec: []
     monit_filesystem: []
     monit_httpd:
       - port 2812
@@ -62,6 +62,10 @@ Available variables are listed below, along with default values:
           monit_daemon: 60
           monit_eventqueue_basedir: /var/tmp
           monit_eventqueue_slots: 2048
+          monit_exec:
+            - name: dev_null.sh
+              base64: |
+                IyEvYmluL2Jhc2gKCmVjaG8gMSA+IC9kZXYvbnVsbAo=
           monit_filesystem:
             - name: root
               rules:

@@ -10,6 +10,10 @@
       monit_daemon: 60
       monit_eventqueue_basedir: /var/tmp
       monit_eventqueue_slots: 2048
+      monit_exec:
+        - name: dev_null.sh
+          base64: |
+            IyEvYmluL2Jhc2gKCmVjaG8gMSA+IC9kZXYvbnVsbAo=
       monit_filesystem:
         - name: root_linuxhq
           rules:
