@@ -1,0 +1,9 @@
+---
+- name: Reload NetworkManager
+  tags:
+    - nmcli
+  become: true
+  ansible.builtin.service:
+    name: NetworkManager
+    state: reloaded
+...

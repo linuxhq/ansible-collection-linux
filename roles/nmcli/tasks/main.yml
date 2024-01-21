@@ -1,0 +1,122 @@
+---
+- name: Ensure NetworkManager-tui package is present
+  tags:
+    - nmcli
+  become: true
+  ansible.builtin.dnf:
+    name: NetworkManager-tui
+    state: present
+  when:
+    - ansible_distribution_major_version | int == 7
+
+- name: Ensure NetworkManager package is present
+  tags:
+    - nmcli
+  become: true
+  ansible.builtin.dnf:
+    name: NetworkManager
+    state: present
+  when:
+    - ansible_distribution_major_version | int >= 8
+
+- name: Ensure NetworkManager is started and enabled on boot
+  tags:
+    - nmcli
+  become: true
+  ansible.builtin.service:
+    enabled: true
+    name: NetworkManager
+    state: started
+
+- name: Ensure nmcli network devices are managed
+  tags:
+    - nmcli
+  become: true
+  community.general.nmcli:
+    addr_gen_mode6: "{{ _network.addr_gen_mode6 | default(omit) }}"
+    ageingtime: "{{ _network.ageingtime | default(omit) }}"
+    arp_interval: "{{ _network.arp_interval | default(omit) }}"
+    arp_ip_target: "{{ _network.arp_ip_target | default(omit) }}"
+    autoconnect: "{{ _network.autoconnect | default(true) }}"
+    conn_name: "{{ _network.conn_name }}"
+    dhcp_client_id: "{{ _network.dhcp_client_id | default(omit) }}"
+    dns4: "{{ _network.dns4 | default(omit) }}"
+    dns4_ignore_auto: "{{ _network.dns4_ignore_auto | default(omit) }}"
+    dns4_options: "{{ _network.dns4_options | default(omit) }}"
+    dns4_search: "{{ _network.dns4_search | default(omit) }}"
+    dns6: "{{ _network.dns6 | default(omit) }}"
+    dns6_ignore_auto: "{{ _network.dns6_ignore_auto | default(omit) }}"
+    dns6_options: "{{ _network.dns6_options | default(omit) }}"
+    dns6_search: "{{ _network.dns6_search | default(omit) }}"
+    downdelay: "{{ _network.downdelay | default(omit) }}"
+    egress: "{{ _network.egress | default(omit) }}"
+    flags: "{{ _network.flags | default(omit) }}"
+    forwarddelay: "{{ _network.forwarddelay | default(omit) }}"
+    gsm: "{{ _network.gsm | default(omit) }}"
+    gw4: "{{ _network.gw4 | default(omit) }}"
+    gw4_ignore_auto: "{{ _network.gw4_ignore_auto | default(omit) }}"
+    gw6: "{{ _network.gw6 | default(omit) }}"
+    gw6_ignore_auto: "{{ _network.gw6_ignore_auto | default(omit) }}"
+    hairpin: "{{ _network.hairpin | default(omit) }}"
+    hellotime: "{{ _network.hellotime | default(omit) }}"
+    ifname: "{{ _network.ifname | default(omit) }}"
+    ignore_unsupported_suboptions: "{{ _network.ignore_unsupported_suboptions | default(omit) }}"
+    ingress: "{{ _network.ingress | default(omit) }}"
+    ip4: "{{ _network.ip4 | default(omit) }}"
+    ip6: "{{ _network.ip6 | default(omit) }}"
+    ip_privacy6: "{{ _network.ip_privacy6 | default(omit) }}"
+    ip_tunnel_dev: "{{ _network.ip_tunnel_dev | default(omit) }}"
+    ip_tunnel_input_key: "{{ _network.ip_tunnel_input_key | default(omit) }}"
+    ip_tunnel_local: "{{ _network.ip_tunnel_local | default(omit) }}"
+    ip_tunnel_output_key: "{{ _network.ip_tunnel_output_key | default(omit) }}"
+    ip_tunnel_remote: "{{ _network.ip_tunnel_remote | default(omit) }}"
+    mac: "{{ _network.mac | default(omit) }}"
+    macvlan: "{{ _network.macvlan | default(omit) }}"
+    master: "{{ _network.master | default(omit) }}"
+    maxage: "{{ _network.maxage | default(omit) }}"
+    may_fail4: "{{ _network.may_fail4 | default(omit) }}"
+    method4: "{{ _network.method4 | default(omit) }}"
+    method6: "{{ _network.method6 | default(omit) }}"
+    miimon: "{{ _network.miimon | default(omit) }}"
+    mtu: "{{ _network.mtu | default(omit) }}"
+    never_default4: "{{ _network.never_default4 | default(omit) }}"
+    path_cost: "{{ _network.path_cost | default(omit) }}"
+    primary: "{{ _network.primary | default(omit) }}"
+    priority: "{{ _network.priority | default(omit) }}"
+    route_metric4: "{{ _network.route_metric4 | default(omit) }}"
+    route_metric6: "{{ _network.route_metric6 | default(omit) }}"
+    routes4: "{{ _network.routes4 | default(omit) }}"
+    routes4_extended: "{{ _network.routes4_extended | default(omit) }}"
+    routes6: "{{ _network.routes6 | default(omit) }}"
+    routes6_extended: "{{ _network.routes6_extended | default(omit) }}"
+    routing_rules4: "{{ _network.routing_rules4 | default(omit) }}"
+    runner: "{{ _network.runner | default(omit) }}"
+    runner_fast_rate: "{{ _network.runner_fast_rate | default(omit) }}"
+    runner_hwaddr_policy: "{{ _network.runner_hwaddr_policy | default(omit) }}"
+    slave_type: "{{ _network.slave_type | default(omit) }}"
+    slavepriority: "{{ _network.slavepriority | default(omit) }}"
+    ssid: "{{ _network.ssid | default(omit) }}"
+    state: "{{ _network.state | default('present') }}"
+    stp: "{{ _network.stp | default(omit) }}"
+    transport_mode: "{{ _network.transport_mode | default(omit) }}"
+    type: "{{ _network.type | default(omit) }}"
+    updelay: "{{ _network.updelay | default(omit) }}"
+    vlandev: "{{ _network.vlandev | default(omit) }}"
+    vlanid: "{{ _network.vlanid | default(omit) }}"
+    vpn: "{{ _network.vpn | default(omit) }}"
+    vxlan_id: "{{ _network.vxlan_id | default(omit) }}"
+    vxlan_local: "{{ _network.vxlan_local | default(omit) }}"
+    vxlan_remote: "{{ _network.vxlan_remote | default(omit) }}"
+    wifi: "{{ _network.wifi | default(omit) }}"
+    wifi_sec: "{{ _network.wifi_sec | default(omit) }}"
+    wireguard: "{{ _network.wireguard | default(omit) }}"
+    xmit_hash_policy: "{{ _network.xmit_hash_policy | default(omit) }}"
+    zone: "{{ _network.zone | default(omit) }}"
+  notify: Reload NetworkManager
+  loop: "{{ nmcli }}"
+  loop_control:
+    label: "{{ _network.conn_name | default(none) }}"
+    loop_var: _network
+  when:
+    - _network.conn_name is defined
+...
