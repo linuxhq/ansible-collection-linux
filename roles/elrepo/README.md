@@ -22,9 +22,13 @@ Available variables are listed below, along with default values:
     elrepo_packages: []
     elrepo_releasever: "{{ ansible_distribution_major_version }}"
     elrepo_repository_elrepo: true
+    elrepo_repository_elrepo_mirrorlist: true
     elrepo_repository_elrepo_testing: false
+    elrepo_repository_elrepo_testing_mirrorlist: true
     elrepo_repository_elrepo_kernel: false
+    elrepo_repository_elrepo_kernel_mirrorlist: true
     elrepo_repository_elrepo_extras: false
+    elrepo_repository_elrepo_extras_mirrorlist: true
     elrepo_rpm_key: https://www.elrepo.org/RPM-GPG-KEY-elrepo.org
 
 ## Dependencies
