@@ -42,60 +42,14 @@
     owner: root
     src: "{{ 'elrepo.repo.' ~ elrepo_releasever ~ '.j2' }}"
 
-- name: Ensure old kernel packages are absent
+- name: Ensure elrepo kernel tasks are included
   tags:
     - elrepo
-  become: true
-  ansible.builtin.yum:
-    name: "{{ elrepo_kernel_absent }}"
-    state: absent
-  when:
-    - elrepo_kernel | bool
-    - elrepo_releasever | int == 7
-
-- name: Ensure old kernel packages are absent
-  tags:
-    - elrepo
-  become: true
-  ansible.builtin.dnf:
-    name: "{{ elrepo_kernel_absent }}"
-    state: absent
-  when:
-    - elrepo_kernel | bool
-    - elrepo_releasever | int >= 8
-
-- name: Ensure elrepo kernel package is present
-  tags:
-    - elrepo
-  become: true
-  ansible.builtin.yum:
-    enablerepo: elrepo-kernel
-    name: "kernel-{{ elrepo_kernel_version }}"
-    state: present
-  when:
-    - elrepo_kernel | bool
-    - elrepo_releasever | int == 7
-
-- name: Ensure elrepo kernel package is present
-  tags:
-    - elrepo
-  become: true
-  ansible.builtin.dnf:
-    enablerepo: elrepo-kernel
-    name: "kernel-{{ elrepo_kernel_version }}"
-    state: present
-  when:
-    - elrepo_kernel | bool
-    - elrepo_releasever | int >= 8
-
-- name: Ensure elrepo kernel is grub default
-  tags:
-    - elrepo
-  become: true
-  ansible.builtin.command:
-    cmd: >
-      /usr/sbin/grub2-set-default 0
-  changed_when: false
+  ansible.builtin.include_tasks:
+    apply:
+      tags:
+        - elrepo_kernel
+    file: kernel.yml
   when:
     - elrepo_kernel | bool
 

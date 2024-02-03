@@ -1,0 +1,81 @@
+---
+- name: Ensure old kernel devel and tools packages are absent
+  tags:
+    - elrepo
+  become: true
+  ansible.builtin.package:
+    name:
+      - kernel-devel
+      - kernel-tools
+      - kernel-tools-libs
+    state: absent
+
+- name: Ensure elrepo kernel package is present
+  tags:
+    - elrepo
+  become: true
+  ansible.builtin.yum:
+    enablerepo: elrepo-kernel
+    name:
+      - kernel-headers
+      - "kernel-{{ elrepo_kernel_version }}"
+      - "kernel-{{ elrepo_kernel_version }}-devel"
+    state: present
+  register: _elrepo_kernel
+  when:
+    - elrepo_releasever | int == 7
+
+- name: Ensure elrepo kernel package is present
+  tags:
+    - elrepo
+  become: true
+  ansible.builtin.dnf:
+    enablerepo: elrepo-kernel
+    name:
+      - kernel-headers
+      - "kernel-{{ elrepo_kernel_version }}"
+      - "kernel-{{ elrepo_kernel_version }}-devel"
+    state: present
+  register: _elrepo_kernel
+  when:
+    - elrepo_releasever | int >= 8
+
+- name: Ensure elrepo kernel is grub default
+  tags:
+    - elrepo
+  become: true
+  ansible.builtin.command:
+    cmd: >
+      /usr/sbin/grub2-set-default 0
+  when:
+    - elrepo_kernel_default | bool
+    - _elrepo_kernel is changed
+  changed_when: false
+
+- name: Ensure system is rebooted to pickup new kernel
+  tags:
+    - elrepo
+  become: true
+  ansible.builtin.reboot:
+    reboot_timeout: 600
+    test_command: >
+      uname -r
+  when:
+    - elrepo_kernel_reboot | bool
+    - _elrepo_kernel is changed
+
+- name: Ensure old kernel core and module packages are absent
+  tags:
+    - elrepo
+  become: true
+  ansible.builtin.package:
+    name:
+      - kernel
+      - kernel-core
+      - kernel-modules
+      - kernel-modules-core
+    state: absent
+  when:
+    - elrepo_kernel_absent | bool
+    - _elrepo_kernel is changed
+...

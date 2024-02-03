@@ -13,11 +13,9 @@ None
 Available variables are listed below, along with default values:
 
     elrepo_kernel: false
-    elrepo_kernel_absent:
-      - kernel-devel
-      - kernel-headers
-      - kernel-tools
-      - kernel-tools-libs
+    elrepo_kernel_absent: false
+    elrepo_kernel_default: false
+    elrepo_kernel_reboot: false
     elrepo_kernel_version: ml
     elrepo_packages: []
     elrepo_releasever: "{{ ansible_distribution_major_version }}"
@@ -43,9 +41,13 @@ None
       roles:
         - role: linuxhq.linux.elrepo
           elrepo_kernel: true
+          elrepo_kernel_absent: true
+          elrepo_kernel_default: true
+          elrepo_kernel_reboot: true
           elrepo_kernel_version: lt
           elrepo_packages:
             - kmod-a3818
+          elrepo_repository_elrepo_kernel: true
 
 ## License
 
