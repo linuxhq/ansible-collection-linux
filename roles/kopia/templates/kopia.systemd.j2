@@ -1,0 +1,15 @@
+[Unit]
+Description=Kopia Server
+After=network.target
+
+[Service]
+EnvironmentFile=/etc/sysconfig/kopia
+ExecStart=/usr/bin/kopia server start {{ kopia_server_args | join(' ') }}
+Group=root
+Restart=always
+RestartSec=5
+Type=simple
+User=root
+
+[Install]
+WantedBy=multi-user.target

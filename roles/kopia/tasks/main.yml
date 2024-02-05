@@ -1,0 +1,39 @@
+---
+- name: Ensure kopia rpm key is present
+  tags:
+    - kopia
+  become: true
+  ansible.builtin.rpm_key:
+    key: "{{ kopia_rpm_key }}"
+    state: present
+
+- name: Ensure kopia repository template is present
+  tags:
+    - kopia
+  become: true
+  ansible.builtin.template:
+    dest: /etc/yum.repos.d/kopia.repo
+    group: root
+    mode: '0644'
+    owner: root
+    src: kopia.repo.j2
+
+- name: Ensure kopia packages are present
+  tags:
+    - kopia
+  become: true
+  ansible.builtin.dnf:
+    name: "{{ kopia_packages }}"
+    state: present
+
+- name: Ensure kopia server tasks are included
+  tags:
+    - kopia
+  ansible.builtin.include_tasks:
+    apply:
+      tags:
+        - kopia_server
+    file: server.yml
+  when:
+    - kopia_server | bool
+...

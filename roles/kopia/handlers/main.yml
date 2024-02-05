@@ -1,0 +1,9 @@
+---
+- name: Restart kopia
+  tags:
+    - kopia
+  become: true
+  ansible.builtin.service:
+    name: kopia.service
+    state: restarted
+...

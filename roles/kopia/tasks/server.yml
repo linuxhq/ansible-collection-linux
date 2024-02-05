@@ -1,0 +1,133 @@
+---
+- name: Ensure kopia systemd templates are present
+  tags:
+    - kopia
+  become: true
+  ansible.builtin.template:
+    dest: "{{ _template.dest }}"
+    group: root
+    mode: "{{ _template.mode }}"
+    owner: root
+    src: "{{ _template.src }}"
+  notify: Restart kopia
+  loop:
+    - { dest: /etc/sysconfig/kopia,
+        mode: '0640',
+        src: kopia.sysconfig.j2 }
+    - { dest: /usr/lib/systemd/system/kopia.service,
+        mode: '0644',
+        src: kopia.systemd.j2 }
+  loop_control:
+    label: "{{ _template.dest }}"
+    loop_var: _template
+
+- name: Ensure systemd is reloaded
+  tags:
+    - kopia
+  become: true
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+
+- name: Ensure kopia is started and enabled on boot
+  tags:
+    - kopia
+  become: true
+  ansible.builtin.service:
+    enabled: true
+    name: kopia.service
+    state: started
+
+- name: Ensure kopia backup repository status is gathered
+  tags:
+    - kopia
+  become: true
+  ansible.builtin.command:
+    cmd: >
+      kopia repository status
+  register: _kopia_repository_status
+  when:
+    - kopia_repository | length > 0
+  changed_when: false
+  failed_when: false
+
+- name: Ensure kopia backup repository is present
+  tags:
+    - kopia
+  become: true
+  environment:
+    KOPIA_PASSWORD: "{{ kopia_password }}"
+  ansible.builtin.command:
+    cmd: >
+      kopia repository create
+        {{ kopia_repository.location }}
+        {{ kopia_repository.flags | join(' ') }}
+  when:
+    - _kopia_repository_status is not skipped
+    - _kopia_repository_status.rc == 1
+    - kopia_repository.location is defined
+    - kopia_repository.flags is defined
+    - kopia_repository.flags | length > 0
+  changed_when: false
+
+- name: Ensure kopia backup repository is validated
+  tags:
+    - kopia
+  become: true
+  ansible.builtin.command:
+    cmd: >
+      kopia repository validate-provider
+  when:
+    - _kopia_repository_status is not skipped
+    - _kopia_repository_status.rc == 1
+    - kopia_repository.location is defined
+    - kopia_repository.flags is defined
+    - kopia_repository.flags | length > 0
+  changed_when: false
+
+- name: Ensure kopia maintenance settings are present
+  tags:
+    - kopia
+  become: true
+  ansible.builtin.command:
+    cmd: >
+      kopia maintenance set
+        {{ kopia_maintenance | join(' ') }}
+  when:
+    - kopia_maintenance | length > 0
+  changed_when: false
+
+- name: Ensure kopia backup policies are present
+  tags:
+    - kopia
+  become: true
+  ansible.builtin.command:
+    cmd: >
+      kopia policy set
+        {{ _policy.flags | join(' ') }}
+        {{ _policy.target }}
+  loop: "{{ kopia_policies }}"
+  loop_control:
+    label: "{{ _policy.target | default(none) }}"
+    loop_var: _policy
+  when:
+    - _policy.flags is defined
+    - _policy.flags | length > 0
+    - _policy.target is defined
+  changed_when: false
+
+- name: Ensure kopia snapshots are present
+  tags:
+    - kopia
+  become: true
+  ansible.builtin.command:
+    cmd: >
+      kopia snapshot create
+        {{ _snapshot.target }}
+  loop: "{{ kopia_policies }}"
+  loop_control:
+    label: "{{ _snapshot.target | default(none) }}"
+    loop_var: _snapshot
+  when:
+    - _snapshot.target is defined
+  changed_when: false
+...
