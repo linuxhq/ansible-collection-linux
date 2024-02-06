@@ -4,22 +4,12 @@
     - kopia
   become: true
   ansible.builtin.template:
-    dest: "{{ _template.dest }}"
+    dest: /usr/lib/systemd/system/kopia.service
     group: root
-    mode: "{{ _template.mode }}"
+    mode: '0644'
     owner: root
-    src: "{{ _template.src }}"
+    src: kopia.systemd.j2
   notify: Restart kopia
-  loop:
-    - { dest: /etc/sysconfig/kopia,
-        mode: '0640',
-        src: kopia.sysconfig.j2 }
-    - { dest: /usr/lib/systemd/system/kopia.service,
-        mode: '0644',
-        src: kopia.systemd.j2 }
-  loop_control:
-    label: "{{ _template.dest }}"
-    loop_var: _template
 
 - name: Ensure systemd is reloaded
   tags:
