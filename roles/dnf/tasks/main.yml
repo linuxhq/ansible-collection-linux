@@ -10,6 +10,25 @@
     owner: root
     src: dnf.conf.j2
 
+- name: Ensure dnf protected.d templates are present
+  tags:
+    - dnf
+  become: true
+  ansible.builtin.template:
+    dest: "/etc/dnf/protected.d/{{ _protected.name }}.conf"
+    group: root
+    mode: '0644'
+    owner: root
+    src: protected_d.conf.j2
+  loop: "{{ dnf_protected_d }}"
+  loop_control:
+    label: "{{ _protected.name | default(none) }}"
+    loop_var: _protected
+  when:
+    - _protected.name
+    - _protected.packages is defined
+    - _protected.packages | length > 0
+
 - name: Ensure dnf packages are present
   tags:
     - dnf

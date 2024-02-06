@@ -20,6 +20,7 @@ Available variables are listed below, along with default values:
     dnf_gpgcheck: true
     dnf_installonly_limit: 3
     dnf_present: []
+    dnf_protected_d: []
     dnf_skip_if_unavailable: false
     dnf_update: false
     dnf_update_cache: false
@@ -37,6 +38,13 @@ None
         - role: linuxhq.linux.dnf
           dnf_present:
             - python-virtualenv
+          dnf_protected_d:
+            - name: shim
+              packages:
+                - shim-aa64
+                - shim-arm
+                - shim-ia32
+                - shim-x64
           dnf_update: true
 
 ## License
