@@ -21,7 +21,7 @@
       - "kernel-{{ elrepo_kernel_version }}"
       - "kernel-{{ elrepo_kernel_version }}-devel"
     state: present
-  register: _elrepo_kernel
+  register: _kernel
   when:
     - elrepo_releasever | int == 7
 
@@ -36,7 +36,7 @@
       - "kernel-{{ elrepo_kernel_version }}"
       - "kernel-{{ elrepo_kernel_version }}-devel"
     state: present
-  register: _elrepo_kernel
+  register: _kernel
   when:
     - elrepo_releasever | int >= 8
 
@@ -47,9 +47,10 @@
   ansible.builtin.command:
     cmd: >
       /usr/sbin/grub2-set-default 0
+  register: _grub
   when:
+    - _kernel is changed
     - elrepo_kernel_default | bool
-    - _elrepo_kernel is changed
   changed_when: false
 
 - name: Ensure system is rebooted to pickup new kernel
@@ -60,9 +61,11 @@
     reboot_timeout: 600
     test_command: >
       uname -r
+  register: _reboot
   when:
+    - _kernel is changed
+    - _grub is success
     - elrepo_kernel_reboot | bool
-    - _elrepo_kernel is changed
 
 - name: Ensure old kernel core and module packages are absent
   tags:
@@ -76,6 +79,8 @@
       - kernel-modules-core
     state: absent
   when:
+    - _kernel is changed
+    - _grub is success
+    - _reboot is success
     - elrepo_kernel_absent | bool
-    - _elrepo_kernel is changed
 ...
