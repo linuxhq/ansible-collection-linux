@@ -11,7 +11,8 @@
     mode: "{{ _template.1.mode | default(_template.0.mode) }}"
     owner: "{{ _template.1.owner | default(_template.0.owner) }}"
     src: "{{ _template.0.path_src }}/{{ _template.1.src }}"
-    validate: "{{ _template.0.validate | default(false) }}"
+    trim_blocks: "{{ _template.1.trim_blocks | default(true) }}"
+    validate: "{{ _template.1.validate | default(omit) }}"
   loop: "{{ q('ansible.builtin.subelements', templates, 'paths', {'skip_missing': true}) }}"
   loop_control:
     label: "{{ _label }}"
