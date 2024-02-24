@@ -23,32 +23,29 @@ auth-zone:
   {{ key }}: {{ value }}
 {%       endif %}
 {%     endfor %}
-{%     if not loop.last %}
 
-{%     endif %}
 {%   endfor %}
 {% endif %}
-
 {% if unbound_cachedb | length > 0 %}
+
 cachedb:
   {{ unbound_cachedb | to_nice_yaml(indent=2) | indent(2) }}
 {% endif %}
-
 {% if unbound_dnscrypt | length > 0 %}
+
 dnscrypt:
   {{ unbound_dnscrypt | to_nice_yaml(indent=2) | indent(2) }}
 {% endif %}
-
 {% if unbound_dnstap | length > 0 %}
+
 dnstap:
   {{ unbound_dnstap | to_nice_yaml(indent=2) | indent(2) }}
 {% endif %}
-
 {% if unbound_dynlib | length > 0 %}
+
 dynlib:
   {{ unbound_dynlib | to_nice_yaml(indent=2) | indent(2) }}
 {% endif %}
-
 {% if unbound_forward_zones | length > 0 %}
 {%   for zone in unbound_forward_zones.keys() | sort %}
 {%     for key, value in unbound_forward_zones[zone] | dictsort %}
@@ -72,29 +69,25 @@ forward-zone:
   {{ key }}: {{ value }}
 {%       endif %}
 {%     endfor %}
-{%     if not loop.last %}
 
-{%     endif %}
 {%   endfor %}
 {% endif %}
-
 include: {{ unbound_include }}
-
 {% if unbound_ipset | length > 0 %}
+
 ipset:
   {{ unbound_ipset | to_nice_yaml(indent=2) | indent(2) }}
 {% endif %}
-
 {% if unbound_python | length > 0 %}
+
 python:
   {{ unbound_python | to_nice_yaml(indent=2) | indent(2) }}
 {% endif %}
-
 {% if unbound_remote_control | length > 0 %}
+
 remote-control:
   {{ unbound_remote_control | to_nice_yaml(indent=2) | indent(2) }}
 {% endif %}
-
 {% if unbound_rpzs | length > 0 %}
 {%   for rpz in unbound_rpzs.keys() | sort %}
 {%     for key, value in unbound_rpzs[rpz] | dictsort %}
@@ -118,17 +111,14 @@ rpz:
   {{ key }}: {{ value }}
 {%       endif %}
 {%     endfor %}
-{%     if not loop.last %}
 
-{%     endif %}
 {%   endfor %}
 {% endif %}
-
 {% if unbound_server | length > 0 %}
+
 server:
   {{ unbound_server | to_nice_yaml(indent=2) | indent(2) }}
 {% endif %}
-
 {% if unbound_stub_zones | length > 0 %}
 {%   for zone in unbound_stub_zones.keys() | sort %}
 {%     for key, value in unbound_stub_zones[zone] | dictsort %}
@@ -152,12 +142,9 @@ stub-zone:
   {{ key }}: {{ value }}
 {%       endif %}
 {%     endfor %}
-{%     if not loop.last %}
 
-{%     endif %}
 {%   endfor %}
 {% endif %}
-
 {% if unbound_views | length > 0 %}
 {%   for view in unbound_views.keys() | sort %}
 {%     for key, value in unbound_views[view] | dictsort %}
@@ -181,8 +168,6 @@ view:
   {{ key }}: {{ value }}
 {%       endif %}
 {%     endfor %}
-{%     if not loop.last %}
 
-{%     endif %}
 {%   endfor %}
 {% endif %}
