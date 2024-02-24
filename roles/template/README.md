@@ -26,16 +26,17 @@ None
       roles:
         - role: linuxhq.linux.template
           templates:
-            - dest: /tmp/template_1
-              group: root
-              mode: '0600'
-              owner: root
-              src: /path/to/template_1.j2
-            - dest: /tmp/template_2
-              group: root
+            - group: linuxhq
               mode: '0644'
-              owner: root
-              src: /path/to/template_2.j2
+              owner: linuxhq
+              path_dest: /home/linuxhq/containers
+              path_src: "{{ lookup('env', 'PWD') ~ '/templates' }}"
+              paths:
+                - dest: certbot/config/cloudflare.ini
+                  src: certbot/cloudflare.ini.j2
+                - dest: openssh-server/config/pubkeys/linuxhq
+                  mode: '0600'
+                  src: openssh-server/pubkey.j2
 
 ## License
 

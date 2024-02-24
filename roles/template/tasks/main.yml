@@ -4,21 +4,29 @@
     - template
   become: true
   ansible.builtin.template:
-    backup: "{{ _template.backup | default(omit) }}"
-    dest: "{{ _template.dest }}"
-    follow: "{{ _template.follow | default(false) }}"
-    group: "{{ _template.group | default(omit) }}"
-    mode: "{{ _template.mode | default(omit) }}"
-    owner: "{{ _template.owner | default(omit) }}"
-    src: "{{ _template.src }}"
-    validate: "{{ _template.validate | default(omit) }}"
-  loop: "{{ templates }}"
+    backup: "{{ _template.0.backup | default(false) }}"
+    dest: "{{ _template.0.path_dest }}/{{ _template.1.dest }}"
+    follow: "{{ _template.0.follow | default(false) }}"
+    group: "{{ _template.1.group | default(_template.0.group) }}"
+    mode: "{{ _template.1.mode | default(_template.0.mode) }}"
+    owner: "{{ _template.1.owner | default(_template.0.owner) }}"
+    src: "{{ _template.0.path_src }}/{{ _template.1.src }}"
+    validate: "{{ _template.0.validate | default(false) }}"
+  loop: "{{ q('ansible.builtin.subelements', templates, 'paths', {'skip_missing': true}) }}"
   loop_control:
-    label: "{{ _label | default(none) }}"
+    label: "{{ _label }}"
     loop_var: _template
   vars:
-    _label: "{{ _template.src | basename }}"
+    _label: "{{ _template.1.dest | basename | default(none) }}"
   when:
-    - _template.dest is defined
-    - _template.src is defined
+    - _template.0.group is defined or
+      _template.1.group is defined
+    - _template.0.mode is defined or
+      _template.1.mode is defined
+    - _template.0.owner is defined or
+      _template.1.owner is defined
+    - _template.0.path_dest is defined
+    - _template.0.path_src is defined
+    - _template.1.dest is defined
+    - _template.1.src is defined
 ...
