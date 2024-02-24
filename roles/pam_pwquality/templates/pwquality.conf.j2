@@ -1,10 +1,22 @@
 # {{ ansible_managed }}
 
+{% if pam_pwquality_badwords | length > 0 %}
+badwords {{ pam_pwquality_badwords | join(' ') }}
+{% endif %}
 dcredit = {{ pam_pwquality_dcredit | int }}
 dictcheck = {{ pam_pwquality_dictcheck | int }}
+{% if pam_pwquality_dictpath is not none %}
+dictpath {{ pam_pwquality_dictpath }}
+{% endif %}
 difok = {{ pam_pwquality_difok | int }}
+{% if pam_pwquality_enforce_for_root | bool %}
+enforce_for_root
+{% endif %}
 enforcing = {{ pam_pwquality_enforcing | int }}
 gecoscheck = {{ pam_pwquality_gecoscheck | int }}
+{% if pam_pwquality_local_users_only | bool %}
+local_users_only
+{% endif %}
 lcredit = {{ pam_pwquality_lcredit | int }}
 maxclassrepeat = {{ pam_pwquality_maxclassrepeat | int }}
 maxrepeat = {{ pam_pwquality_maxrepeat | int }}
@@ -16,19 +28,3 @@ retry = {{ pam_pwquality_retry | int }}
 ucredit = {{ pam_pwquality_ucredit | int }}
 usercheck = {{ pam_pwquality_usercheck | int }}
 usersubstr = {{ pam_pwquality_usersubstr | int }}
-
-{% if pam_pwquality_badwords | length > 0 %}
-badwords {{ pam_pwquality_badwords | join(' ') }}
-{% endif %}
-
-{% if pam_pwquality_dictpath is not none %}
-dictpath {{ pam_pwquality_dictpath }}
-{% endif %}
-
-{% if pam_pwquality_enforce_for_root | bool %}
-enforce_for_root
-{% endif %}
-
-{% if pam_pwquality_local_users_only | bool %}
-local_users_only
-{% endif %}
