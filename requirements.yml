@@ -1,9 +1,0 @@
----
-collections:
-  - name: ansible.posix
-    version: '*'
-  - name: community.docker
-    version: '*'
-  - name: community.general
-    version: '*'
-...
