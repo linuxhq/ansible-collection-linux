@@ -96,7 +96,7 @@
   ansible.builtin.set_fact:
     _docker_compose_changed: "{{ _docker_compose_changed |
                                  default([]) +
-                                 [ _name ] }}"
+                                 [_name] }}"
   loop: "{{ _docker_compose_env.results +
             _docker_compose_service.results }}"
   loop_control:
