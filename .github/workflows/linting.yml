@@ -11,19 +11,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Ensure codebase is present
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
+        uses: actions/checkout@v4
 
       - name: Ensure ansible-lint-action is present
-        uses: ansible/ansible-lint-action@v6
+        uses: ansible/ansible-lint@main
 
   yamllint:
     name: yamllint
     runs-on: ubuntu-latest
     steps:
       - name: Ensure codebase is present
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Ensure python3 is present
         uses: actions/setup-python@v4
