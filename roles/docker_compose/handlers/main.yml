@@ -1,0 +1,13 @@
+---
+- name: Restart docker-compose
+  tags:
+    - docker_compose
+  become: true
+  ansible.builtin.systemd_service:
+    name: "docker-compose@{{ _restart }}.service"
+    state: restarted
+  loop: "{{ _docker_compose_changed | unique }}"
+  loop_control:
+    label: "{{ _restart }}"
+    loop_var: _restart
+...

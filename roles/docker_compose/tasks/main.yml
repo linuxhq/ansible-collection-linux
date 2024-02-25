@@ -9,7 +9,6 @@
     state: present
   when:
     - ansible_distribution_major_version | int == 7
-    - docker_packages | length > 0
 
 - name: Ensure docker compose packages are present
   tags:
@@ -21,7 +20,6 @@
     state: present
   when:
     - ansible_distribution_major_version | int >= 8
-    - docker_packages | length > 0
 
 - name: Ensure docker-compose directory is present
   tags:
@@ -61,6 +59,8 @@
     mode: '0640'
     owner: root
     src: docker-compose.env.j2
+  notify: Restart docker-compose
+  register: _docker_compose_env
   loop: "{{ docker_compose }}"
   loop_control:
     label: "{{ _project.name }}"
@@ -80,6 +80,8 @@
     mode: '0640'
     owner: root
     src: docker-compose.yml.j2
+  notify: Restart docker-compose
+  register: _docker_compose_service
   loop: "{{ docker_compose }}"
   loop_control:
     label: "{{ _project.name }}"
@@ -87,6 +89,24 @@
   when:
     - _project.name is defined
     - _project.version is defined
+
+- name: Ensure docker-compose template results are formatted
+  tags:
+    - docker_compose
+  ansible.builtin.set_fact:
+    _docker_compose_changed: "{{ _docker_compose_changed |
+                                 default([]) +
+                                 [ _name ] }}"
+  loop: "{{ _docker_compose_env.results +
+            _docker_compose_service.results }}"
+  loop_control:
+    label: "{{ _name }}"
+    loop_var: _result
+  vars:
+    _name: "{{ _result._project.name | d(none) }}"
+  when:
+    - _name is not none
+    - _result.changed | bool
 
 - name: Ensure docker-compose systemd unit is present
   tags:
@@ -110,21 +130,16 @@
   tags:
     - docker_compose
   become: true
-  ansible.builtin.systemd:
+  ansible.builtin.systemd_service:
     enabled: true
-    name: "{{ _name }}"
+    name: "docker-compose@{{ _name }}.service"
     state: started
-  loop: "{{ docker_compose |
-            map(attribute='name') |
-            list |
-            default([]) }}"
+  loop: "{{ docker_compose }}"
   loop_control:
-    label: "{{ _name | default(none) }}"
+    label: "{{ _name }}"
     loop_var: _project
   vars:
-    _name: "docker-compose@{{ _project }}.service"
+    _name: "{{ _project.name | d(none) }}"
   when:
-    - docker_compose |
-      map(attribute='name') |
-      length > 0
+    - _name is not none
 ...
