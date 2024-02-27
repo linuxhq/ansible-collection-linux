@@ -12,6 +12,8 @@ None
 
 Available variables are listed below, along with default values:
 
+    mount_packages:
+      - util-linux-core
     mounts: []
 
 ## Dependencies

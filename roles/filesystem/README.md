@@ -12,6 +12,9 @@ None
 
 Available variables are listed below, along with default values:
 
+    filesystem_packages:
+      - e2fsprogs
+      - xfsprogs
     filesystems: []
 
 ## Dependencies
