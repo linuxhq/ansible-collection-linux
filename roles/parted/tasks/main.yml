@@ -7,7 +7,7 @@
     name: parted
     state: present
 
-- name: Ensure block device partitions are present
+- name: Ensure parted block device partitions are present
   tags:
     - parted
   become: true

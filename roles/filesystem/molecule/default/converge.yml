@@ -1,0 +1,9 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - role: linuxhq.linux.filesystem
+      filesystems:
+        - dev: /dev/sda1
+          fstype: ext4
+...

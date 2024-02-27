@@ -1,0 +1,32 @@
+---
+- name: Ensure filesystem packages are present
+  tags:
+    - filesystem
+  become: true
+  ansible.builtin.package:
+    name: "{{ filesystem_packages }}"
+    state: present
+
+- name: Ensure filesystems are present
+  tags:
+    - filesystem
+  become: true
+  community.general.filesystem:
+    dev: "{{ _dev }}"
+    force: "{{ _filesystem.force | default(false) }}"
+    fstype: "{{ _fstype }}"
+    opts: "{{ _filesystem.opts | default(omit) }}"
+    resizefs: "{{ _filesystem.resizefs | default(false) }}"
+    state: present
+    uuid: "{{ _filesystem.uuid | default(omit) }}"
+  loop: "{{ filesystems }}"
+  loop_control:
+    label: "{{ _dev }}:{{ _fstype }}"
+    loop_var: _filesystem
+  vars:
+    _dev: "{{ _filesystem.dev | default(none) }}"
+    _fstype: "{{ _filesystem.fstype | default(none) }}"
+  when:
+    - _dev is not none
+    - _fstype is not none
+...
