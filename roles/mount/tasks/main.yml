@@ -1,0 +1,34 @@
+---
+- name: Ensure mount packages are present
+  tags:
+    - mount
+  become: true
+  ansible.builtin.package:
+    name: "{{ mount_packages }}"
+    state: present
+
+- name: Ensure mounts are present
+  tags:
+    - mount
+  become: true
+  ansible.posix.mount:
+    backup: "{{ _mount.backup | default(false) }}"
+    boot: "{{ _mount.boot | default(true) }}"
+    fstab: "{{ _mount.fstab | default(omit) }}"
+    fstype: "{{ _mount.fstype }}"
+    opts: "{{ _mount.opts | default(omit) }}"
+    path: "{{ _mount.path }}"
+    src: "{{ _mount.src }}"
+    state: "{{ _mount.state | default('mounted') }}"
+  loop: "{{ mounts }}"
+  loop_control:
+    label: "{{ _src }}:{{ _path }}"
+    loop_var: _mount
+  vars:
+    _path: "{{ _mount.path | default(none) }}"
+    _src: "{{ _mount.src | default(none) }}"
+  when:
+    - _path is not none
+    - _src is not none
+    - _mount.fstype is defined
+...

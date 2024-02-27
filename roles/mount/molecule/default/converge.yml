@@ -1,0 +1,11 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - role: linuxhq.linux.mount
+      mounts:
+        - fstype: ext4
+          opts: nodev,noexec,nosuid
+          path: /srv
+          src: UUID=9f052ee9-2210-457c-9572-ee1a3ff96d71
+...
