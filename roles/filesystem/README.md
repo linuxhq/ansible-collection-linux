@@ -24,7 +24,7 @@ None
       collections:
         - linuxhq.linux
       roles:
-        - role: linuxhq.linux.filesystems
+        - role: linuxhq.linux.filesystem
           filesystems:
             - dev: /dev/sda1
               fstype: ext4

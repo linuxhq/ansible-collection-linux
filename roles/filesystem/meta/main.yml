@@ -13,6 +13,9 @@ galaxy_info:
         - '8'
         - '9'
   galaxy_tags:
+    - ext3
+    - ext4
     - filesystem
     - linux
+    - xfs
 ...
