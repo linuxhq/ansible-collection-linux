@@ -1,0 +1,14 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - role: linuxhq.linux.parted
+      parted:
+        - device: /dev/sda
+          label: gpt
+          partitions:
+            - number: 1
+              part_end: '100%'
+              part_start: '0%'
+              part_type: primary
+...
