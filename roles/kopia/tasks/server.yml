@@ -120,4 +120,13 @@
   when:
     - _snapshot.target is defined
   changed_when: false
+
+- name: Ensure kopia server is restarted
+  tags:
+    - kopia
+  become: true
+  ansible.builtin.systemd_service:
+    name: kopia
+    state: restarted
+  changed_when: false
 ...
