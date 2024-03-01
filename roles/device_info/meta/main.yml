@@ -1,0 +1,17 @@
+---
+dependencies: []
+galaxy_info:
+  role_name: device_info
+  author: Taylor Kimball
+  description: Gather information about devices and partitions
+  license: GPLv3
+  min_ansible_version: 2.15.0
+  platforms:
+    - name: GenericLinux
+      versions:
+        - all
+  galaxy_tags:
+    - device
+    - linux
+    - info
+...

@@ -1,24 +1,28 @@
-# mount
+# device\_info
 
 [![License](https://img.shields.io/badge/license-GPLv3-lightgreen)](https://www.gnu.org/licenses/gpl-3.0.en.html#license-text)
 
-Control active and configured mount points
+Gather information about devices and partitions
 
 ## Requirements
 
-None
+* jmespath
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
-    mount_packages:
-      - util-linux-core
-    mounts: []
+None
 
 ## Dependencies
 
-* linuxhq.linux.device\_info
+None
+
+## Return Values
+
+    _device_names
+    _device_partitions
+    _device_part_sect
+    _device_part_size
+    _device_part_uuid
 
 ## Example Playbook
 
@@ -26,12 +30,7 @@ Available variables are listed below, along with default values:
       collections:
         - linuxhq.linux
       roles:
-        - role: linuxhq.linux.mount
-          mounts:
-            - fstype: ext4
-              opts: nodev,noexec,nosuid
-              path: /srv
-              src: UUID=9f052ee9-2210-457c-9572-ee1a3ff96d71
+        - linuxhq.linux.device_info
 
 ## License
 

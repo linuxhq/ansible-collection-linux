@@ -1,5 +1,6 @@
 ---
-dependencies: []
+dependencies:
+  - { role: linuxhq.linux.device_info, tags: mount }
 galaxy_info:
   role_name: mount
   author: Taylor Kimball
