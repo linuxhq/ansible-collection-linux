@@ -53,10 +53,10 @@
     loop_var: _device_info
   vars:
     _dev: "{{ _device_info.0.name | d(none) }}"
-    _part: "{{ _device_info.1 | d(none) }}"
     _info: "{{ ansible_devices[_dev]['partitions'][_part] | d(none) }}"
+    _part: "{{ _device_info.1 | d(none) }}"
   when:
     - _dev is not none
-    - _part is not none
     - _info is not none
+    - _part is not none
 ...
