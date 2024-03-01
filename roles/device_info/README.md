@@ -6,7 +6,7 @@ Gather information about devices and partitions
 
 ## Requirements
 
-* jmespath
+None
 
 ## Role Variables
 
