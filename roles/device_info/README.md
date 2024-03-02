@@ -20,8 +20,7 @@ None
 
     _device_names
     _device_partitions
-    _device_part_sect
-    _device_part_size
+    _device_part_labels
     _device_part_uuid
 
 ## Example Playbook

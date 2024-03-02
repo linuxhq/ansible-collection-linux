@@ -31,7 +31,7 @@ Available variables are listed below, along with default values:
             - fstype: ext4
               opts: nodev,noexec,nosuid
               path: /srv
-              src: "UUID={{ _device_part_uuid['sda1'] }}"
+              src: LABEL=srv
 
 ## License
 

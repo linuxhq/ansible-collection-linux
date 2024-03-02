@@ -35,28 +35,19 @@
   tags:
     - device_info
   ansible.builtin.set_fact:
-    _device_part_sect: "{{ _device_part_sect |
-                           default({}) |
-                           combine({_part: _info.sectors}) }}"
-    _device_part_size: "{{ _device_part_size |
-                           default({}) |
-                           combine({_part: _info.size}) }}"
+    _device_part_labels: "{{ _device_part_labels |
+                             default({}) |
+                             combine({_d.1: _info.links.labels}) }}"
     _device_part_uuid: "{{ _device_part_uuid |
                            default({}) |
-                           combine({_part: _info.uuid}) }}"
+                           combine({_d.1: _info.uuid}) }}"
   loop: "{{ q('ansible.builtin.subelements',
               _device_partitions,
               'partitions',
               {'skip_missing': true}) }}"
   loop_control:
-    label: "{{ _part }}"
-    loop_var: _device_info
+    label: "{{ _d.1 }}"
+    loop_var: _d
   vars:
-    _dev: "{{ _device_info.0.name | d(none) }}"
-    _info: "{{ ansible_devices[_dev]['partitions'][_part] | d(none) }}"
-    _part: "{{ _device_info.1 | d(none) }}"
-  when:
-    - _dev is not none
-    - _info is not none
-    - _part is not none
+    _info: "{{ ansible_devices[_d.0.name]['partitions'][_d.1] }}"
 ...
