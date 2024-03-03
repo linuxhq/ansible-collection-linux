@@ -1,9 +1,9 @@
 ---
 dependencies: []
 galaxy_info:
-  role_name: template
+  role_name: file
   author: Taylor Kimball
-  description: Manage presence of templates on a host
+  description: Manage presence of files on a host
   license: GPLv3
   min_ansible_version: 2.15.0
   platforms:
@@ -11,6 +11,6 @@ galaxy_info:
       versions:
         - all
   galaxy_tags:
+    - file
     - linux
-    - template
 ...

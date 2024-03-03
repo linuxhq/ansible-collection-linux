@@ -1,0 +1,21 @@
+---
+- name: Ensure files are present
+  tags:
+    - file
+  become: true
+  ansible.builtin.file:
+    follow: "{{ _file.follow | default(true) }}"
+    force: "{{ _file.force | default(false) }}"
+    group: "{{ _file.group | default(omit) }}"
+    mode: "{{ _file.mode | default(omit) }}"
+    owner: "{{ _file.owner | default(omit) }}"
+    path: "{{ _file.path }}"
+    recurse: "{{ _file.recurse | default(false) }}"
+    state: file
+  loop: "{{ files }}"
+  loop_control:
+    label: "{{ _file.path | default(none) }}"
+    loop_var: _file
+  when:
+    - _file.path is defined
+...

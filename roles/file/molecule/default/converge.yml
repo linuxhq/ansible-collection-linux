@@ -1,0 +1,9 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - role: linuxhq.linux.file
+      files:
+        - path: /usr/bin/su
+          mode: '0755'
+...
