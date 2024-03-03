@@ -46,7 +46,7 @@ Defaults {{ '!' if not sudoers_match_group_by_gid | bool }}match_group_by_gid
 Defaults {{ '!' if not sudoers_requiretty | bool }}requiretty
 Defaults {{ '!' if not sudoers_visiblepw | bool }}visiblepw
 
-root      ALL=(ALL) NOPASSWD:ALL
-%wheel    ALL=(ALL) NOPASSWD:ALL
+root      ALL=(ALL) {{ 'NOPASSWD:' if sudoers_nopasswd_root  | bool else '' }}ALL
+%wheel    ALL=(ALL) {{ 'NOPASSWD:' if sudoers_nopasswd_wheel | bool else '' }}ALL
 
 #includedir {{ sudoers_includedir }}
