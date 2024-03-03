@@ -22,6 +22,8 @@ Available variables are listed below, along with default values:
     sudoers_d: []
     sudoers_includedir: /etc/sudoers.d
     sudoers_match_group_by_gid: true
+    sudoers_nopasswd_root: false
+    sudoers_nopasswd_wheel: false
     sudoers_requiretty: false
     sudoers_visiblepw: false
 
