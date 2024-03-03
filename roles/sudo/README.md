@@ -12,20 +12,37 @@ None
 
 Available variables are listed below, along with default values:
 
-    sudoers_alias_cmnds: []
-    sudoers_alias_hosts: []
-    sudoers_alias_runas: []
-    sudoers_alias_users: []
-    sudoers_always_set_home: true
-    sudoers_env_keep: []
-    sudoers_env_reset: true
-    sudoers_d: []
-    sudoers_includedir: /etc/sudoers.d
-    sudoers_match_group_by_gid: true
-    sudoers_nopasswd_root: false
-    sudoers_nopasswd_wheel: false
-    sudoers_requiretty: false
-    sudoers_visiblepw: false
+    sudo_alias_cmnds: []
+    sudo_alias_hosts: []
+    sudo_alias_runas: []
+    sudo_alias_users: []
+
+    sudo_always_set_home: true
+    sudo_env_keep: []
+    sudo_env_reset: true
+    sudo_includedir: /etc/sudoers.d
+    sudo_match_group_by_gid: true
+    sudo_requiretty: false
+    sudo_visiblepw: false
+
+    sudo_d: []
+
+    sudo_nopasswd_root: false
+    sudo_nopasswd_wheel: false
+
+    sudo_pam:
+      - module_interface: auth
+        control_flag: include
+        module_name: system-auth
+      - module_interface: account
+        control_flag: include
+        module_name: system-auth
+      - module_interface: password
+        control_flag: include
+        module_name: system-auth
+      - module_interface: session
+        control_flag: include
+        module_name: system-auth
 
 ## Dependencies
 
@@ -38,13 +55,32 @@ None
         - linuxhq.linux
       roles:
         - role: linuxhq.linux.sudo
-          sudoers_d:
+          sudo_env_keep:
+            - SSH_AUTH_SOCK
+          sudo_d:
             - file: linuxhq
               user: %linuxhq
               host: ALL
               runas: ALL
               cmnds:
                 - NOPASSWD:ALL
+          sudo_pam:
+            - module_interface: auth
+              control_flag: sufficient
+              module_name: pam_ssh_agent_auth.so
+              module_arguments: file=/etc/security/authorized_keys
+            - module_interface: auth
+              control_flag: include
+              module_name: system-auth
+            - module_interface: account
+              control_flag: include
+              module_name: system-auth
+            - module_interface: password
+              control_flag: include
+              module_name: system-auth
+            - module_interface: session
+              control_flag: include
+              module_name: system-auth
 
 ## License
 

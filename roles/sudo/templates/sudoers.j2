@@ -1,52 +1,63 @@
 ## {{ ansible_managed }}
 
-{% if sudoers_alias_cmnds | length > 0 %}
-{%   for cmnd in sudoers_alias_cmnds | sort %}
+{% if sudo_alias_cmnds | length > 0 %}
+{%   for cmnd in sudo_alias_cmnds | sort %}
 {%     if cmnd.name is defined and
           cmnd.cmnds is defined and
           cmnd.cmnds | length > 0 %}
 Cmnd_Alias {{ cmnd.name | upper }} = {{ cmnd.cmnds | join(', ') }}
 {%     endif %}
+{%     if loop.last %}
+
+{%     endif %}
 {%   endfor %}
 {% endif %}
-{% if sudoers_alias_hosts | length > 0 %}
-{%   for host in sudoers_alias_hosts | sort %}
+{% if sudo_alias_hosts | length > 0 %}
+{%   for host in sudo_alias_hosts | sort %}
 {%     if host.name is defined and
           host.hosts is defined and
           host.hosts | length > 0 %}
 Host_Alias {{ host.name | upper }} = {{ host.hosts | join(', ') }}
 {%     endif %}
+{%     if loop.last %}
+
+{%     endif %}
 {%   endfor %}
 {% endif %}
-{% if sudoers_alias_runas | length > 0 %}
-{%   for runas in sudoers_alias_runas | sort %}
+{% if sudo_alias_runas | length > 0 %}
+{%   for runas in sudo_alias_runas | sort %}
 {%     if runas.name is defined and
           runas.runas is defined and
           runas.runas | length > 0 %}
 Runas_Alias {{ runas.name | upper }} = {{ runas.runas | join(', ') }}
 {%     endif %}
+{%     if loop.last %}
+
+{%     endif %}
 {%   endfor %}
 {% endif %}
-{% if sudoers_alias_users | length > 0 %}
-{%   for user in sudoers_alias_users | sort %}
+{% if sudo_alias_users | length > 0 %}
+{%   for user in sudo_alias_users | sort %}
 {%     if user.name is defined and
           user.users is defined and
           user.users | length > 0 %}
 User_Alias {{ user.name | upper }} = {{ user.users | join(', ') }}
 {%     endif %}
+{%     if loop.last %}
+
+{%     endif %}
 {%   endfor %}
 {% endif %}
-
-Defaults {{ '!' if not sudoers_always_set_home | bool }}always_set_home
-{% if sudoers_env_keep | length > 0 %}
-Defaults env_keep = "{{ sudoers_env_keep | join(' ') }}"
+Defaults {{ '!' if not sudo_always_set_home | bool }}always_set_home
+{% if sudo_env_keep | length > 0 %}
+Defaults env_keep += "{{ sudo_env_keep | join(' ') }}"
 {% endif %}
-Defaults {{ '!' if not sudoers_env_reset | bool }}env_reset
-Defaults {{ '!' if not sudoers_match_group_by_gid | bool }}match_group_by_gid
-Defaults {{ '!' if not sudoers_requiretty | bool }}requiretty
-Defaults {{ '!' if not sudoers_visiblepw | bool }}visiblepw
+Defaults {{ '!' if not sudo_env_reset | bool }}env_reset
+Defaults {{ '!' if not sudo_match_group_by_gid | bool }}match_group_by_gid
+Defaults {{ '!' if not sudo_requiretty | bool }}requiretty
+Defaults {{ '!' if not sudo_visiblepw | bool }}visiblepw
 
-root      ALL=(ALL) {{ 'NOPASSWD:' if sudoers_nopasswd_root  | bool else '' }}ALL
-%wheel    ALL=(ALL) {{ 'NOPASSWD:' if sudoers_nopasswd_wheel | bool else '' }}ALL
+root      ALL=(ALL) {{ 'NOPASSWD:' if sudo_nopasswd_root  | bool else '' }}ALL
+%wheel    ALL=(ALL) {{ 'NOPASSWD:' if sudo_nopasswd_wheel | bool else '' }}ALL
 
-#includedir {{ sudoers_includedir }}
+#includedir {{ sudo_includedir }}

@@ -42,7 +42,7 @@
     owner: root
     src: sudoers_d.j2
     validate: '/usr/sbin/visudo -cf %s'
-  loop: "{{ sudoers_d }}"
+  loop: "{{ sudo_d }}"
   loop_control:
     label: "{{ _sudoers.file | default(none) }}"
     loop_var: _sudoers
@@ -53,4 +53,17 @@
     - _sudoers.runas is defined
     - _sudoers.cmnds is defined
     - _sudoers.cmnds | length > 0
+
+- name: Ensure sudo pam configuration is present
+  tags:
+    - sudo
+  become: true
+  ansible.builtin.template:
+    dest: /etc/pam.d/sudo
+    group: root
+    mode: '0644'
+    owner: root
+    src: sudo.pam.j2
+  when:
+    - sudo_pam | length > 0
 ...
