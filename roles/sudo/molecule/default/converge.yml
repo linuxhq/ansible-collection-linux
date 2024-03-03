@@ -3,26 +3,26 @@
   hosts: all
   roles:
     - role: linuxhq.linux.sudo
-      sudoers_alias_cmnds:
+      sudo_alias_cmnds:
         - name: access
           cmnds:
             - /usr/sbin/groupadd
             - /usr/sbin/useradd
-      sudoers_alias_hosts:
+      sudo_alias_hosts:
         - name: hosts
           hosts:
             - localhost
             - 127.0.0.1
-      sudoers_alias_runas:
+      sudo_alias_runas:
         - name: runas
           runas:
             - linuxhq
             - tkimball
-      sudoers_alias_users:
+      sudo_alias_users:
         - name: users
           users:
             - tkimball
-      sudoers_d:
+      sudo_d:
         - file: tkimball
           user: tkimball
           host: ALL
