@@ -88,7 +88,6 @@
     loop_var: _project
   when:
     - _project.name is defined
-    - _project.version is defined
 
 - name: Ensure docker-compose template results are formatted
   tags:

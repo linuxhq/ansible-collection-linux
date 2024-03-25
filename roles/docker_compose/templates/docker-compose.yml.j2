@@ -1,5 +1,7 @@
 ---
+{% if _project.version is defined %}
 version: '{{ _project.version }}'
+{% endif %}
 {% if _project.networks is defined and _project.networks | length > 0 %}
 networks:
   {{ _project.networks | to_nice_yaml(indent=2) | indent(2) }}
