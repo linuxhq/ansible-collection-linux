@@ -1,0 +1,15 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - role: linuxhq.linux.dnf_versionlock
+      dnf_versionlock_packages:
+        - name: docker-ce
+          version: '3:25.0.5-1.el9.*'
+        - name: docker-ce-cli
+          version: '1:25.0.5-1.el9.*'
+        - name: docker-ce-rootless-extras
+          version: '0:25.0.5-1.el9.*'
+        - name: containerd.io
+          version: '0:1.6.28-3.2.el9.*'
+...

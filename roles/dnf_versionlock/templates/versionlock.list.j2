@@ -1,0 +1,7 @@
+# {{ ansible_managed }}
+
+{% for package in dnf_versionlock_packages %}
+{%   if package.name is defined and package.version is defined %}
+{{ package.name }}-{{ package.version }}
+{%   endif %}
+{% endfor %}

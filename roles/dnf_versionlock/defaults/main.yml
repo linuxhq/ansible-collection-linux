@@ -1,0 +1,5 @@
+---
+dnf_versionlock_enabled: true
+dnf_versionlock_locklist: /etc/dnf/plugins/versionlock.list
+dnf_versionlock_packages: []
+...

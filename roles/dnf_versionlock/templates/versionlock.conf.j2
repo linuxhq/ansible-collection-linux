@@ -1,0 +1,5 @@
+# {{ ansible_managed }}
+
+[main]
+enabled = {{ '1' if dnf_versionlock_enabled | bool else '0' }}
+locklist = {{ dnf_versionlock_locklist }}

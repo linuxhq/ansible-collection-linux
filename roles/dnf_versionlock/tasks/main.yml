@@ -1,0 +1,33 @@
+---
+- name: Ensure dnf versionlock package is installed
+  tags:
+    - dnf_versionlock
+  become: true
+  ansible.builtin.dnf:
+    name: python3-dnf-plugin-versionlock
+    state: present
+
+- name: Esnure dnf versionlock config template is present
+  tags:
+    - dnf_versionlock
+  become: true
+  ansible.builtin.template:
+    dest: /etc/dnf/plugins/versionlock.conf
+    group: root
+    mode: '0644'
+    owner: root
+    src: versionlock.conf.j2
+
+- name: Ensure dnf versionlock locklist template is present
+  tags:
+    - dnf_versionlock
+  become: true
+  ansible.builtin.template:
+    dest: /etc/dnf/plugins/versionlock.list
+    group: root
+    mode: '0644'
+    owner: root
+    src: versionlock.list.j2
+  when:
+    - dnf_versionlock_packages | length > 0
+...
