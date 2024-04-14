@@ -23,7 +23,7 @@
     - dnf_versionlock
   become: true
   ansible.builtin.template:
-    dest: /etc/dnf/plugins/versionlock.list
+    dest: "{{ dnf_versionlock_locklist }}"
     group: root
     mode: '0644'
     owner: root
