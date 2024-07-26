@@ -35,6 +35,9 @@ Available variables are listed below, along with default values:
     dnf_automatic_emitters_emit_via: stdio
     dnf_automatic_emitters_system_name: "{{ inventory_hostname }}"
     dnf_automatic_timer: dnf-automatic-notifyonly.timer
+    dnf_automatic_timer_on_calendar: '*-*-* 6:00'
+    dnf_automatic_timer_persistent: true
+    dnf_automatic_timer_randomized_delay_sec: 60m
 
 ## Dependencies
 

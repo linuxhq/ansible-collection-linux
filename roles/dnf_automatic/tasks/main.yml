@@ -18,6 +18,26 @@
     owner: root
     src: automatic.conf.j2
 
+- name: Esnure dnf-automatic timer templates are present
+  tags:
+    - dnf_automatic
+  become: true
+  ansible.builtin.template:
+    dest: "/usr/lib/systemd/system/{{ _timer }}"
+    group: root
+    mode: '0644'
+    owner: root
+    src: "{{ _timer }}.j2"
+  notify: Reload systemd
+  loop:
+    - dnf-automatic.timer
+    - dnf-automatic-download.timer
+    - dnf-automatic-install.timer
+    - dnf-automatic-notifyonly.timer
+  loop_control:
+    label: "{{ _timer }}"
+    loop_var: _timer
+
 - name: Ensure dnf-automatic is started and enabled on boot
   tags:
     - dnf_automatic

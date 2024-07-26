@@ -1,0 +1,13 @@
+[Unit]
+Description=dnf-automatic-install timer
+# See comment in dnf-makecache.service
+ConditionPathExists=!/run/ostree-booted
+Wants=network-online.target
+
+[Timer]
+OnCalendar={{ dnf_automatic_timer_on_calendar }}
+RandomizedDelaySec={{ dnf_automatic_timer_randomized_delay_sec }}
+Persistent={{ 'true' if dnf_automatic_timer_persistent else 'false' }}
+
+[Install]
+WantedBy=timers.target
