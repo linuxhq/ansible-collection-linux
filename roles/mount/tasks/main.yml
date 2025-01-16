@@ -7,28 +7,25 @@
     name: "{{ mount_packages }}"
     state: present
 
-- name: Ensure mounts are present
+- name: Ensure mounts are managed
   tags:
     - mount
   become: true
   ansible.posix.mount:
-    backup: "{{ _mount.backup | default(false) }}"
-    boot: "{{ _mount.boot | default(true) }}"
-    fstab: "{{ _mount.fstab | default(omit) }}"
+    backup: "{{ _mount.backup | d(false) }}"
+    boot: "{{ _mount.boot | d(true) }}"
+    fstab: "{{ _mount.fstab | d(omit) }}"
     fstype: "{{ _mount.fstype }}"
-    opts: "{{ _mount.opts | default(omit) }}"
+    opts: "{{ _mount.opts | d(omit) }}"
     path: "{{ _mount.path }}"
     src: "{{ _mount.src }}"
-    state: "{{ _mount.state | default('mounted') }}"
-  loop: "{{ mounts }}"
+    state: "{{ _mount.state | d('mounted') }}"
+  loop: "{{ mount_list }}"
   loop_control:
-    label: "{{ _src }}:{{ _path }}"
+    label: "{{ _mount.path | d(none) }}"
     loop_var: _mount
-  vars:
-    _path: "{{ _mount.path | default(none) }}"
-    _src: "{{ _mount.src | default(none) }}"
   when:
-    - _path is not none
-    - _src is not none
     - _mount.fstype is defined
+    - _mount.path is defined
+    - _mount.src is defined
 ...

@@ -12,22 +12,24 @@ None
 
 Available variables are listed below, along with default values:
 
+    mount_list: []
     mount_packages:
       - util-linux-core
-    mounts: []
+
+## Return Values
+
+None
 
 ## Dependencies
 
-* linuxhq.linux.device\_info
+* [linuxhq.aws.device\_info](https://github.com/linuxhq/ansible-collection-linux/tree/main/roles/device_info)
 
 ## Example Playbook
 
     - hosts: server
-      collections:
-        - linuxhq.linux
       roles:
         - role: linuxhq.linux.mount
-          mounts:
+          mount_list:
             - fstype: ext4
               opts: nodev,noexec,nosuid
               path: /srv
@@ -35,7 +37,7 @@ Available variables are listed below, along with default values:
 
 ## License
 
-Copyright (C) 2023 Linux HeadQuarters
+Copyright (C) 2025 Linux HeadQuarters
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
