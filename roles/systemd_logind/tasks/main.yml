@@ -14,23 +14,11 @@
   tags:
     - systemd_logind
   become: true
-  ansible.builtin.yum:
-    name: systemd
-    state: present
-  when:
-    - ansible_os_family == 'RedHat'
-    - ansible_distribution_major_version | int == 7
-
-- name: Ensure systemd package is present
-  tags:
-    - systemd_logind
-  become: true
   ansible.builtin.dnf:
     name: systemd
     state: present
   when:
     - ansible_os_family == 'RedHat'
-    - ansible_distribution_major_version | int >= 8
 
 - name: Ensure systemd-logind template is present
   tags:

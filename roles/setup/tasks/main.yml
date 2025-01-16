@@ -3,21 +3,9 @@
   tags:
     - setup
   become: true
-  ansible.builtin.yum:
-    name: setup
-    state: present
-  when:
-    - ansible_distribution_major_version | int == 7
-
-- name: Ensure setup package is present
-  tags:
-    - setup
-  become: true
   ansible.builtin.dnf:
     name: setup
     state: present
-  when:
-    - ansible_distribution_major_version | int >= 8
 
 - name: Ensure setup aliases configuration is present
   tags:

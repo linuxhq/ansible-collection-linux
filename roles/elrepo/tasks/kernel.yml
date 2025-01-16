@@ -14,21 +14,6 @@
   tags:
     - elrepo
   become: true
-  ansible.builtin.yum:
-    enablerepo: elrepo-kernel
-    name:
-      - kernel-headers
-      - "kernel-{{ elrepo_kernel_version }}"
-      - "kernel-{{ elrepo_kernel_version }}-devel"
-    state: present
-  register: _kernel
-  when:
-    - elrepo_releasever | int == 7
-
-- name: Ensure elrepo kernel package is present
-  tags:
-    - elrepo
-  become: true
   ansible.builtin.dnf:
     enablerepo: elrepo-kernel
     name:
@@ -37,8 +22,6 @@
       - "kernel-{{ elrepo_kernel_version }}-devel"
     state: present
   register: _kernel
-  when:
-    - elrepo_releasever | int >= 8
 
 - name: Ensure elrepo kernel is grub default
   tags:

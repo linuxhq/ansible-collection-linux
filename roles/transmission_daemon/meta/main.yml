@@ -1,6 +1,8 @@
 ---
 dependencies:
-  - { role: linuxhq.linux.epel, tags: transmission_daemon, when: ansible_os_family == 'RedHat' }
+  - role: linuxhq.linux.epel
+    tags: transmission_daemon
+    when: ansible_os_family == 'RedHat'
 galaxy_info:
   role_name: transmission_daemon
   author: Taylor Kimball

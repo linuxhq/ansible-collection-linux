@@ -1,6 +1,7 @@
 ---
 dependencies:
-  - { role: linuxhq.linux.docker, tags: docker_container }
+  - role: linuxhq.linux.docker
+    tags: docker_container
 galaxy_info:
   role_name: docker_container
   author: Taylor Kimball

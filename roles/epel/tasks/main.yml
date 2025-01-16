@@ -3,23 +3,11 @@
   tags:
     - epel
   become: true
-  ansible.builtin.yum:
-    name: epel-release
-    state: present
-  when:
-    - epel_releasever | int == 7
-
-- name: Ensure epel repository package is present
-  tags:
-    - epel
-  become: true
   ansible.builtin.dnf:
     name:
       - dnf-plugins-core
       - epel-release
     state: present
-  when:
-    - epel_releasever | int >= 8
 
 - name: Ensure epel dependent repository is enabled
   tags:
@@ -30,8 +18,6 @@
       dnf config-manager --set-enabled "{{ _repo }}"
   vars:
     _repo: "{{ 'crb' if epel_releasever | int >= 9 else 'powertools' }}"
-  when:
-    - epel_releasever | int >= 8
   changed_when: false
 
 - name: Ensure epel repository templates are present
@@ -65,19 +51,7 @@
   tags:
     - epel
   become: true
-  ansible.builtin.yum:
-    name: "{{ epel_packages }}"
-    state: present
-  when:
-    - epel_releasever | int == 7
-
-- name: Ensure epel repository packages are present
-  tags:
-    - epel
-  become: true
   ansible.builtin.dnf:
     name: "{{ epel_packages }}"
     state: present
-  when:
-    - epel_releasever | int >= 8
 ...

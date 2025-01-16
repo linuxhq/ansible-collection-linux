@@ -3,21 +3,9 @@
   tags:
     - openssh_client
   become: true
-  ansible.builtin.yum:
-    name: openssh-clients
-    state: present
-  when:
-    - ansible_distribution_major_version | int == 7
-
-- name: Ensure openssh-clients package is present
-  tags:
-    - openssh_client
-  become: true
   ansible.builtin.dnf:
     name: openssh-clients
     state: present
-  when:
-    - ansible_distribution_major_version | int >= 8
 
 - name: Ensure openssh-clients template is present
   tags:

@@ -14,25 +14,12 @@
   tags:
     - transmission_daemon
   become: true
-  ansible.builtin.yum:
-    enablerepo: epel
-    name: transmission-daemon
-    state: present
-  when:
-    - ansible_os_family == 'RedHat'
-    - ansible_distribution_major_version | int == 7
-
-- name: Ensure transmission-daemon package is present
-  tags:
-    - transmission_daemon
-  become: true
   ansible.builtin.dnf:
     enablerepo: epel
     name: transmission-daemon
     state: present
   when:
     - ansible_os_family == 'RedHat'
-    - ansible_distribution_major_version | int >= 8
 
 - name: Ensure transmission-daemon os specific vars are present
   tags:

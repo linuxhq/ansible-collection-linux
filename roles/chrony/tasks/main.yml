@@ -3,21 +3,9 @@
   tags:
     - chrony
   become: true
-  ansible.builtin.yum:
-    name: chrony
-    state: present
-  when:
-    - ansible_distribution_major_version | int == 7
-
-- name: Ensure chrony package is present
-  tags:
-    - chrony
-  become: true
   ansible.builtin.dnf:
     name: chrony
     state: present
-  when:
-    - ansible_distribution_major_version | int >= 8
 
 - name: Ensure chrony templates are present
   tags:

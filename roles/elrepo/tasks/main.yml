@@ -11,25 +11,11 @@
   tags:
     - elrepo
   become: true
-  ansible.builtin.yum:
-    name: "https://www.elrepo.org/elrepo-release-{{ _ver }}.elrepo.noarch.rpm"
-    state: present
-  vars:
-    _ver: "{{ elrepo_releasever }}.el{{ elrepo_releasever }}"
-  when:
-    - elrepo_releasever | int == 7
-
-- name: Ensure elrepo repository package is present
-  tags:
-    - elrepo
-  become: true
   ansible.builtin.dnf:
     name: "https://www.elrepo.org/elrepo-release-{{ _ver }}.elrepo.noarch.rpm"
     state: present
   vars:
     _ver: "{{ elrepo_releasever }}.el{{ elrepo_releasever }}"
-  when:
-    - elrepo_releasever | int >= 8
 
 - name: Ensure elrepo repository templates are present
   tags:
@@ -57,19 +43,7 @@
   tags:
     - elrepo
   become: true
-  ansible.builtin.yum:
-    name: "{{ elrepo_packages }}"
-    state: present
-  when:
-    - elrepo_releasever | int == 7
-
-- name: Ensure elrepo packages are present
-  tags:
-    - elrepo
-  become: true
   ansible.builtin.dnf:
     name: "{{ elrepo_packages }}"
     state: present
-  when:
-    - elrepo_releasever | int >= 8
 ...

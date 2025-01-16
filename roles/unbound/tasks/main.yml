@@ -3,21 +3,9 @@
   tags:
     - unbound
   become: true
-  ansible.builtin.yum:
-    name: unbound
-    state: present
-  when:
-    - ansible_distribution_major_version | int == 7
-
-- name: Ensure unbound package is present
-  tags:
-    - unbound
-  become: true
   ansible.builtin.dnf:
     name: unbound
     state: present
-  when:
-    - ansible_distribution_major_version | int >= 8
 
 - name: Ensure unbound template is present
   tags:

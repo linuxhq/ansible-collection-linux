@@ -3,21 +3,9 @@
   tags:
     - openssh_server
   become: true
-  ansible.builtin.yum:
-    name: openssh-server
-    state: present
-  when:
-    - ansible_distribution_major_version | int == 7
-
-- name: Ensure openssh-server package is present
-  tags:
-    - openssh_server
-  become: true
   ansible.builtin.dnf:
     name: openssh-server
     state: present
-  when:
-    - ansible_distribution_major_version | int >= 8
 
 - name: Ensure openssh-server sysconfig template is present
   tags:

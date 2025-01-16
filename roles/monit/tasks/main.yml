@@ -3,21 +3,9 @@
   tags:
     - monit
   become: true
-  ansible.builtin.yum:
-    name: monit
-    state: present
-  when:
-    - ansible_distribution_major_version | int == 7
-
-- name: Ensure monit package is present
-  tags:
-    - monit
-  become: true
   ansible.builtin.dnf:
     name: monit
     state: present
-  when:
-    - ansible_distribution_major_version | int >= 8
 
 - name: Ensure monit template is present
   tags:

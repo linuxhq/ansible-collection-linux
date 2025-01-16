@@ -1,9 +1,0 @@
----
-- name: Converge
-  hosts: all
-  roles:
-    - role: linuxhq.linux.ius
-      ius_packages:
-        - tmux2
-      ius_repository_ius_testing: true
-...

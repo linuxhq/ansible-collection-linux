@@ -22,19 +22,7 @@
   tags:
     - speedtest
   become: true
-  ansible.builtin.yum:
-    name: "{{ speedtest_packages }}"
-    state: present
-  when:
-    - speedtest_releasever | int == 7
-
-- name: Ensure ookla speedtest packages are present
-  tags:
-    - speedtest
-  become: true
   ansible.builtin.dnf:
     name: "{{ speedtest_packages }}"
     state: present
-  when:
-    - speedtest_releasever | int >= 8
 ...

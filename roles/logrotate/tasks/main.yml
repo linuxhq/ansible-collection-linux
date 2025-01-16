@@ -3,7 +3,7 @@
   tags:
     - logrotate
   become: true
-  ansible.builtin.yum:
+  ansible.builtin.dnf:
     name: logrotate
     state: present
 

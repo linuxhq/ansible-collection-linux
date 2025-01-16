@@ -3,23 +3,10 @@
   tags:
     - cronie
   become: true
-  ansible.builtin.yum:
-    name: cronie
-    state: present
-    update_cache: true
-  when:
-    - ansible_distribution_major_version | int == 7
-
-- name: Ensure cronie package is present
-  tags:
-    - cronie
-  become: true
   ansible.builtin.dnf:
     name: cronie
     state: present
     update_cache: true
-  when:
-    - ansible_distribution_major_version | int >= 8
 
 - name: Ensure cronie templates are present
   tags:

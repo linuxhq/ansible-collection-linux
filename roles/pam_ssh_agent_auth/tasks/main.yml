@@ -3,21 +3,9 @@
   tags:
     - pam_ssh_agent_auth
   become: true
-  ansible.builtin.yum:
-    name: pam_ssh_agent_auth
-    state: present
-  when:
-    - ansible_distribution_major_version | int == 7
-
-- name: Ensure pam_ssh_agent_auth package is present
-  tags:
-    - pam_ssh_agent_auth
-  become: true
   ansible.builtin.dnf:
     name: pam_ssh_agent_auth
     state: present
-  when:
-    - ansible_distribution_major_version | int >= 8
 
 - name: Ensure pam_ssh_agent_auth ssh keys are present
   tags:

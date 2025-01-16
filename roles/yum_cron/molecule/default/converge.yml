@@ -1,8 +1,0 @@
----
-- name: Converge
-  hosts: all
-  roles:
-    - role: linuxhq.linux.yum_cron
-      yum_cron_apply_updates: true
-      yum_cron_hourly_apply_updates: true
-...

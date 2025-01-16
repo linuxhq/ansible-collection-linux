@@ -3,26 +3,12 @@
   tags:
     - lux
   become: true
-  ansible.builtin.yum:
-    name: "http://repo.iotti.biz/CentOS/{{ lux_releasever }}/noarch/{{ _pkg }}"
-    state: present
-  vars:
-    _pkg: "lux-release-{{ lux_releasever }}-1.noarch.rpm"
-  when:
-    - lux_releasever | int == 7
-
-- name: Ensure lux repository package is present
-  tags:
-    - lux
-  become: true
   ansible.builtin.dnf:
     disable_gpg_check: true
     name: "http://repo.iotti.biz/CentOS/{{ lux_releasever }}/noarch/{{ _pkg }}"
     state: present
   vars:
     _pkg: "lux-release-{{ lux_releasever }}-1.noarch.rpm"
-  when:
-    - lux_releasever | int >= 8
 
 - name: Ensure lux repository gpg key is present
   tags:
@@ -53,20 +39,6 @@
   tags:
     - lux
   become: true
-  ansible.builtin.yum:
-    name: "{{ _package }}"
-    state: present
-  loop: "{{ lux_packages }}"
-  loop_control:
-    label: "{{ _package }}"
-    loop_var: _package
-  when:
-    - lux_releasever | int == 7
-
-- name: Ensure lux repository packages are present
-  tags:
-    - lux
-  become: true
   ansible.builtin.dnf:
     name: "{{ _package }}"
     state: present
@@ -74,6 +46,4 @@
   loop_control:
     label: "{{ _package }}"
     loop_var: _package
-  when:
-    - lux_releasever | int >= 8
 ...

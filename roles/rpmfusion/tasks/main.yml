@@ -3,22 +3,6 @@
   tags:
     - rpmfusion
   become: true
-  ansible.builtin.yum:
-    disable_gpg_check: true
-    name:
-      - "https://mirrors.rpmfusion.org/free/el/{{ _free }}"
-      - "https://mirrors.rpmfusion.org/nonfree/el/{{ _nonfree }}"
-    state: present
-  vars:
-    _free: "rpmfusion-free-release-{{ rpmfusion_releasever }}.noarch.rpm"
-    _nonfree: "rpmfusion-nonfree-release-{{ rpmfusion_releasever }}.noarch.rpm"
-  when:
-    - rpmfusion_releasever | int == 7
-
-- name: Ensure rpmfusion repository package is present
-  tags:
-    - rpmfusion
-  become: true
   ansible.builtin.dnf:
     disable_gpg_check: true
     name:
@@ -28,8 +12,6 @@
   vars:
     _free: "rpmfusion-free-release-{{ rpmfusion_releasever }}.noarch.rpm"
     _nonfree: "rpmfusion-nonfree-release-{{ rpmfusion_releasever }}.noarch.rpm"
-  when:
-    - rpmfusion_releasever | int >= 8
 
 - name: Ensure rpmfusion dependent repository is enabled
   tags:
@@ -40,8 +22,6 @@
       dnf config-manager --set-enabled "{{ _repo }}"
   vars:
     _repo: "{{ 'crb' if rpmfusion_releasever | int >= 9 else 'powertools' }}"
-  when:
-    - rpmfusion_releasever | int >= 8
   changed_when: false
 
 - name: Ensure rpmfusion rpm keys are present
@@ -81,19 +61,7 @@
   tags:
     - rpmfusion
   become: true
-  ansible.builtin.yum:
-    name: "{{ rpmfusion_packages }}"
-    state: present
-  when:
-    - rpmfusion_releasever | int == 7
-
-- name: Ensure rpmfusion packages are present
-  tags:
-    - rpmfusion
-  become: true
   ansible.builtin.dnf:
     name: "{{ rpmfusion_packages }}"
     state: present
-  when:
-    - rpmfusion_releasever | int >= 8
 ...

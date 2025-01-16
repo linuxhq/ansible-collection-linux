@@ -3,21 +3,9 @@
   tags:
     - tftp_server
   become: true
-  ansible.builtin.yum:
-    name: "{{ tftp_server_packages }}"
-    state: present
-  when:
-    - ansible_distribution_major_version | int == 7
-
-- name: Ensure tftp-server package is present
-  tags:
-    - tftp_server
-  become: true
   ansible.builtin.dnf:
     name: "{{ tftp_server_packages }}"
     state: present
-  when:
-    - ansible_distribution_major_version | int >= 8
 
 - name: Ensure tftp-server systemd override directory is present
   tags:

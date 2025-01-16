@@ -3,21 +3,9 @@
   tags:
     - pam_limit
   become: true
-  ansible.builtin.yum:
-    name: pam
-    state: present
-  when:
-    - ansible_distribution_major_version | int == 7
-
-- name: Ensure pam package is present
-  tags:
-    - pam_limit
-  become: true
   ansible.builtin.dnf:
     name: pam
     state: present
-  when:
-    - ansible_distribution_major_version | int >= 8
 
 - name: Ensure pam limits template is present
   tags:
