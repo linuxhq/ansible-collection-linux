@@ -12,7 +12,7 @@ None
 
 Available variables are listed below, along with default values:
 
-    openssh_server:
+    openssh_server_parameters:
       AcceptEnv:
         - LANG LC_CTYPE LC_NUMERIC LC_TIME LC_COLLATE LC_MONETARY LC_MESSAGES
         - LC_IDENTIFICATION LC_ALL LANGUAGE
@@ -33,9 +33,6 @@ Available variables are listed below, along with default values:
       SyslogFacility: AUTHPRIV
       UsePAM: true
       X11Forwarding: true
-    openssh_server_autocreate_server_keys: []
-    openssh_server_crypto_policy: null
-    openssh_server_use_strong_rng: false
 
 ## Dependencies
 
@@ -44,11 +41,9 @@ None
 ## Example Playbook
 
     - hosts: server
-      collections:
-        - linuxhq.linux
       roles:
         - role: linuxhq.linux.openssh_server
-          openssh_server:
+          openssh_server_parameters:
             AddressFamily: inet
             AllowAgentForwarding: false
             ChallengeResponseAuthentication: false
@@ -87,7 +82,7 @@ None
 
 ## License
 
-Copyright (C) 2023 Linux HeadQuarters
+Copyright (C) 2025 Linux HeadQuarters
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

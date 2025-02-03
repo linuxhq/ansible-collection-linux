@@ -1,9 +1,9 @@
 ---
-- name: Converge
+- name: Ensure role is executed
   hosts: all
   roles:
-    - role: linuxhq.linux.openssh_server
-      openssh_server:
+    - role: openssh_server
+      openssh_server_parameters:
         AddressFamily: inet
         AllowAgentForwarding: false
         ChallengeResponseAuthentication: false

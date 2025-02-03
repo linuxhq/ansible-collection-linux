@@ -7,27 +7,22 @@
     name: openssh-server
     state: present
 
-- name: Ensure openssh-server sysconfig template is present
+- name: Ensure openssh-server configurations are managed
   tags:
     - openssh_server
   become: true
   ansible.builtin.template:
-    dest: /etc/sysconfig/sshd
+    dest: "{{ _sshd.dest }}"
     group: root
-    mode: '0640'
+    mode: "{{ _sshd.mode }}"
     owner: root
-    src: sshd.sysconfig.j2
+    src: "{{ _sshd.src }}"
   notify: Restart sshd
-
-- name: Ensure openssh-server sshd template is present
-  tags:
-    - openssh_server
-  become: true
-  ansible.builtin.template:
-    dest: /etc/ssh/sshd_config
-    group: root
-    mode: '0600'
-    owner: root
-    src: sshd_config.j2
-  notify: Restart sshd
+  loop:
+    - dest: /etc/ssh/sshd_config
+      mode: '0600'
+      src: sshd_config.j2
+  loop_control:
+    label: "{{ _sshd.dest | d(none) }}"
+    loop_var: _sshd
 ...

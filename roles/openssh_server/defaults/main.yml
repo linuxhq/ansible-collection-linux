@@ -1,5 +1,5 @@
 ---
-openssh_server:
+openssh_server_parameters:
   AcceptEnv:
     - LANG LC_CTYPE LC_NUMERIC LC_TIME LC_COLLATE LC_MONETARY LC_MESSAGES
     - LC_IDENTIFICATION LC_ALL LANGUAGE
@@ -20,7 +20,4 @@ openssh_server:
   SyslogFacility: AUTHPRIV
   UsePAM: true
   X11Forwarding: true
-openssh_server_autocreate_server_keys: []
-openssh_server_crypto_policy: null
-openssh_server_use_strong_rng: false
 ...

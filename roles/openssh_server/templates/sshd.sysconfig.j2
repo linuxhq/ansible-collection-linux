@@ -1,9 +1,0 @@
-# {{ ansible_managed }}
-
-{% if openssh_server_autocreate_server_keys | length > 0 %}
-AUTOCREATE_SERVER_KEYS="{{ openssh_server_autocreate_server_keys | join(' ') }}"
-{% endif %}
-{% if openssh_server_crypto_policy is not none %}
-CRYPTO_POLICY={{ openssh_server_crypto_policy }}
-{% endif %}
-SSH_USE_STRONG_RNG={{ '1' if openssh_server_use_strong_rng | bool else '0' }}

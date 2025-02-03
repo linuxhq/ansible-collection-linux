@@ -1,5 +1,26 @@
 ---
-- name: Verify
+- name: Ensure role is verified
   hosts: all
-  tasks: []
+  tasks:
+    - name: Ensure service information is gathered
+      tags:
+        - openssh_server
+      ansible.builtin.service_facts:
+
+    - name: Ensure service is present in service facts
+      tags:
+        - openssh_server
+      ansible.builtin.assert:
+        that:
+          - services['sshd.service'] is defined
+          - services['sshd.service'].state  == 'running'
+          - services['sshd.service'].status == 'enabled'
+
+    - name: Ensure service port is accessible
+      tags:
+        - openssh_server
+      ansible.builtin.wait_for:
+        host: 0.0.0.0
+        port: 22
+        state: started
 ...
