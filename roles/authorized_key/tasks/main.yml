@@ -1,22 +1,22 @@
 ---
-- name: Ensure authorized keys are present
+- name: Ensure authorized keys are managed
   tags:
     - authorized_key
   become: true
   ansible.posix.authorized_key:
-    comment: "{{ _key.comment | default(omit) }}"
-    exclusive: "{{ _key.exclusive | default(false) }}"
-    follow: "{{ _key.follow | default(false) }}"
+    comment: "{{ _key.comment | d(omit) }}"
+    exclusive: "{{ _key.exclusive | d(false) }}"
+    follow: "{{ _key.follow | d(false) }}"
     key: "{{ _key.key }}"
-    key_options: "{{ _key.key_options | default(omit) }}"
-    manage_dir: "{{ _key.manage_dir | default(true) }}"
-    path: "{{ _key.path | default(omit) }}"
-    state: "{{ _key.state | default('present') }}"
+    key_options: "{{ _key.key_options | d(omit) }}"
+    manage_dir: "{{ _key.manage_dir | d(true) }}"
+    path: "{{ _key.path | d(omit) }}"
+    state: "{{ _key.state | d('present') }}"
     user: "{{ _key.user }}"
-    validate_certs: "{{ _key.validate_certs | default(omit) }}"
-  loop: "{{ authorized_keys }}"
+    validate_certs: "{{ _key.validate_certs | d(omit) }}"
+  loop: "{{ authorized_key_list }}"
   loop_control:
-    label: "{{ _key.user | default(none) }}"
+    label: "{{ _key.user | d(none) }}"
     loop_var: _key
   when:
     - _key.key is defined

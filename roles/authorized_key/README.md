@@ -12,7 +12,7 @@ None
 
 Available variables are listed below, along with default values:
 
-    authorized_keys: []
+    authorized_key_list: []
 
 ## Dependencies
 
@@ -21,17 +21,17 @@ None
 ## Example Playbook
 
     - hosts: server
-      collections:
-        - linuxhq.linux
       roles:
         - role: linuxhq.linux.authorized_key
-          authorized_keys:
-            - key: 'ssh-rsa ...'
-              user: tkimball
+          authorized_key_list:
+            - user: root
+              exclusive: true
+              key: >-
+                ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBwCfEABKtScVJMqT8kH0rdaisRopPeLqAUnRz4BKM7S
 
 ## License
 
-Copyright (C) 2023 Linux HeadQuarters
+Copyright (C) 2025 Linux HeadQuarters
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

@@ -1,5 +1,5 @@
 ---
-- name: Verify
+- name: Ensure role is verified
   hosts: all
   tasks:
     - name: Ensure output from ssh-keygen is gathered
@@ -7,11 +7,11 @@
       ansible.builtin.command:
         cmd: >
           ssh-keygen -l -f /root/.ssh/authorized_keys
-      register: _command
+      register: __authorized_key_keygen
       changed_when: false
 
     - name: Ensure output from ssh-keygen is verified
       ansible.builtin.assert:
         that:
-          - _command.stdout is match('^[0-9]{3,4}')
+          - "'ED25519' in __authorized_key_keygen.stdout"
 ...
