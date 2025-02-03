@@ -10,8 +10,6 @@ Run multi-container applications with Docker
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
     docker_compose: []
     docker_compose_bin: /usr/libexec/docker/cli-plugins/docker-compose
     docker_compose_dir: /etc/docker/compose
@@ -25,8 +23,6 @@ Available variables are listed below, along with default values:
 ## Example Playbook
 
     - hosts: server
-      collections:
-        - linuxhq.linux
       roles:
         - role: linuxhq.linux.docker_compose
           docker_compose:
@@ -59,7 +55,7 @@ Available variables are listed below, along with default values:
 
 ## License
 
-Copyright (C) 2023 Linux HeadQuarters
+Copyright (C) 2025 Linux HeadQuarters
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

@@ -10,8 +10,6 @@ None
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
     dnf_versionlock_enabled: true
     dnf_versionlock_locklist: /etc/dnf/plugins/versionlock.list
     dnf_versionlock_packages: []
@@ -23,8 +21,6 @@ None
 ## Example Playbook
 
     - hosts: server
-      collections:
-        - linuxhq.linux
       roles:
         - role: linuxhq.linux.dnf_versionlock
           dnf_versionlock_packages:
@@ -39,7 +35,7 @@ None
 
 ## License
 
-Copyright (C) 2023 Linux HeadQuarters
+Copyright (C) 2025 Linux HeadQuarters
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
