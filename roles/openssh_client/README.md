@@ -28,24 +28,24 @@ None
           openssh_client_parameters:
             AddressFamily: inet
             Ciphers: aes128-ctr,aes192-ctr,aes256-ctr
-            ForwardAgent: no
-            ForwardX11: no
-            HashKnownHosts: yes
+            ForwardAgent: false
+            ForwardX11: false
+            HashKnownHosts: true
             LogLevel: ERROR
             MACs: hmac-sha2-256,hmac-sha2-512
-            StrictHostKeyChecking: no
+            StrictHostKeyChecking: false
             UserKnownHostsFile: /dev/null
           openssh_client_parameters_d:
             - name: linuxhq-net.conf
               host: linuxhq.net
               parameters:
-                HashKnownHosts: no
+                HashKnownHosts: false
                 LogLevel: QUIET
             - name: linuxhq-org.conf
               host: linuxhq.org
               parameters:
-                ForwardAgent: yes
-                ForwardX11: yes
+                ForwardAgent: true
+                ForwardX11: true
 
 ## License
 
@@ -62,4 +62,4 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with this program. If not, see <http://www.gnu.org/licenses/>.
+along with this program. If falset, see <http://www.gnu.org/licenses/>.
