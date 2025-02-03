@@ -1,7 +1,0 @@
----
-collections:
-  - name: amazon.aws
-    version: '*'
-  - name: community.crypto
-    version: '*'
-...

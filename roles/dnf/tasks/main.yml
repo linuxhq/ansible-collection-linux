@@ -60,7 +60,7 @@
     label: "{{ _absent }}"
     loop_var: _absent
 
-- name: Ensure dnf packages are latest
+- name: Ensure dnf packages are latest  # noqa: package-latest
   tags:
     - dnf
   become: true

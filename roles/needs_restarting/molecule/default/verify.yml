@@ -2,7 +2,7 @@
 - name: Verify
   hosts: all
   tasks:
-    - name: Ensure kernel package is latest
+    - name: Ensure kernel package is latest  # noqa: package-latest
       become: true
       ansible.builtin.dnf:
         name: kernel

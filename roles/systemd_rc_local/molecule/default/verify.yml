@@ -6,7 +6,8 @@
       ansible.builtin.service_facts:
       register: _service_facts
 
-    - debug:
+    - name: Ensure service facts are displayed
+      ansible.builtin.debug:
         msg: "{{ _service_facts }}"
 
     - name: Ensure service is present in service facts

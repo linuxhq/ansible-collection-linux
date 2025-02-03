@@ -25,7 +25,7 @@
         myhostname: "{{ inventory_hostname }}"
         mydomain: "{{ inventory_hostname }}"
         mynetworks:
-        - 192.168.0.0/24
+          - 192.168.0.0/24
         newaliases_path: /usr/bin/newaliases.postfix
         recipient_canonical_maps: regexp:/etc/postfix/recipient_canonical
         relayhost: '[mail.linuxhq.org]:587'

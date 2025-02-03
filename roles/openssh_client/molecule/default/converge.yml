@@ -6,23 +6,23 @@
       openssh_client:
         AddressFamily: inet
         Ciphers: aes128-ctr,aes192-ctr,aes256-ctr
-        ForwardAgent: no
-        ForwardX11: no
-        HashKnownHosts: yes
+        ForwardAgent: false
+        ForwardX11: false
+        HashKnownHosts: true
         LogLevel: ERROR
         MACs: hmac-sha2-256,hmac-sha2-512
-        StrictHostKeyChecking: no
+        StrictHostKeyChecking: false
         UserKnownHostsFile: /dev/null
 
       openssh_client_d:
         - file: 01-linuxhq
           host: linuxhq.net
           options:
-            HashKnownHosts: no
+            HashKnownHosts: false
             LogLevel: QUIET
         - file: 02-tkimball
           host: taylorkimball.com
           options:
-            ForwardAgent: yes
-            ForwardX11: yes
+            ForwardAgent: true
+            ForwardX11: true
 ...

@@ -2,7 +2,7 @@
 - name: Verify
   hosts: all
   tasks:
-    - name: Ensure kernel package is latest
+    - name: Ensure kernel package is latest  # noqa: package-latest
       become: true
       ansible.builtin.dnf:
         name: kernel
@@ -16,7 +16,7 @@
       register: _grub
       changed_when: false
 
-    - name: Ensure kernel information is gathered
+    - name: Ensure kernel information is gathered  # noqa: command-instead-of-module risky-shell-pipe
       ansible.builtin.shell:
         cmd: >
           /usr/bin/rpm -q kernel | sort -V | tail -1
