@@ -10,8 +10,6 @@ None
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
     elrepo_kernel: false
     elrepo_kernel_absent: false
     elrepo_kernel_default: false

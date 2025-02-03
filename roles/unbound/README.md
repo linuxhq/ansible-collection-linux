@@ -10,8 +10,6 @@ None
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
     unbound_auth_zones: {}
     unbound_cachedb: {}
     unbound_dnscrypt: {}

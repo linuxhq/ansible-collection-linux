@@ -10,8 +10,6 @@ None
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
     sudo_alias_cmnds: []
     sudo_alias_hosts: []
     sudo_alias_runas: []

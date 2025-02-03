@@ -10,8 +10,6 @@ None
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
     pam_pwquality_badwords: []
     pam_pwquality_dcredit: 0
     pam_pwquality_dictcheck: 1

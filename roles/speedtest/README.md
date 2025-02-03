@@ -10,8 +10,6 @@ None
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
     speedtest_packages:
       - speedtest
     speedtest_releasever: "{{ ansible_distribution_major_version }}"

@@ -10,8 +10,6 @@ None
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
     nr_crontab: null
     nr_package_dir: /etc/dnf/plugins/needs-restarting.d/
     nr_packages: []

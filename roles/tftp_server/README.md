@@ -10,8 +10,6 @@ None
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
     tftp_server_exec_start: null
     tftp_server_packages:
       - tftp

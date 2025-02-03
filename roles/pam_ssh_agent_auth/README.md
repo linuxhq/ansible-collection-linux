@@ -10,8 +10,6 @@ None
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
     pam_ssh_agent_auth_file: /etc/security/authorized_keys
     pam_ssh_agent_auth_keys: []
 

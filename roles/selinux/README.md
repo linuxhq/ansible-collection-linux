@@ -10,8 +10,6 @@ None
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
     selinux_conf: /etc/selinux/config
     selinux_policy: targeted
     selinux_reboot: false

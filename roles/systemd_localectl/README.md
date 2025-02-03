@@ -10,8 +10,6 @@ None
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
     systemd_localectl_keymap: null
     systemd_localectl_locale: LANG=C.UTF-8
     systemd_localectl_x11_keymap: null

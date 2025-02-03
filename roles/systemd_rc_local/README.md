@@ -10,8 +10,6 @@ None
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
     systemd_rc_local: []
 
 ## Dependencies

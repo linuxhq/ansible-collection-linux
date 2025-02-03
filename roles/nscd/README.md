@@ -10,8 +10,6 @@ None
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
     nscd_debug_level: 0
     nscd_logfile: /var/log/nscd.log
     nscd_max_threads: 32

@@ -10,8 +10,6 @@ None
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
     setup_aliases:
       - key: mailer-daemon
         value: postmaster

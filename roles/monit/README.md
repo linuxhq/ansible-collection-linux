@@ -10,8 +10,6 @@ None
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
     monit_alert: []
     monit_daemon: 30
     monit_eventqueue_basedir: /tmp

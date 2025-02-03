@@ -10,8 +10,6 @@ None
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
     systemd_logind_handlehibernatekey: hibernate
     systemd_logind_handlehibernatekeylongpress: ignore
     systemd_logind_handlelidswitch: suspend

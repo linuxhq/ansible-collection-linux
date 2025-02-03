@@ -10,8 +10,6 @@ Merger of Dribble, Freshrpms, and Livna
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
     rpmfusion_packages: []
     rpmfusion_releasever: "{{ ansible_distribution_major_version }}"
     rpmfusion_repository_free_updates: true

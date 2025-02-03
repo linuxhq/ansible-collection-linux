@@ -10,8 +10,6 @@ TCP Bottleneck Bandwidth and RRT
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
     tcp_bbr_modules:
       - sch_fq
       - tcp_bbr

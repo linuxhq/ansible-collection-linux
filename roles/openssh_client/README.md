@@ -10,8 +10,6 @@ None
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
     openssh_client_include: /etc/ssh/ssh_config.d/*.conf
     openssh_client_parameters: {}
     openssh_client_parameters_d: []

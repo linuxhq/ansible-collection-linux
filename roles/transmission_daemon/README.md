@@ -13,8 +13,6 @@ The default login and password is transmission/transmission
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
     td_alt_speed_down: 50
     td_alt_speed_enabled: false
     td_alt_speed_time_begin: 540

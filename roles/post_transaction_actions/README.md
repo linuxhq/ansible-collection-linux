@@ -10,8 +10,6 @@ None
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
     pta_actiondir: /etc/dnf/plugins/post-transaction-actions.d/
     pta_actions: []
     pta_enabled: true

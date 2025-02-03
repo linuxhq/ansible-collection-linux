@@ -10,8 +10,6 @@ None
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
     snoopy_datasource_message_max_length: 2047
     snoopy_error_logging: false
     snoopy_filter_chain: []

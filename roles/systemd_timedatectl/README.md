@@ -10,8 +10,6 @@ None
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
     systemd_timedatectl_local_rtc: false
     systemd_timedatectl_ntp: true
     systemd_timedatectl_time: null

@@ -10,8 +10,6 @@ None
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
     epel_packages: []
     epel_releasever: "{{ ansible_distribution_major_version }}"
     epel_repository_epel: true

@@ -10,8 +10,6 @@ None
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
     systemd_hostnamectl_chassis: server
     systemd_hostnamectl_deployment: development
     systemd_hostnamectl_hostname: "{{ inventory_hostname }}"

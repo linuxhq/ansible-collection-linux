@@ -10,8 +10,6 @@ None
 
 ## Role Variables
 
-Available variables are listed below, along with default values:
-
     git_become: false
     git_become_user: root
     git_packages:
