@@ -1,11 +1,6 @@
 ---
-- name: Ensure role is executed
+- name: Ensure test play is executed
   hosts: all
   roles:
-    - role: authorized_key
-      authorized_key_list:
-        - user: root
-          exclusive: true
-          key: >-
-            ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBwCfEABKtScVJMqT8kH0rdaisRopPeLqAUnRz4BKM7S
+    - authorized_key
 ...

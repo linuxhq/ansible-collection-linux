@@ -1,7 +1,7 @@
 ---
-- name: Ensure role is verified
+- name: Ensure test play is verified
   hosts: all
-  tasks:
+  pre_tasks:
     - name: Ensure output from ssh-keygen is gathered
       become: true
       ansible.builtin.command:
@@ -14,4 +14,13 @@
       ansible.builtin.assert:
         that:
           - "'ED25519' in __authorized_key_keygen.stdout"
+
+    - name: Ensure inventory lists are formatted
+      ansible.builtin.set_fact:
+        authorized_key_list:
+          "{{ authorized_key_list |
+              map('combine', {'state': 'absent'}) }}"
+
+  roles:
+    - authorized_key
 ...

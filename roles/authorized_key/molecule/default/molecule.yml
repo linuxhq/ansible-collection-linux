@@ -18,6 +18,14 @@ platforms:
 
 provisioner:
   name: ansible
+  inventory:
+    group_vars:
+      all:
+        authorized_key_list:
+          - user: root
+            exclusive: true
+            key: >-
+              ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBwCfEABKtScVJMqT8kH0rdaisRopPeLqAUnRz4BKM7S
   log: true
   options:
     diff: true
