@@ -1,17 +1,26 @@
 ---
-- name: Verify
+- name: Ensure test play is verified
   hosts: all
-  tasks:
+  pre_tasks:
     - name: Ensure user information is gathered
       ansible.builtin.getent:
         database: passwd
         fail_key: false
-      register: _getent
 
     - name: Ensure users are in expected state
       ansible.builtin.assert:
         that:
-          - "'linuxhq' in getent_passwd"
-          - "'ftp' not in getent_passwd"
-          - getent_passwd.linuxhq[1] == '2000'
+          - "'johndoe' in getent_passwd"
+          - "'janedoe' in getent_passwd"
+          - getent_passwd.johndoe.1 == '1001'
+          - getent_passwd.janedoe.1 == '1002'
+
+    - name: Ensure inventory lists are formatted
+      ansible.builtin.set_fact:
+        user_list:
+          "{{ user_list |
+              map('combine', {'state': 'absent'}) }}"
+
+  roles:
+    - user
 ...

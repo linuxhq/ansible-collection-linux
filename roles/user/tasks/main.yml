@@ -1,58 +1,42 @@
 ---
-- name: Ensure users are present
+- name: Ensure users are managed
   tags:
     - user
   become: true
   ansible.builtin.user:
-    append: "{{ _user.append | default(false) }}"
-    comment: "{{ _user.comment | default(omit) }}"
-    create_home: "{{ _user.create_home | default(true) }}"
-    expires: "{{ _user.expires | default(omit) }}"
-    force: "{{ _user.force | default(false) }}"
-    generate_ssh_key: "{{ _user.generate_ssh_key | default(false) }}"
-    group: "{{ _user.group | default(omit) }}"
-    groups: "{{ _user.groups | default(omit) }}"
-    home: "{{ _user.home | default(omit) }}"
-    local: "{{ _user.local | default(false) }}"
-    move_home: "{{ _user.move_home | default(false) }}"
+    append: "{{ _user.append | d(false) }}"
+    comment: "{{ _user.comment | d(omit) }}"
+    create_home: "{{ _user.create_home | d(true) }}"
+    expires: "{{ _user.expires | d(omit) }}"
+    force: "{{ _user.force | d(false) }}"
+    generate_ssh_key: "{{ _user.generate_ssh_key | d(false) }}"
+    group: "{{ _user.group | d(omit) }}"
+    groups: "{{ _user.groups | d(omit) }}"
+    home: "{{ _user.home | d(omit) }}"
+    local: "{{ _user.local | d(false) }}"
+    move_home: "{{ _user.move_home | d(false) }}"
     name: "{{ _user.name }}"
-    non_unique: "{{ _user.non_unique | default(false) }}"
-    password: "{{ _user.password | default(omit) }}"
-    password_expire_max: "{{ _user.password_expire_max | default(omit) }}"
-    password_expire_min: "{{ _user.password_expire_min | default(omit) }}"
-    password_lock: "{{ _user.password_lock | default(omit) }}"
-    seuser: "{{ _user.seuser | default(omit) }}"
-    shell: "{{ _user.shell | default(omit) }}"
-    skeleton: "{{ _user.skeleton | default(omit) }}"
-    ssh_key_bits: "{{ _user.ssh_key_bits | default(omit) }}"
-    ssh_key_comment: "{{ _user.ssh_key_comment | default(omit) }}"
-    ssh_key_file: "{{ _user.ssh_key_file | default(omit) }}"
-    ssh_key_passphrase: "{{ _user.ssh_key_passphrase | default(omit) }}"
-    ssh_key_type: "{{ _user.ssh_key_type | default(omit) }}"
-    state: present
-    system: "{{ _user.system | default(false) }}"
-    uid: "{{ _user.uid | default(omit) }}"
-    umask: "{{ _user.umask | default(omit) }}"
-    update_password: "{{ _user.update_password | default('always') }}"
-  loop: "{{ useradd }}"
+    non_unique: "{{ _user.non_unique | d(false) }}"
+    password: "{{ _user.password | d(omit) }}"
+    password_expire_max: "{{ _user.password_expire_max | d(omit) }}"
+    password_expire_min: "{{ _user.password_expire_min | d(omit) }}"
+    password_lock: "{{ _user.password_lock | d(omit) }}"
+    seuser: "{{ _user.seuser | d(omit) }}"
+    shell: "{{ _user.shell | d(omit) }}"
+    skeleton: "{{ _user.skeleton | d(omit) }}"
+    ssh_key_bits: "{{ _user.ssh_key_bits | d(omit) }}"
+    ssh_key_comment: "{{ _user.ssh_key_comment | d(omit) }}"
+    ssh_key_file: "{{ _user.ssh_key_file | d(omit) }}"
+    ssh_key_passphrase: "{{ _user.ssh_key_passphrase | d(omit) }}"
+    ssh_key_type: "{{ _user.ssh_key_type | d(omit) }}"
+    state: "{{ _user.state | d('present') }}"
+    system: "{{ _user.system | d(false) }}"
+    uid: "{{ _user.uid | d(omit) }}"
+    umask: "{{ _user.umask | d(omit) }}"
+    update_password: "{{ _user.update_password | d('always') }}"
+  loop: "{{ user_list }}"
   loop_control:
-    label: "{{ _user.name | default(none) }}"
-    loop_var: _user
-  when:
-    - _user.name is defined
-
-- name: Ensure users are absent
-  tags:
-    - user
-  become: true
-  ansible.builtin.user:
-    force: "{{ _user.force | default(false) }}"
-    name: "{{ _user.name }}"
-    remove: "{{ _user.remove | default(false) }}"
-    state: absent
-  loop: "{{ userdel }}"
-  loop_control:
-    label: "{{ _user.name | default(none) }}"
+    label: "{{ _user.name | d(none) }}"
     loop_var: _user
   when:
     - _user.name is defined

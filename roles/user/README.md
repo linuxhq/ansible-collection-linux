@@ -10,8 +10,7 @@ None
 
 ## Role Variables
 
-    useradd: []
-    userdel: []
+    user_list: []
 
 ## Dependencies
 
@@ -22,12 +21,11 @@ None
     - hosts: server
       roles:
         - role: linuxhq.linux.user
-          useradd:
-            - name: linuxhq
-              gid: 2000
-          userdel:
-            - name: linuxhq
-              force: true
+          user_list:
+            - name: johndoe
+              uid: 1001
+            - name: janedoe
+              uid: 1002
 
 ## License
 

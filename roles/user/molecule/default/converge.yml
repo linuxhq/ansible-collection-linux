@@ -1,12 +1,6 @@
 ---
-- name: Converge
+- name: Ensure test play is executed
   hosts: all
   roles:
-    - role: linuxhq.linux.user
-      useradd:
-        - name: linuxhq
-          uid: 2000
-      userdel:
-        - name: ftp
-          force: true
+    - user
 ...
