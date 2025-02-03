@@ -1,28 +1,39 @@
 ---
-- name: Converge
+- name: Ensure role is executed
   hosts: all
   roles:
-    - role: linuxhq.linux.openssh_client
-      openssh_client:
+    - role: openssh_client
+      openssh_client_parameters:
         AddressFamily: inet
         Ciphers: aes128-ctr,aes192-ctr,aes256-ctr
-        ForwardAgent: false
-        ForwardX11: false
-        HashKnownHosts: true
+        ForwardAgent: no
+        ForwardX11: no
+        HashKnownHosts: yes
         LogLevel: ERROR
         MACs: hmac-sha2-256,hmac-sha2-512
-        StrictHostKeyChecking: false
+        StrictHostKeyChecking: no
         UserKnownHostsFile: /dev/null
 
-      openssh_client_d:
-        - file: 01-linuxhq
+    - role: openssh_client
+      openssh_client_parameters:
+        AddressFamily: inet
+        Ciphers: aes128-ctr,aes192-ctr,aes256-ctr
+        ForwardAgent: no
+        ForwardX11: no
+        HashKnownHosts: yes
+        LogLevel: ERROR
+        MACs: hmac-sha2-256,hmac-sha2-512
+        StrictHostKeyChecking: no
+        UserKnownHostsFile: /dev/null
+      openssh_client_parameters_d:
+        - name: linuxhq-net.conf
           host: linuxhq.net
-          options:
-            HashKnownHosts: false
+          parameters:
+            HashKnownHosts: no
             LogLevel: QUIET
-        - file: 02-tkimball
-          host: taylorkimball.com
-          options:
-            ForwardAgent: true
-            ForwardX11: true
+        - name: linuxhq-org.conf
+          host: linuxhq.org
+          parameters:
+            ForwardAgent: yes
+            ForwardX11: yes
 ...

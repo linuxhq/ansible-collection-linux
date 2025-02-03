@@ -12,9 +12,9 @@ None
 
 Available variables are listed below, along with default values:
 
-    openssh_client: {}
-    openssh_client_d: []
     openssh_client_include: /etc/ssh/ssh_config.d/*.conf
+    openssh_client_parameters: {}
+    openssh_client_parameters_d: []
 
 ## Dependencies
 
@@ -23,11 +23,9 @@ None
 ## Example Playbook
 
     - hosts: server
-      collections:
-        - linuxhq.linux
       roles:
         - role: linuxhq.linux.openssh_client
-          openssh_client:
+          openssh_client_parameters:
             AddressFamily: inet
             Ciphers: aes128-ctr,aes192-ctr,aes256-ctr
             ForwardAgent: no
@@ -37,21 +35,21 @@ None
             MACs: hmac-sha2-256,hmac-sha2-512
             StrictHostKeyChecking: no
             UserKnownHostsFile: /dev/null
-          openssh_client_d:
-            - file: 01-linuxhq
+          openssh_client_parameters_d:
+            - name: linuxhq-net.conf
               host: linuxhq.net
-              options:
+              parameters:
                 HashKnownHosts: no
                 LogLevel: QUIET
-            - file: 02-tkimball
-              host: taylorkimball.com
-              options:
+            - name: linuxhq-org.conf
+              host: linuxhq.org
+              parameters:
                 ForwardAgent: yes
                 ForwardX11: yes
 
 ## License
 
-Copyright (C) 2023 Linux HeadQuarters
+Copyright (C) 2025 Linux HeadQuarters
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

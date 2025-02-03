@@ -1,5 +1,27 @@
 ---
-- name: Verify
+- name: Ensure role is verified
   hosts: all
-  tasks: []
+  tasks:
+    - name: Ensure file information is gathered
+      tags:
+        - openssh_client
+      ansible.builtin.stat:
+        path: "{{ _stat }}"
+      loop:
+        - /etc/ssh/ssh_config
+        - /etc/ssh/ssh_config.d/linuxhq-net.conf
+        - /etc/ssh/ssh_config.d/linuxhq-org.conf
+      register: __openssh_client_stat
+      loop_control:
+        label: "{{ _stat }}"
+        loop_var: _stat
+
+    - name: Ensure files are present
+      tags:
+        - openssh_client
+      ansible.builtin.assert:
+        that:
+          - __openssh_client_stat.results[0].stat.exists | bool
+          - __openssh_client_stat.results[1].stat.exists | bool
+          - __openssh_client_stat.results[2].stat.exists | bool
 ...

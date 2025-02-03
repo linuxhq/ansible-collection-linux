@@ -1,7 +1,7 @@
 # {{ ansible_managed }}
 
-Host {{ _client.host }}
-{% for key, value in _client.options | dictsort %}
+Host {{ _include.host }}
+{% for key, value in _include.parameters | dictsort %}
 {%   if value is sameas true %}
   {{ key }} yes
 {%   elif value is sameas false %}

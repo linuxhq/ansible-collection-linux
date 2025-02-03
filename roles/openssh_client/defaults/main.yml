@@ -1,5 +1,5 @@
 ---
-openssh_client: {}
-openssh_client_d: []
 openssh_client_include: /etc/ssh/ssh_config.d/*.conf
+openssh_client_parameters: {}
+openssh_client_parameters_d: []
 ...

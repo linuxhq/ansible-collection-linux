@@ -7,7 +7,7 @@
     name: openssh-clients
     state: present
 
-- name: Ensure openssh-clients template is present
+- name: Ensure openssh-clients configuration is managed
   tags:
     - openssh_client
   become: true
@@ -29,25 +29,27 @@
     path: "{{ openssh_client_include | ansible.builtin.dirname }}"
     state: directory
 
-- name: Ensure openssh-clients include templates are present
+- name: Ensure openssh-clients configuration includes are present
   tags:
     - openssh_client
   become: true
   ansible.builtin.template:
-    dest: "{{ _dir }}/{{ _client.file }}.conf"
+    dest:
+      "{{ openssh_client_include |
+          ansible.builtin.dirname ~
+          '/' ~
+          _include.name }}"
     group: root
     mode: '0644'
     owner: root
     src: ssh_config_d.j2
-  loop: "{{ openssh_client_d }}"
+  loop: "{{ openssh_client_parameters_d }}"
   loop_control:
-    label: "{{ _client.file | default(none) }}"
-    loop_var: _client
-  vars:
-    _dir: "{{ openssh_client_include | ansible.builtin.dirname }}"
+    label: "{{ _include.name | d(none) }}"
+    loop_var: _include
   when:
-    - _client.file is defined
-    - _client.host is defined
-    - _client.options is defined
-    - _client.options | length > 0
+    - _include.name is defined
+    - _include.host is defined
+    - _include.parameters is defined
+    - _include.parameters | length > 0
 ...

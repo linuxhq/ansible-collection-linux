@@ -1,8 +1,8 @@
 # {{ ansible_managed }}
 
-{% if openssh_client | length > 0 %}
+{% if openssh_client_parameters | length > 0 %}
 Host *
-{%   for key, value in openssh_client | dictsort %}
+{%   for key, value in openssh_client_parameters | dictsort %}
 {%     if value is sameas true %}
   {{ key }} yes
 {%     elif value is sameas false %}
