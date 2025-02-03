@@ -7,22 +7,26 @@
     name: chrony
     state: present
 
-- name: Ensure chrony templates are present
+- name: Ensure chrony configurations are managed
   tags:
     - chrony
   become: true
   ansible.builtin.template:
-    dest: "{{ _chrony.dst }}"
+    dest: "{{ _chrony.dest }}"
     group: root
     mode: "{{ _chrony.mode }}"
     owner: root
     src: "{{ _chrony.src }}"
   notify: Restart chronyd
   loop:
-    - { src: chrony.conf.j2, dst: /etc/chrony.conf, mode: '0644' }
-    - { src: chronyd.sysconfig.j2, dst: /etc/sysconfig/chronyd, mode: '0644' }
+    - dest: /etc/chrony.conf
+      mode: '0644'
+      src: chrony.conf.j2
+    - dest: /etc/sysconfig/chronyd
+      mode: '0644'
+      src: chronyd.sysconfig.j2
   loop_control:
-    label: "{{ _chrony.dst }}"
+    label: "{{ _chrony.dest | d(none) }}"
     loop_var: _chrony
 
 - name: Ensure chrony is started and enabled on boot

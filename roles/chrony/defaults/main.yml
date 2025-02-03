@@ -5,9 +5,11 @@ chrony_conf:
   - leapsectz right/UTC
   - logdir /var/log/chrony
   - makestep 1.0 3
+  - ntsdumpdir /var/lib/chrony
   - pool 1.pool.ntp.org iburst
   - pool 2.pool.ntp.org iburst
   - pool 3.pool.ntp.org iburst
   - rtcsync
+  - sourcedir /run/chrony-dhcp
 chrony_options: []
 ...

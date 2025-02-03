@@ -1,7 +1,7 @@
 ---
 dependencies: []
 galaxy_info:
-  role_name: user
+  role_name: chrony
   author: Taylor Kimball
   description: Programs for keeping computer clocks accurate
   license: GPLv3

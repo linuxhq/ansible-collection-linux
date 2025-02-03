@@ -1,17 +1,33 @@
 ---
-- name: Verify
+- name: Ensure role is verified
   hosts: all
   tasks:
-    - name: Ensure chrony tracking is executed
+    - name: Ensure service information is gathered
+      tags:
+        - chrony
+      ansible.builtin.service_facts:
+
+    - name: Ensure service is present in service facts
+      tags:
+        - chrony
+      ansible.builtin.assert:
+        that:
+          - services['chronyd.service'] is defined
+          - services['chronyd.service'].state  == 'running'
+          - services['chronyd.service'].status == 'enabled'
+
+    - name: Ensure service sources and tracking output is displayed
+      tags:
+        - chrony
       become: true
       ansible.builtin.command:
         cmd: >
-          chronyc tracking
-      register: _tracking
+          chronyc {{ _option }}
+      loop:
+        - sources
+        - tracking
+      loop_control:
+        label: "{{ _option }}"
+        loop_var: _option
       changed_when: false
-
-    - name: Ensure chrony tracking is success
-      ansible.builtin.assert:
-        that:
-          - _tracking.rc == 0
 ...

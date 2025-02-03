@@ -18,10 +18,12 @@ Available variables are listed below, along with default values:
       - leapsectz right/UTC
       - logdir /var/log/chrony
       - makestep 1.0 3
+      - ntsdumpdir /var/lib/chrony
       - pool 1.pool.ntp.org iburst
       - pool 2.pool.ntp.org iburst
       - pool 3.pool.ntp.org iburst
       - rtcsync
+      - sourcedir /run/chrony-dhcp
     chrony_options: []
 
 ## Dependencies
@@ -31,11 +33,10 @@ None
 ## Example Playbook
 
     - hosts: server
-      collections:
-        - linuxhq.linux
       roles:
         - role: linuxhq.linux.chrony
           chrony_conf:
+            - authselectmode require
             - cmdport 0
             - driftfile /var/lib/chrony/drift
             - hwtimestamp *
@@ -43,16 +44,17 @@ None
             - logdir /var/log/chrony
             - makestep 1.0 3
             - minsources 2
+            - ntsdumpdir /var/lib/chrony
             - rtcsync
-            - pool 1.pool.ntp.org iburst
-            - pool 2.pool.ntp.org iburst
-            - pool 3.pool.ntp.org iburst
+            - server ntppool1.time.nl iburst nts
+            - server ntppool2.time.nl iburst nts
+            - sourcedir /run/chrony-dhcp
           chrony_options:
             - '-F 1'
 
 ## License
 
-Copyright (C) 2023 Linux HeadQuarters
+Copyright (C) 2025 Linux HeadQuarters
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

@@ -1,9 +1,10 @@
 ---
-- name: Converge
+- name: Ensure test play is executed
   hosts: all
   roles:
-    - role: linuxhq.linux.chrony
+    - role: chrony
       chrony_conf:
+        - authselectmode require
         - cmdport 0
         - driftfile /var/lib/chrony/drift
         - hwtimestamp *
@@ -11,10 +12,11 @@
         - logdir /var/log/chrony
         - makestep 1.0 3
         - minsources 2
+        - ntsdumpdir /var/lib/chrony
         - rtcsync
-        - pool 1.pool.ntp.org iburst
-        - pool 2.pool.ntp.org iburst
-        - pool 3.pool.ntp.org iburst
+        - server ntppool1.time.nl iburst nts
+        - server ntppool2.time.nl iburst nts
+        - sourcedir /run/chrony-dhcp
       chrony_options:
         - '-F 1'
 ...
