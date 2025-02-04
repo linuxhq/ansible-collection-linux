@@ -1,14 +1,15 @@
 ---
 dependency:
   name: galaxy
+  options:
+    requirements-file: ../../requirements.yml
 
 driver:
   name: vagrant
 
 platforms:
   - name: almalinux9
-    box: bento/almalinux-9-arm64
-    box_architecture: arm64
+    box: bento/almalinux-9
 
 provisioner:
   name: ansible

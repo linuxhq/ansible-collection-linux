@@ -1,33 +1,32 @@
 ---
-- name: Converge
+- name: Ensure role is executed
   hosts: all
   roles:
-    - role: linuxhq.linux.sudo
-      sudo_alias_cmnds:
-        - name: access
-          cmnds:
-            - /usr/sbin/groupadd
-            - /usr/sbin/useradd
-      sudo_alias_hosts:
-        - name: hosts
-          hosts:
-            - localhost
-            - 127.0.0.1
-      sudo_alias_runas:
-        - name: runas
-          runas:
-            - linuxhq
-            - tkimball
-      sudo_alias_users:
-        - name: users
-          users:
-            - tkimball
+    - role: sudo
       sudo_d:
-        - file: tkimball
-          user: tkimball
+        - file: linuxhq
+          user: '%linuxhq'
           host: ALL
           runas: ALL
           cmnds:
-            - /bin/su
             - NOPASSWD:ALL
+      sudo_env_keep:
+        - SSH_AUTH_SOCK
+      sudo_pam:
+        - module_interface: auth
+          control_flag: sufficient
+          module_name: pam_ssh_agent_auth.so
+          module_arguments: file=/etc/security/authorized_keys
+        - module_interface: auth
+          control_flag: include
+          module_name: system-auth
+        - module_interface: account
+          control_flag: include
+          module_name: system-auth
+        - module_interface: password
+          control_flag: include
+          module_name: system-auth
+        - module_interface: session
+          control_flag: include
+          module_name: system-auth
 ...

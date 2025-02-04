@@ -1,5 +1,14 @@
 ---
-- name: Verify
+- name: Ensure role is verified
   hosts: all
-  tasks: []
+  tasks:
+    - name: Ensure sudo config syntax is valid
+      tags:
+        - sudo
+      become: true
+      ansible.builtin.command:
+        cmd: >
+          visudo -c
+      changed_when: false
+      check_mode: false
 ...

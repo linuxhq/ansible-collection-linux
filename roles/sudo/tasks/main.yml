@@ -7,7 +7,7 @@
     name: sudo
     state: present
 
-- name: Ensure sudoers configuration is present
+- name: Ensure sudoers configuration is managed
   tags:
     - sudo
   become: true
@@ -19,7 +19,7 @@
     src: sudoers.j2
     validate: '/usr/sbin/visudo -cf %s'
 
-- name: Ensure sudoers.d configurations are present
+- name: Ensure sudoers.d configurations are managed
   tags:
     - sudo
   become: true
@@ -42,7 +42,7 @@
     - _sudoers.cmnds is defined
     - _sudoers.cmnds | length > 0
 
-- name: Ensure sudo pam configuration is present
+- name: Ensure sudo pam configuration is managed
   tags:
     - sudo
   become: true

@@ -3,11 +3,15 @@
   hosts: all
   pre_tasks:
     - name: Ensure user information is gathered
+      tags:
+        - user
       ansible.builtin.getent:
         database: passwd
         fail_key: false
 
     - name: Ensure users are in expected state
+      tags:
+        - user
       ansible.builtin.assert:
         that:
           - "'johndoe' in getent_passwd"
@@ -16,6 +20,8 @@
           - getent_passwd.janedoe.1 == '1002'
 
     - name: Ensure inventory lists are formatted
+      tags:
+        - user
       ansible.builtin.set_fact:
         user_list:
           "{{ user_list |

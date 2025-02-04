@@ -51,15 +51,15 @@ None
     - hosts: server
       roles:
         - role: linuxhq.linux.sudo
-          sudo_env_keep:
-            - SSH_AUTH_SOCK
           sudo_d:
             - file: linuxhq
-              user: %linuxhq
+              user: '%linuxhq'
               host: ALL
               runas: ALL
               cmnds:
                 - NOPASSWD:ALL
+          sudo_env_keep:
+            - SSH_AUTH_SOCK
           sudo_pam:
             - module_interface: auth
               control_flag: sufficient
