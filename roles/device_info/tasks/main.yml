@@ -1,53 +1,33 @@
 ---
-- name: Ensure device facts are gathered
+- name: Ensure device information is gathered
   tags:
     - device_info
   become: true
   ansible.builtin.setup:
     gather_subset: devices
 
-- name: Ensure device name list is generated
+- name: Ensure list of devices is generated
   tags:
     - device_info
   ansible.builtin.set_fact:
-    _device_names: "{{ ansible_devices.keys() |
-                       list |
-                       default([]) }}"
+    _device_info_list:
+      "{{ (ansible_devices |
+          dict2items |
+          json_query('[].{
+            device: key,
+            partitions: value.partitions
+          }')) |
+          d([]) }}"
 
-- name: Ensure device partition list is generated
+- name: Ensure dict of devices is generated
   tags:
     - device_info
   ansible.builtin.set_fact:
-    _device_partitions: "{{ _device_partitions |
-                            default([]) +
-                            [{'name': _name,
-                              'partitions': _part}] }}"
-  loop: "{{ _device_names }}"
-  loop_control:
-    label: "{{ _name }}"
-    loop_var: _name
-  vars:
-    _part: "{{ ansible_devices[_name]['partitions'].keys() |
-               list |
-               default([]) }}"
-
-- name: Ensure device partition dictionaries are generated
-  tags:
-    - device_info
-  ansible.builtin.set_fact:
-    _device_part_labels: "{{ _device_part_labels |
-                             default({}) |
-                             combine({_d.1: _info.links.labels}) }}"
-    _device_part_uuid: "{{ _device_part_uuid |
-                           default({}) |
-                           combine({_d.1: _info.uuid}) }}"
-  loop: "{{ q('ansible.builtin.subelements',
-              _device_partitions,
-              'partitions',
-              {'skip_missing': true}) }}"
-  loop_control:
-    label: "{{ _d.1 }}"
-    loop_var: _d
-  vars:
-    _info: "{{ ansible_devices[_d.0.name]['partitions'][_d.1] }}"
+    _device_info_dict:
+      "{{ (_device_info_list |
+          items2dict(
+            key_name='device',
+            value_name='partitions'
+          )) |
+          d({}) }}"
 ...

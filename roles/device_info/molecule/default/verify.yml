@@ -1,5 +1,5 @@
 ---
-- name: Verify
+- name: Ensure role is verified
   hosts: all
   tasks: []
 ...

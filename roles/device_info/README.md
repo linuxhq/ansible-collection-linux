@@ -18,10 +18,8 @@ None
 
 ## Return Values
 
-    _device_names
-    _device_partitions
-    _device_part_labels
-    _device_part_uuid
+    _device_info_dict
+    _device_info_list
 
 ## Example Playbook
 
