@@ -1,10 +1,10 @@
 ---
-- name: Converge
+- name: Ensure test play is executed
   hosts: all
   roles:
-    - role: linuxhq.linux.transmission_daemon
-      td_bind_address_ipv6: "fe80::"
-      td_dht_enabled: false
-      td_pex_enabled: false
-      td_umask: 2
+    - role: transmission_daemon
+      transmission_daemon_bind_address_ipv6: "fe80::"
+      transmission_daemon_dht_enabled: false
+      transmission_daemon_pex_enabled: false
+      transmission_daemon_umask: 2
 ...

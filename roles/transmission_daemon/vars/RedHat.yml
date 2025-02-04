@@ -1,6 +1,5 @@
 ---
-td_downloads: Downloads
-td_home: /var/lib/transmission
-td_owner: transmission
-td_settings: "{{ td_home }}/.config/transmission-daemon/settings.json"
+transmission_daemon_home: /var/lib/transmission
+transmission_daemon_owner: transmission
+transmission_daemon_settings: "{{ transmission_daemon_home }}/.config/transmission-daemon/settings.json"
 ...

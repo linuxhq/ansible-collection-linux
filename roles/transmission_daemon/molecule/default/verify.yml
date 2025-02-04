@@ -1,12 +1,26 @@
 ---
-- name: Verify
+- name: Ensure role is verified
   hosts: all
   tasks:
-    - name: Ensure transmission-daemon is listening
+    - name: Ensure service information is gathered
+      tags:
+        - transmission_daemon
+      ansible.builtin.service_facts:
+
+    - name: Ensure service is present in service facts
+      tags:
+        - transmission_daemon
+      ansible.builtin.assert:
+        that:
+          - services['transmission-daemon.service'] is defined
+          - services['transmission-daemon.service'].state  == 'running'
+          - services['transmission-daemon.service'].status == 'enabled'
+
+    - name: Ensure service port is accessible
+      tags:
+        - transmission_daemon
       ansible.builtin.wait_for:
-        delay: 0
-        host: localhost
+        host: 0.0.0.0
         port: 9091
         state: started
-        timeout: 3
 ...

@@ -18,10 +18,11 @@
     enablerepo: epel
     name: transmission-daemon
     state: present
+    update_cache: true
   when:
     - ansible_os_family == 'RedHat'
 
-- name: Ensure transmission-daemon os specific vars are present
+- name: Ensure transmission-daemon os specific vars are included
   tags:
     - transmission_daemon
   ansible.builtin.include_vars:
@@ -32,32 +33,51 @@
     - transmission_daemon
   become: true
   ansible.builtin.file:
-    group: "{{ td_owner }}"
+    group: "{{ transmission_daemon_owner }}"
     mode: '0700'
-    owner: "{{ td_owner }}"
+    owner: "{{ transmission_daemon_owner }}"
     path: "{{ _path }}"
     recurse: false
     state: directory
   loop:
-    - "{{ td_home }}/.config"
-    - "{{ td_home }}/.config/transmission-daemon"
+    - "{{ transmission_daemon_home }}/.config"
+    - "{{ transmission_daemon_home }}/.config/transmission-daemon"
   loop_control:
     label: "{{ _path }}"
     loop_var: _path
   when:
     - ansible_os_family == 'RedHat'
 
-- name: Ensure transmission-daemon settings are present
+- name: Esnure transmission-daemon download directories are present
+  tags:
+    - transmission_daemon
+  become: true
+  ansible.builtin.file:
+    group: "{{ transmission_daemon_owner }}"
+    mode: '0700'
+    owner: "{{ transmission_daemon_owner }}"
+    path: "{{ _path }}"
+    recurse: false
+    state: directory
+  loop:
+    - "{{ transmission_daemon_download_dir }}"
+    - "{{ transmission_daemon_incomplete_dir }}"
+  loop_control:
+    label: "{{ _path }}"
+    loop_var: _path
+
+- name: Ensure transmission-daemon settings are managed
   tags:
     - transmission_daemon
   become: true
   ansible.builtin.template:
-    dest: "{{ td_settings }}"
-    group: "{{ td_owner }}"
+    dest: "{{ transmission_daemon_settings }}"
+    group: "{{ transmission_daemon_owner }}"
     mode: '0600'
-    owner: "{{ td_owner }}"
+    owner: "{{ transmission_daemon_owner }}"
     src: settings.json.j2
-  notify: Reload transmission-daemon
+  notify:
+    - Reload transmission-daemon
 
 - name: Ensure transmission-daemon is started and enabled on boot
   tags:
