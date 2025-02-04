@@ -1,11 +1,27 @@
 ---
-- name: Converge
+- name: Ensure test play is executed
   hosts: all
   roles:
-    - role: linuxhq.linux.mount
-      mounts:
+    - role: parted
+      parted_list:
+        - device: /dev/sdb
+          label: gpt
+          partitions:
+            - number: 1
+              part_end: '100%'
+              part_start: '0%'
+              part_type: primary
+
+    - role: filesystem
+      filesystem_list:
+        - dev: /dev/sdb1
+          fstype: ext4
+          opts: -L srv
+
+    - role: mount
+      mount_list:
         - fstype: ext4
           opts: nodev,noexec,nosuid
           path: /srv
-          src: UUID=9f052ee9-2210-457c-9572-ee1a3ff96d71
+          src: LABEL=srv
 ...

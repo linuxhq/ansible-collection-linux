@@ -1,5 +1,14 @@
 ---
-- name: Verify
+- name: Ensure role is verified
   hosts: all
-  tasks: []
+  tasks:
+    - name: Ensure partition is mounted correctly
+      tags:
+        - mount
+      ansible.builtin.assert:
+        that:
+          - ansible_mounts |
+            selectattr('device', 'eq', '/dev/sdb1') |
+            map(attribute='mount') |
+            first == '/srv'
 ...

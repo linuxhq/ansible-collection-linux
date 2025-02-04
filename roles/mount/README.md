@@ -11,8 +11,6 @@ None
 ## Role Variables
 
     mount_list: []
-    mount_packages:
-      - util-linux-core
 
 ## Return Values
 

@@ -1,12 +1,4 @@
 ---
-- name: Ensure mount packages are present
-  tags:
-    - mount
-  become: true
-  ansible.builtin.package:
-    name: "{{ mount_packages }}"
-    state: present
-
 - name: Ensure mounts are managed
   tags:
     - mount

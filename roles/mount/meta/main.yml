@@ -1,6 +1,6 @@
 ---
 dependencies:
-  - role: linuxhq.linux.device_info
+  - role: device_info
     tags: mount
 galaxy_info:
   role_name: mount
@@ -8,7 +8,11 @@ galaxy_info:
   description: Control active and configured mount points
   license: GPLv3
   min_ansible_version: 2.15.0
+  namespace: linuxhq
   platforms:
+    - name: Debian
+      versions:
+        - all
     - name: EL
       versions:
         - all
