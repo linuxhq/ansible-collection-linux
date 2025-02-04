@@ -10,7 +10,7 @@ None
 
 ## Role Variables
 
-    parted: []
+    parted_list: []
 
 ## Dependencies
 
@@ -21,8 +21,8 @@ None
     - hosts: server
       roles:
         - role: linuxhq.linux.parted
-          parted:
-            - device: /dev/sda
+          parted_list:
+            - device: /dev/sdb
               label: gpt
               partitions:
                 - number: 1

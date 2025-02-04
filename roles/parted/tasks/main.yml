@@ -7,31 +7,32 @@
     name: parted
     state: present
 
-- name: Ensure parted block device partitions are present
+- name: Ensure parted block device partitions are managed
   tags:
     - parted
   become: true
   community.general.parted:
-    align: "{{ _parted.1.align | default('optimal') }}"
-    device: "{{ _device }}"
-    flags: "{{ _parted.1.flags | default(omit) }}"
-    fs_type: "{{ _parted.1.fs_type | default(omit) }}"
-    label: "{{ _parted.0.label | default('msdos') }}"
-    name: "{{ _parted.1.name | default(omit) }}"
-    number: "{{ _number }}"
-    part_end: "{{ _parted.1.part_end | default('100%') }}"
-    part_start: "{{ _parted.1.part_start | default('0%') }}"
-    part_type: "{{ _parted.1.part_type | default('primary') }}"
-    resize: "{{ _parted.1.resize | default(false) }}"
+    align: "{{ _parted.1.align | d('optimal') }}"
+    device: "{{ _parted.0.device }}"
+    flags: "{{ _parted.1.flags | d(omit) }}"
+    fs_type: "{{ _parted.1.fs_type | d(omit) }}"
+    label: "{{ _parted.0.label | d('msdos') }}"
+    name: "{{ _parted.1.name | d(omit) }}"
+    number: "{{ _parted.1.number }}"
+    part_end: "{{ _parted.1.part_end | d('100%') }}"
+    part_start: "{{ _parted.1.part_start | d('0%') }}"
+    part_type: "{{ _parted.1.part_type | d('primary') }}"
+    resize: "{{ _parted.1.resize | d(false) }}"
     state: present
-  loop: "{{ q('ansible.builtin.subelements', parted, 'partitions', {'skip_missing': true}) }}"
+  loop:
+    "{{ q('ansible.builtin.subelements',
+          parted_list,
+          'partitions',
+          {'skip_missing': true}) }}"
   loop_control:
-    label: "{{ _device }}:{{ _number }}"
+    label: "{{ _parted.0.device | d(none) }}"
     loop_var: _parted
-  vars:
-    _device: "{{ _parted.0.device | default(none) }}"
-    _number: "{{ _parted.1.number | default(none) }}"
   when:
-    - _parted.0.device is not none
-    - _parted.1.number is not none
+    - _parted.0.device is defined
+    - _parted.1.number is defined
 ...

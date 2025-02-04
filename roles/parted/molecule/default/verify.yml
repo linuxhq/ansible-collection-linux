@@ -1,5 +1,14 @@
 ---
-- name: Verify
+- name: Ensure role is verified
   hosts: all
-  tasks: []
+  tasks:
+    - name: Ensure devices are present
+      tags:
+        - parted
+      ansible.builtin.assert:
+        that:
+          - ansible_devices.sdb is defined
+          - ansible_devices.sdb.size == '5.00 GB'
+          - ansible_devices.sdb.partitions.sdb1 is defined
+          - ansible_devices.sdb.partitions.sdb1.size == '5.00 GB'
 ...

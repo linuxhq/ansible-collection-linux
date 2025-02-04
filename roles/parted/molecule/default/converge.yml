@@ -1,10 +1,10 @@
 ---
-- name: Converge
+- name: Ensure test play is executed
   hosts: all
   roles:
-    - role: linuxhq.linux.parted
-      parted:
-        - device: /dev/sda
+    - role: parted
+      parted_list:
+        - device: /dev/sdb
           label: gpt
           partitions:
             - number: 1
