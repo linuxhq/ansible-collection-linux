@@ -10,10 +10,10 @@ None
 
 ## Role Variables
 
+    filesystem_list: []
     filesystem_packages:
       - e2fsprogs
       - xfsprogs
-    filesystems: []
 
 ## Dependencies
 
@@ -24,8 +24,8 @@ None
     - hosts: server
       roles:
         - role: linuxhq.linux.filesystem
-          filesystems:
-            - dev: /dev/sda1
+          filesystem_list:
+            - dev: /dev/sdb1
               fstype: ext4
 
 ## License

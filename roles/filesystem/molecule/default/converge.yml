@@ -1,9 +1,19 @@
 ---
-- name: Converge
+- name: Ensure test play is executed
   hosts: all
   roles:
-    - role: linuxhq.linux.filesystem
-      filesystems:
-        - dev: /dev/sda1
+    - role: parted
+      parted_list:
+        - device: /dev/sdb
+          label: gpt
+          partitions:
+            - number: 1
+              part_end: '100%'
+              part_start: '0%'
+              part_type: primary
+
+    - role: filesystem
+      filesystem_list:
+        - dev: /dev/sdb1
           fstype: ext4
 ...

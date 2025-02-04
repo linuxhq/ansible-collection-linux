@@ -1,6 +1,6 @@
 ---
+filesystem_list: []
 filesystem_packages:
   - e2fsprogs
   - xfsprogs
-filesystems: []
 ...

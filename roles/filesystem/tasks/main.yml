@@ -7,26 +7,23 @@
     name: "{{ filesystem_packages }}"
     state: present
 
-- name: Ensure filesystems are present
+- name: Ensure filesystems are managed
   tags:
     - filesystem
   become: true
   community.general.filesystem:
-    dev: "{{ _dev }}"
-    force: "{{ _filesystem.force | default(false) }}"
-    fstype: "{{ _fstype }}"
-    opts: "{{ _filesystem.opts | default(omit) }}"
-    resizefs: "{{ _filesystem.resizefs | default(false) }}"
+    dev: "{{ _fs.dev }}"
+    force: "{{ _fs.force | d(false) }}"
+    fstype: "{{ _fs.fstype }}"
+    opts: "{{ _fs.opts | d(omit) }}"
+    resizefs: "{{ _fs.resizefs | d(false) }}"
     state: present
-    uuid: "{{ _filesystem.uuid | default(omit) }}"
-  loop: "{{ filesystems }}"
+    uuid: "{{ _fs.uuid | d(omit) }}"
+  loop: "{{ filesystem_list }}"
   loop_control:
-    label: "{{ _dev }}:{{ _fstype }}"
-    loop_var: _filesystem
-  vars:
-    _dev: "{{ _filesystem.dev | default(none) }}"
-    _fstype: "{{ _filesystem.fstype | default(none) }}"
+    label: "{{ _fs.dev | d(none) }}"
+    loop_var: _fs
   when:
-    - _dev is not none
-    - _fstype is not none
+    - _fs.dev is defined
+    - _fs.fstype is defined
 ...

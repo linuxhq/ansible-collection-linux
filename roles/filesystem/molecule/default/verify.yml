@@ -1,5 +1,31 @@
 ---
-- name: Verify
+- name: Ensure role is verified
   hosts: all
-  tasks: []
+  tasks:
+    - name: Ensure partition is mounted
+      tags:
+        - filesystem
+      become: true
+      ansible.posix.mount:
+        path: /srv
+        src: /dev/sdb1
+        fstype: ext4
+        state: mounted
+
+    - name: Ensure ansible facts are regathered
+      tags:
+        - filesystem
+      ansible.builtin.setup:
+        gather_subset:
+          - mounts
+
+    - name: Ensure partition has the correct filesystem
+      tags:
+        - filesystem
+      ansible.builtin.assert:
+        that:
+          - ansible_mounts |
+            selectattr('device', 'eq', '/dev/sdb1') |
+            map(attribute='fstype') |
+            first == 'ext4'
 ...
