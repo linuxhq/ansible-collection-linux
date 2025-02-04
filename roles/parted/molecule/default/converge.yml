@@ -3,6 +3,9 @@
   hosts: all
   roles:
     - role: parted
+      parted_list: []
+
+    - role: parted
       parted_list:
         - device: /dev/sdb
           label: gpt

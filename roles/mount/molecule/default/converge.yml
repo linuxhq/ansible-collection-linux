@@ -19,6 +19,9 @@
           opts: -L srv
 
     - role: mount
+      mount_list: []
+
+    - role: mount
       mount_list:
         - fstype: ext4
           opts: nodev,noexec,nosuid

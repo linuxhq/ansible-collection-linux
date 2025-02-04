@@ -1,4 +1,4 @@
 ---
 virtualenv_become: false
-virtualenvs: []
+virtualenv_list: []
 ...

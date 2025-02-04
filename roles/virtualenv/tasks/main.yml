@@ -1,24 +1,46 @@
 ---
+- name: Ensure virtual environment packages are present
+  tags:
+    - virtualenv
+  become: true
+  ansible.builtin.apt:
+    name: python3-venv
+    state: present
+    update_cache: true
+  when:
+    - ansible_os_family == 'Debian'
+
+- name: Ensure virtual environment packages are present
+  tags:
+    - virtualenv
+  become: true
+  ansible.builtin.dnf:
+    name: python3
+    state: present
+    update_cache: true
+  when:
+    - ansible_os_family == 'RedHat'
+
 - name: Ensure virtual environments are present
   tags:
     - virtualenv
   become: "{{ virtualenv_become | bool }}"
   ansible.builtin.pip:
-    chdir: "{{ _venv.chdir | default(omit) }}"
-    editable: "{{ _venv.editable | default(false) }}"
-    executable: "{{ _venv.executable | default(omit) }}"
+    chdir: "{{ _venv.chdir | d(omit) }}"
+    editable: "{{ _venv.editable | d(false) }}"
+    executable: "{{ _venv.executable | d(omit) }}"
     extra_args: --upgrade
     name:
       - pip
     state: present
-    umask: "{{ _venv.umask | default(omit) }}"
+    umask: "{{ _venv.umask | d(omit) }}"
     virtualenv: "{{ _venv.virtualenv }}"
-    virtualenv_command: "{{ _venv.virtualenv_command | default('virtualenv') }}"
-    virtualenv_python: "{{ _venv.virtualenv_python | default(omit) }}"
-    virtualenv_site_packages: "{{ _venv.virtualenv_site_packages | default(false) }}"
-  loop: "{{ virtualenvs }}"
+    virtualenv_command: "{{ _venv.virtualenv_command | d('virtualenv') }}"
+    virtualenv_python: "{{ _venv.virtualenv_python | d(omit) }}"
+    virtualenv_site_packages: "{{ _venv.virtualenv_site_packages | d(false) }}"
+  loop: "{{ virtualenv_list }}"
   loop_control:
-    label: "{{ _venv.virtualenv | default(none) }}"
+    label: "{{ _venv.virtualenv | d(none) }}"
     loop_var: _venv
   when:
     - _venv.virtualenv is defined
@@ -28,22 +50,21 @@
     - virtualenv
   become: "{{ virtualenv_become | bool }}"
   ansible.builtin.pip:
-    chdir: "{{ _venv.chdir | default(omit) }}"
-    editable: "{{ _venv.editable | default(false) }}"
-    executable: "{{ _venv.executable | default(omit) }}"
-    extra_args: "{{ _venv.extra_args | default(omit) }}"
-    name: "{{ _venv.name | default(omit) }}"
-    requirements: "{{ _venv.requirements | default(omit) }}"
+    chdir: "{{ _venv.chdir | d(omit) }}"
+    editable: "{{ _venv.editable | d(false) }}"
+    executable: "{{ _venv.executable | d(omit) }}"
+    extra_args: "{{ _venv.extra_args | d(omit) }}"
+    name: "{{ _venv.name | d(omit) }}"
     state: present
-    umask: "{{ _venv.umask | default(omit) }}"
-    version: "{{ _venv.version | default(omit) }}"
+    umask: "{{ _venv.umask | d(omit) }}"
+    version: "{{ _venv.version | d(omit) }}"
     virtualenv: "{{ _venv.virtualenv }}"
-    virtualenv_command: "{{ _venv.virtualenv_command | default('virtualenv') }}"
-    virtualenv_python: "{{ _venv.virtualenv_python | default(omit) }}"
-    virtualenv_site_packages: "{{ _venv.virtualenv_site_packages | default(false) }}"
-  loop: "{{ virtualenvs }}"
+    virtualenv_command: "{{ _venv.virtualenv_command | d('virtualenv') }}"
+    virtualenv_python: "{{ _venv.virtualenv_python | d(omit) }}"
+    virtualenv_site_packages: "{{ _venv.virtualenv_site_packages | d(false) }}"
+  loop: "{{ virtualenv_list }}"
   loop_control:
-    label: "{{ _venv.virtualenv | default(none) }}"
+    label: "{{ _venv.virtualenv | d(none) }}"
     loop_var: _venv
   when:
     - _venv.virtualenv is defined

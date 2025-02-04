@@ -2,5 +2,8 @@
 - name: Ensure test play is executed
   hosts: all
   roles:
+    - role: authorized_key
+      authorized_key_list: []
+
     - authorized_key
 ...

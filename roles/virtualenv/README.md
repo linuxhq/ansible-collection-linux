@@ -11,7 +11,7 @@ None
 ## Role Variables
 
     virtualenv_become: false
-    virtualenvs: []
+    virtualenv_list: []
 
 ## Dependencies
 
@@ -23,11 +23,11 @@ None
       roles:
         - role: linuxhq.linux.virtualenv
           virtualenv_become: true
-          virtualenvs:
+          virtualenv_list:
             - virtualenv: /opt/ansible
               virtualenv_command: /usr/bin/python3 -m venv
               name:
-                - ansible<9
+                - 'ansible>8,<9'
               extra_args: '--no-cache-dir'
 
 ## License

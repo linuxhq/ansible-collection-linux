@@ -1,11 +1,23 @@
 ---
-- name: Verify
+- name: Ensure test play is verified
   hosts: all
   tasks:
-    - name: Ensure virtualenv package is present
+    - name: Ensure virtualenv ansible versions are gathered
+      tags:
+        - virtualenv
       ansible.builtin.command:
         cmd: >
-          /opt/ansible/bin/ansible --version
-      register: _command
-      changed_when: false
+          {{ _venv.virtualenv }}/bin/ansible --version
+      register: __virtualenv_ansible_version
+      loop: "{{ virtualenv_list }}"
+      loop_control:
+        label: "{{ _venv.virtualenv | d(none) }}"
+        loop_var: _venv
+
+    - name: Ensure virtualenv ansible versions are displayed
+      tags:
+        - virtualenv
+      ansible.builtin.debug:
+        msg: |
+          "{{ __virtualenv_ansible_version.results.0.stdout }}"
 ...
