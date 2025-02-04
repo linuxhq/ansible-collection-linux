@@ -13,6 +13,7 @@
       loop_control:
         label: "{{ _venv.virtualenv | d(none) }}"
         loop_var: _venv
+      changed_when: false
 
     - name: Ensure virtualenv ansible versions are displayed
       tags:
