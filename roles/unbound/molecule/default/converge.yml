@@ -2,6 +2,8 @@
 - name: Ensure test play is executed
   hosts: all
   roles:
+    - unbound
+
     - role: unbound
       unbound_forward_zones:
         '.':

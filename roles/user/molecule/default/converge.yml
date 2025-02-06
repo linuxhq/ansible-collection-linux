@@ -2,5 +2,8 @@
 - name: Ensure test play is executed
   hosts: all
   roles:
+    - role: user
+      user_list: []
+
     - user
 ...
