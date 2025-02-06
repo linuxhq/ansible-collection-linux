@@ -1,18 +1,8 @@
 ---
-- name: Converge
+- name: Ensure test play is executed
   hosts: all
   roles:
-    - role: linuxhq.linux.unbound
-      unbound_auth_zones:
-        linuxhq.net:
-          primary:
-            - 199.9.14.201
-            - 192.33.4.12
-        linuxhq.org:
-          primary:
-            - 199.7.91.13
-            - 192.5.5.241
-
+    - role: unbound
       unbound_forward_zones:
         '.':
           forward-addr:
@@ -20,19 +10,6 @@
             - '1.0.0.1@853#cloudflare-dns.com'
           forward-first: false
           forward-tls-upstream: true
-        linuxhq.net:
-          forward-addr:
-            - '1.1.1.1@853#cloudflare-dns.com'
-            - '1.0.0.1@853#cloudflare-dns.com'
-          forward-first: false
-          forward-tls-upstream: true
-
-      unbound_stub_zones:
-        linuxheadquarters.net:
-          stub-host: ns1.linuxheadquarters.net
-        linuxheadquarters.org:
-          stub-host: ns1.linuxheadquarters.org
-
       unbound_server:
         interface: 127.0.0.1
         tls-cert-bundle: /etc/pki/tls/certs/ca-bundle.crt

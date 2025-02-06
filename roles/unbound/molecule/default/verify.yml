@@ -1,5 +1,26 @@
 ---
-- name: Verify
+- name: Ensure role is verified
   hosts: all
-  tasks: []
+  tasks:
+    - name: Ensure service information is gathered
+      tags:
+        - unbound
+      ansible.builtin.service_facts:
+
+    - name: Ensure service is present in service facts
+      tags:
+        - unbound
+      ansible.builtin.assert:
+        that:
+          - services['unbound.service'] is defined
+          - services['unbound.service'].state  == 'running'
+          - services['unbound.service'].status == 'enabled'
+
+    - name: Ensure service port is accessible
+      tags:
+        - unbound
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: 53
+        state: started
 ...

@@ -7,7 +7,7 @@
     name: unbound
     state: present
 
-- name: Ensure unbound template is present
+- name: Ensure unbound configuration is managed
   tags:
     - unbound
   become: true
