@@ -1,17 +1,9 @@
 ---
-- name: Converge
+- name: Ensure test play is executed
   hosts: all
   roles:
-    - role: linuxhq.linux.template
-      templates:
-        - dest: /tmp/template_1
-          group: root
-          mode: '0600'
-          owner: root
-          src: "{{ role_path }}/molecule/templates/template_1.j2"
-        - dest: /tmp/template_2
-          group: root
-          mode: '0644'
-          owner: root
-          src: "{{ role_path }}/molecule/templates/template_2.j2"
+    - role: template
+      template_list: []
+
+    - template
 ...

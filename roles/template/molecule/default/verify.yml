@@ -1,5 +1,29 @@
 ---
-- name: Verify
+- name: Ensure test play is verified
   hosts: all
-  tasks: []
+  pre_tasks:
+    - name: Ensure status of template destinations are gathered
+      tags:
+        - template
+      ansible.builtin.stat:
+        path: "{{ _template.dest }}"
+      register: __template_stat
+      loop: "{{ template_list }}"
+      loop_control:
+        label: "{{ _template.dest | d(none) }}"
+        loop_var: _template
+
+    - name: Ensure template destination and attributes exist
+      tags:
+        - template
+      ansible.builtin.assert:
+        that:
+          - __template_stat.results.0.stat.exists
+          - __template_stat.results.0.stat.gid == 4
+          - __template_stat.results.0.stat.mode == '0600'
+          - __template_stat.results.0.stat.uid == 0
+          - __template_stat.results.1.stat.exists
+          - __template_stat.results.1.stat.gid == 1000
+          - __template_stat.results.1.stat.mode == '0644'
+          - __template_stat.results.1.stat.uid == 1000
 ...

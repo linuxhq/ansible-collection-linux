@@ -1,33 +1,39 @@
 ---
-- name: Ensure templates are present
+- name: Ensure templates are managed
   tags:
     - template
   become: true
   ansible.builtin.template:
-    backup: "{{ _template.0.backup | default(false) }}"
-    dest: "{{ _template.0.path_dest }}/{{ _template.1.dest }}"
-    follow: "{{ _template.0.follow | default(false) }}"
-    group: "{{ _template.1.group | default(_template.0.group) }}"
-    mode: "{{ _template.1.mode | default(_template.0.mode) }}"
-    owner: "{{ _template.1.owner | default(_template.0.owner) }}"
-    src: "{{ _template.0.path_src }}/{{ _template.1.src }}"
-    trim_blocks: "{{ _template.1.trim_blocks | default(true) }}"
-    validate: "{{ _template.1.validate | default(omit) }}"
-  loop: "{{ q('ansible.builtin.subelements', templates, 'paths', {'skip_missing': true}) }}"
+    attributes: "{{ _tempate.attributes | d(omit) }}"
+    backup: "{{ _template.backup | d(false) }}"
+    block_end_string: "{{ _template.block_end_string | d(omit) }}"
+    block_start_string: "{{ _template.block_start_string | d(omit) }}"
+    comment_end_string: "{{ _template.comment_end_string | d(omit) }}"
+    comment_start_string: "{{ _template.comment_start_string | d(omit) }}"
+    dest: "{{ _template.dest }}"
+    follow: "{{ _template.follow | d(false) }}"
+    force: "{{ _template.force | d(true) }}"
+    group: "{{ _template.group | d(omit) }}"
+    lstrip_blocks: "{{ _template.lstrip_blocks | d(false) }}"
+    mode: "{{ _template.mode | d(omit) }}"
+    newline_sequence: "{{ _template.newline_sequence | d(omit) }}"
+    output_encoding: "{{ _template.output_encoding | d(omit) }}"
+    owner: "{{ _template.owner | d(omit) }}"
+    selevel: "{{ _template.selevel | d(omit) }}"
+    serole: "{{ _template.serole | d(omit) }}"
+    setype: "{{ _template.setype | d(omit) }}"
+    seuser: "{{ _template.seuser | d(omit) }}"
+    src: "{{ _template.src }}"
+    trim_blocks: "{{ _template.trim_blocks | d(true) }}"
+    unsafe_writes: "{{ _template.unsafe_writes | d(false) }}"
+    validate: "{{ _template.validate | d(omit) }}"
+    variable_end_string: "{{ _template.variable_end_string | d(omit) }}"
+    variable_start_string: "{{ _template.variable_start_string | d(omit) }}"
+  loop: "{{ template_list }}"
   loop_control:
-    label: "{{ _label }}"
+    label: "{{ _template.dest | d(omit) }}"
     loop_var: _template
-  vars:
-    _label: "{{ _template.1.dest | basename | default(none) }}"
   when:
-    - _template.0.group is defined or
-      _template.1.group is defined
-    - _template.0.mode is defined or
-      _template.1.mode is defined
-    - _template.0.owner is defined or
-      _template.1.owner is defined
-    - _template.0.path_dest is defined
-    - _template.0.path_src is defined
-    - _template.1.dest is defined
-    - _template.1.src is defined
+    - _template.dest is defined
+    - _template.src is defined
 ...

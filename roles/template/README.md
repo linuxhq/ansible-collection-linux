@@ -10,7 +10,7 @@ None
 
 ## Role Variables
 
-    templates: []
+    template_list: []
 
 ## Dependencies
 
@@ -21,18 +21,11 @@ None
     - hosts: server
       roles:
         - role: linuxhq.linux.template
-          templates:
-            - group: linuxhq
-              mode: '0644'
-              owner: linuxhq
-              path_dest: /home/linuxhq/containers
-              path_src: "{{ lookup('env', 'PWD') ~ '/templates' }}"
-              paths:
-                - dest: certbot/config/cloudflare.ini
-                  src: certbot/cloudflare.ini.j2
-                - dest: openssh-server/config/pubkeys/linuxhq
-                  mode: '0600'
-                  src: openssh-server/pubkey.j2
+          template_list:
+            - dest: /etc/aliases
+              src: /path/to/aliases.j2
+            - dest: /etc/environment
+              src: /path/to/environment.j2
 
 ## License
 
