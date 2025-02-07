@@ -1,5 +1,41 @@
 ---
-- name: Verify
+- name: Ensure role is verified
   hosts: all
-  tasks: []
+  tasks:
+    - name: Ensure netstat package is present
+      tags:
+        - tftp_server
+      become: true
+      ansible.builtin.package:
+        name: net-tools
+        state: present
+
+    - name: Ensure service information is gathered
+      tags:
+        - tftp_server
+      ansible.builtin.service_facts:
+
+    - name: Ensure service is present in service facts
+      tags:
+        - tftp_server
+      ansible.builtin.assert:
+        that:
+          - services['tftp.service'] is defined
+          - services['tftp.service'].state  == 'running'
+          - services['tftp.service'].status == 'indirect'
+
+    - name: Ensure listen port information is gathered
+      tags:
+        - tftp_server
+      community.general.listen_ports_facts:
+        command: netstat
+
+    - name: Ensure listen port is present in listen port facts
+      tags:
+        - tftp_server
+      ansible.builtin.assert:
+        that:
+          - udp_listen |
+            selectattr('port', 'eq', 69) |
+            length == 1
 ...

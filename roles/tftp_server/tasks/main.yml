@@ -30,7 +30,8 @@
     mode: '0644'
     owner: root
     src: override.conf.j2
-  notify: Restart tftp-server
+  notify:
+    - Restart tftp-server
   when:
     - tftp_server_exec_start is not none
 
