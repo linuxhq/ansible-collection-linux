@@ -1,19 +1,23 @@
 ---
-- name: Verify
+- name: Ensure test play is verified
   hosts: all
   tasks:
     - name: Ensure timedatectl status is gathered
+      tags:
+        - systemd_timedatectl
       become: true
       ansible.builtin.command:
         cmd: >
           timedatectl show
-      register: _show
+      register: __systemd_timedatectl_show
       changed_when: false
 
     - name: Esnure timedatectl configuration matches
+      tags:
+        - systemd_timedatectl
       ansible.builtin.assert:
         that:
-          - "'LocalRTC=no' in _show.stdout"
-          - "'NTP=no' in _show.stdout"
-          - "'Timezone=UTC' in _show.stdout"
+          - "'LocalRTC=no' in __systemd_timedatectl_show.stdout"
+          - "'NTP=no' in __systemd_timedatectl_show.stdout"
+          - "'Timezone=UTC' in __systemd_timedatectl_show.stdout"
 ...

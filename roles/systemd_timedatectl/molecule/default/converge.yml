@@ -1,7 +1,7 @@
 ---
-- name: Converge
+- name: Ensure test play is executed
   hosts: all
   roles:
-    - role: linuxhq.linux.systemd_timedatectl
+    - role: systemd_timedatectl
       systemd_timedatectl_ntp: false
 ...
