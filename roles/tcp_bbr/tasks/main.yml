@@ -9,7 +9,7 @@
     state: present
   loop: "{{ tcp_bbr_modules }}"
   loop_control:
-    label: "{{ _module | default(none) }}"
+    label: "{{ _module | d(none) }}"
     loop_var: _module
 
 - name: Ensure tcp bbr sysctl directory is present
@@ -37,7 +37,7 @@
     value: "{{ _sysctl.value }}"
   loop: "{{ tcp_bbr_sysctl }}"
   loop_control:
-    label: "{{ _sysctl.key | default(none) }}"
+    label: "{{ _sysctl.key | d(none) }}"
     loop_var: _sysctl
   when:
     - _sysctl.key is defined

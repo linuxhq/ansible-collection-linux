@@ -1,12 +1,14 @@
 ---
-- name: Verify
+- name: Ensure test play is verified
   hosts: all
   tasks:
     - name: Ensure kernel modules are loaded
+      tags:
+        - tcp_bbr
       community.general.modprobe:
         name: "{{ _module }}"
         state: present
-      register: _modprobe
+      register: __tcp_bbr_modprobe
       loop:
         - sch_fq
         - tcp_bbr
@@ -14,24 +16,32 @@
         label: "{{ _module }}"
         loop_var: _module
 
-    - name: Ensure sysctl settings are active
+    - name: Ensure tcp bbr sysctl configuration is present
+      tags:
+        - tcp_bbr
+      become: true
       ansible.posix.sysctl:
+        ignoreerrors: false
         name: "{{ _sysctl.key }}"
+        reload: true
+        state: present
+        sysctl_file: "{{ tcp_bbr_sysctl_file }}"
         sysctl_set: true
         value: "{{ _sysctl.value }}"
-      register: _sysctl
-      loop:
-        - key: net.core.default_qdisc
-          value: fq
-        - key: net.ipv4.tcp_congestion_control
-          value: bbr
+      register: __tcp_bbr_sysctl
+      loop: "{{ tcp_bbr_sysctl }}"
       loop_control:
-        label: "{{ _sysctl.key }}"
+        label: "{{ _sysctl.key | d(none) }}"
         loop_var: _sysctl
+      when:
+        - _sysctl.key is defined
+        - _sysctl.value is defined
 
     - name: Ensure none of the previous tasks are changed
+      tags:
+        - tcp_bbr
       ansible.builtin.assert:
         that:
-          - _modprobe is not changed
-          - _sysctl is not changed
+          - __tcp_bbr_modprobe is not changed
+          - __tcp_bbr_sysctl is not changed
 ...

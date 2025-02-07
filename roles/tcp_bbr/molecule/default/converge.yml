@@ -1,6 +1,6 @@
 ---
-- name: Converge
+- name: Ensure test play is executed
   hosts: all
   roles:
-    - linuxhq.linux.tcp_bbr
+    - tcp_bbr
 ...
