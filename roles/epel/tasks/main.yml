@@ -4,47 +4,51 @@
     - epel
   become: true
   ansible.builtin.dnf:
-    name:
-      - dnf-plugins-core
-      - epel-release
+    name: epel-release
     state: present
+    update_cache: true
 
-- name: Ensure epel dependent repository is enabled
+- name: Ensure epel repository dependencies are enabled
   tags:
     - epel
   become: true
-  ansible.builtin.command:
-    cmd: >
-      dnf config-manager --set-enabled "{{ _repo }}"
-  vars:
-    _repo: "{{ 'crb' if epel_releasever | int >= 9 else 'powertools' }}"
-  changed_when: false
+  community.general.dnf_config_manager:
+    name: powertools
+    state: enabled
+  when:
+    - ansible_distribution_major_version == '8'
 
-- name: Ensure epel repository templates are present
+- name: Ensure epel repository dependencies are enabled
   tags:
     - epel
   become: true
-  ansible.builtin.template:
-    dest: "{{ _repo.dst }}"
-    group: root
-    mode: '0644'
-    owner: root
-    src: "{{ _repo.src }}"
-  loop:
-    - dst: /etc/yum.repos.d/epel.repo
-      src: "{{ 'epel.repo.' ~ epel_releasever ~ '.j2' }}"
-    - dst: /etc/yum.repos.d/epel-testing.repo
-      src: "{{ 'epel-testing.repo.' ~ epel_releasever ~ '.j2' }}"
+  community.general.dnf_config_manager:
+    name: crb
+    state: enabled
+  when:
+    - ansible_distribution_major_version >= '9'
+
+- name: Ensure epel repositories are managed
+  tags:
+    - epel
+  become: true
+  community.general.dnf_config_manager:
+    name: "{{ _epel.name }}"
+    state: "{{ _epel.state }}"
+  loop: "{{ epel_repositories }}"
   loop_control:
-    label: "{{ _repo.dst.split('/')[-1] | default(none) }}"
-    loop_var: _repo
+    label: "{{ _epel.name | d(none) }}"
+    loop_var: _epel
+  when:
+    - _epel.name is defined
+    - _epel.state is defined
 
 - name: Ensure epel repository gpg key is present
   tags:
     - epel
   become: true
   ansible.builtin.rpm_key:
-    key: "{{ '/etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-' ~ epel_releasever }}"
+    key: "/etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-{{ ansible_distribution_major_version }}"
     state: present
 
 - name: Ensure epel repository packages are present
@@ -54,4 +58,5 @@
   ansible.builtin.dnf:
     name: "{{ epel_packages }}"
     state: present
+    update_cache: true
 ...

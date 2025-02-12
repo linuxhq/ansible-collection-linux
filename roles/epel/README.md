@@ -11,13 +11,9 @@ None
 ## Role Variables
 
     epel_packages: []
-    epel_releasever: "{{ ansible_distribution_major_version }}"
-    epel_repository_epel: true
-    epel_repository_epel_debuginfo: false
-    epel_repository_epel_source: false
-    epel_repository_testing: false
-    epel_repository_testing_debuginfo: false
-    epel_repository_testing_source: false
+    epel_repositories:
+      - name: epel
+        state: enabled
 
 ## Dependencies
 
@@ -28,8 +24,15 @@ None
     - hosts: server
       roles:
         - role: linuxhq.linux.epel
-          epel_repository_epel: true
-          epel_repository_testing: true
+          epel_packages:
+            - msmtp
+          epel_repositories:
+            - name: epel
+              state: enabled
+            - name: epel-debuginfo
+              state: disabled
+            - name: epel-testing
+              state: enabled
 
 ## License
 

@@ -5,9 +5,9 @@ build_ignore:
   - .gitignore
 description: A collection of linux roles
 dependencies:
-  ansible.posix: '*'
-  community.docker: '*'
-  community.general: '*'
+  ansible.posix: 2.0.0
+  community.docker: 4.3.1
+  community.general: 10.3.1
 documentation: https://github.com/linuxhq/ansible-collection-linux/blob/main/README.md
 homepage: https://www.linuxhq.org
 issues: https://github.com/linuxhq/ansible-collection-linux/issues

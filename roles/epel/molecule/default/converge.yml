@@ -1,10 +1,17 @@
 ---
-- name: Converge
+- name: Ensure test play is executed
   hosts: all
   roles:
-    - role: linuxhq.linux.epel
+    - epel
+
+    - role: epel
       epel_packages:
-        - ansible
-      epel_repository_epel: true
-      epel_repository_testing: true
+        - msmtp
+      epel_repositories:
+        - name: epel
+          state: enabled
+        - name: epel-debuginfo
+          state: disabled
+        - name: epel-testing
+          state: enabled
 ...
