@@ -10,7 +10,7 @@ None
 
 ## Role Variables
 
-    systemd_rc_local: []
+    systemd_rc_local_list: []
 
 ## Dependencies
 
@@ -21,7 +21,7 @@ None
     - hosts: server
       roles:
         - role: linuxhq.linux.systemd_rc_local
-          systemd_rc_local:
+          systemd_rc_local_list:
             - echo 1 > /proc/sys/kernel/modules_disabled
 
 ## License

@@ -4,6 +4,6 @@
 
 touch /var/lock/subsys/local
 
-{% for command in systemd_rc_local %}
-{{ command }}
+{% for cmd in systemd_rc_local_list %}
+{{ cmd }}
 {% endfor %}

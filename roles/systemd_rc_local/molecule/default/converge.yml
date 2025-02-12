@@ -1,8 +1,10 @@
 ---
-- name: Converge
+- name: Ensure test play is executed
   hosts: all
   roles:
-    - role: linuxhq.linux.systemd_rc_local
-      systemd_rc_local:
+    - systemd_rc_local
+
+    - role: systemd_rc_local
+      systemd_rc_local_list:
         - echo 1 > /proc/sys/kernel/modules_disabled
 ...
