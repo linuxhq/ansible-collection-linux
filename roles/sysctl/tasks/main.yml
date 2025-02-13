@@ -17,10 +17,11 @@
   ansible.builtin.dnf:
     name: procps-ng
     state: present
+    update_cache: true
   when:
     - ansible_os_family == 'RedHat'
 
-- name: Ensure sysctl.conf template is present
+- name: Ensure sysctl.conf configuration is managed
   tags:
     - sysctl
   become: true
@@ -30,28 +31,30 @@
     mode: '0644'
     owner: root
     src: sysctl.conf.j2
-  notify: Reload sysctl
+  notify:
+    - Reload sysctl
   when:
     - sysctl_conf | length > 0
 
-- name: Ensure sysctl.d templates are present
+- name: Ensure sysctl.d configurations are managed
   tags:
     - sysctl
   become: true
   ansible.builtin.template:
-    dest: "/etc/sysctl.d/{{ _d.name }}.conf"
+    dest: "/etc/sysctl.d/{{ _sysctl.name }}.conf"
     group: root
     mode: '0644'
     owner: root
     src: sysctl_d.j2
-  notify: Reload sysctl
+  notify:
+    - Reload sysctl
   loop: "{{ sysctl_d }}"
   loop_control:
-    label: "{{ _d.name | default(none) }}"
-    loop_var: _d
+    label: "{{ _sysctl.name | d(none) }}"
+    loop_var: _sysctl
   when:
     - sysctl_d | length > 0
-    - _d.name is defined
-    - _d.parameters is defined
-    - _d.parameters | length > 0
+    - _sysctl.name is defined
+    - _sysctl.parameters is defined
+    - _sysctl.parameters | length > 0
 ...

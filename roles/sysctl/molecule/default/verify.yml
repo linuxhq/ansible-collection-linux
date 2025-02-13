@@ -1,8 +1,10 @@
 ---
-- name: Verify
+- name: Ensure test play is verified
   hosts: all
   tasks:
     - name: Ensure sysctl parameter is present
+      tags:
+        - sysctl
       become: true
       ansible.posix.sysctl:
         name: kernel.modules_disabled
@@ -10,6 +12,8 @@
         value: '1'
 
     - name: Ensure sysctl parameter is present
+      tags:
+        - sysctl
       become: true
       ansible.posix.sysctl:
         name: vm.swappiness

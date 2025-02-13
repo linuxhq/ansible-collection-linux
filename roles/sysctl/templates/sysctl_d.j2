@@ -1,5 +1,5 @@
 # {{ ansible_managed }}
 
-{% for key, value in _d.parameters | dictsort %}
+{% for key, value in _sysctl.parameters | dictsort %}
 {{ key }} = {{ value | string }}
 {% endfor %}
