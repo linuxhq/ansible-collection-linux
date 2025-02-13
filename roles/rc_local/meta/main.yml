@@ -1,7 +1,7 @@
 ---
 dependencies: []
 galaxy_info:
-  role_name: systemd_rc_local
+  role_name: rc_local
   author: Taylor Kimball
   description: Compatibility
   license: GPLv3

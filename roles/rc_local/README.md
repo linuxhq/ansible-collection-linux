@@ -1,4 +1,4 @@
-# systemd\_rc\_local
+# rc\_local
 
 [![License](https://img.shields.io/badge/license-GPLv3-lightgreen)](https://www.gnu.org/licenses/gpl-3.0.en.html#license-text)
 
@@ -10,7 +10,7 @@ None
 
 ## Role Variables
 
-    systemd_rc_local_list: []
+    rc_local_list: []
 
 ## Dependencies
 
@@ -20,8 +20,8 @@ None
 
     - hosts: server
       roles:
-        - role: linuxhq.linux.systemd_rc_local
-          systemd_rc_local_list:
+        - role: linuxhq.linux.rc_local
+          rc_local_list:
             - echo 1 > /proc/sys/kernel/modules_disabled
 
 ## License

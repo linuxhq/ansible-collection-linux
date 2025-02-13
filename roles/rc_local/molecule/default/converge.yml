@@ -2,9 +2,9 @@
 - name: Ensure test play is executed
   hosts: all
   roles:
-    - systemd_rc_local
+    - rc_local
 
-    - role: systemd_rc_local
-      systemd_rc_local_list:
+    - role: rc_local
+      rc_local_list:
         - echo 1 > /proc/sys/kernel/modules_disabled
 ...

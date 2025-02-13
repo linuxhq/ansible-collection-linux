@@ -1,7 +1,7 @@
 ---
 - name: Restart rc-local
   tags:
-    - systemd_rc_local
+    - rc_local
   become: true
   ansible.builtin.systemd_service:
     name: rc-local

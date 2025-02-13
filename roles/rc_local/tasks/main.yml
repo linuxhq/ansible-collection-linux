@@ -1,7 +1,7 @@
 ---
 - name: Ensure systemd package is present
   tags:
-    - systemd_rc_local
+    - rc_local
   become: true
   ansible.builtin.apt:
     name: systemd
@@ -12,7 +12,7 @@
 
 - name: Ensure systemd package is present
   tags:
-    - systemd_rc_local
+    - rc_local
   become: true
   ansible.builtin.dnf:
     name: systemd
@@ -21,18 +21,18 @@
   when:
     - ansible_os_family == 'RedHat'
 
-- name: Ensure systemd rc.local os specific vars are present
+- name: Ensure rc.local os specific vars are present
   tags:
-    - systemd_rc_local
+    - rc_local
   ansible.builtin.include_vars:
     file: "{{ ansible_os_family }}.yml"
 
-- name: Ensure systemd rc.local template is present
+- name: Ensure rc.local template is present
   tags:
-    - systemd_rc_local
+    - rc_local
   become: true
   ansible.builtin.template:
-    dest: "{{ systemd_rc_local_path }}"
+    dest: "{{ rc_local_path }}"
     group: root
     mode: '0755'
     owner: root
@@ -40,25 +40,25 @@
   notify:
     - Restart rc-local
   when:
-    - systemd_rc_local_list | length > 0
+    - rc_local_list | length > 0
 
 - name: Ensure systemd is reloaded
   tags:
-    - systemd_rc_local
+    - rc_local
   become: true
   ansible.builtin.systemd_service:
     daemon_reload: true
   when:
-    - systemd_rc_local_list | length > 0
+    - rc_local_list | length > 0
 
-- name: Ensure systemd rc-local is started and enabled on boot
+- name: Ensure rc-local is started and enabled on boot
   tags:
-    - systemd_rc_local
+    - rc_local
   become: true
   ansible.builtin.systemd_service:
     enabled: true
     name: rc-local
     state: started
   when:
-    - systemd_rc_local_list | length > 0
+    - rc_local_list | length > 0
 ...
