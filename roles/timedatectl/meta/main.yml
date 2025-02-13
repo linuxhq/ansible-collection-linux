@@ -1,7 +1,7 @@
 ---
 dependencies: []
 galaxy_info:
-  role_name: systemd_timedatectl
+  role_name: timedatectl
   author: Taylor Kimball
   description: Control the system time and date
   license: GPLv3
@@ -15,6 +15,7 @@ galaxy_info:
       versions:
         - all
   galaxy_tags:
+    - ctl
     - date
     - linux
     - systemd

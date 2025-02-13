@@ -1,7 +1,7 @@
 ---
 - name: Ensure systemd package is present
   tags:
-    - systemd_timedatectl
+    - timedatectl
   become: true
   ansible.builtin.apt:
     name: systemd
@@ -12,7 +12,7 @@
 
 - name: Ensure systemd package is present
   tags:
-    - systemd_timedatectl
+    - timedatectl
   become: true
   ansible.builtin.dnf:
     name: systemd
@@ -20,41 +20,41 @@
   when:
     - ansible_os_family == 'RedHat'
 
-- name: Ensure timedatectl local rtc is present
+- name: Ensure timedatectl local rtc setting is managed
   tags:
-    - systemd_timedatectl
+    - timedatectl
   become: true
   ansible.builtin.command:
     cmd: >
-      timedatectl set-local-rtc {{ '1' if systemd_timedatectl_local_rtc | bool else '0' }}
+      timedatectl set-local-rtc {{ '1' if timedatectl_local_rtc | bool else '0' }}
   changed_when: false
 
-- name: Ensure timedatectl ntp is present
+- name: Ensure timedatectl ntp setting is managed
   tags:
-    - systemd_timedatectl
+    - timedatectl
   become: true
   ansible.builtin.command:
     cmd: >
-      timedatectl set-ntp {{ '1' if systemd_timedatectl_ntp | bool else '0' }}
+      timedatectl set-ntp {{ '1' if timedatectl_ntp | bool else '0' }}
   changed_when: false
 
-- name: Ensure timedatectl time is present
+- name: Ensure timedatectl time setting is managed
   tags:
-    - systemd_timedatectl
+    - timedatectl
   become: true
   ansible.builtin.command:
     cmd: >
-      timedatectl set-time {{ systemd_timedatectl_time }}
+      timedatectl set-time {{ timedatectl_time }}
   when:
-    - systemd_timedatectl_time is not none
+    - timedatectl_time is not none
   changed_when: false
 
-- name: Ensure timedatectl timezone is present
+- name: Ensure timedatectl timezone setting is managed
   tags:
-    - systemd_timedatectl
+    - timedatectl
   become: true
   ansible.builtin.command:
     cmd: >
-      timedatectl set-timezone {{ systemd_timedatectl_timezone }}
+      timedatectl set-timezone {{ timedatectl_timezone }}
   changed_when: false
 ...

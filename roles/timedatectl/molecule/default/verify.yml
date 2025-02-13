@@ -4,20 +4,20 @@
   tasks:
     - name: Ensure timedatectl status is gathered
       tags:
-        - systemd_timedatectl
+        - timedatectl
       become: true
       ansible.builtin.command:
         cmd: >
           timedatectl show
-      register: __systemd_timedatectl_show
+      register: __timedatectl_show
       changed_when: false
 
     - name: Esnure timedatectl configuration matches
       tags:
-        - systemd_timedatectl
+        - timedatectl
       ansible.builtin.assert:
         that:
-          - "'LocalRTC=no' in __systemd_timedatectl_show.stdout"
-          - "'NTP=no' in __systemd_timedatectl_show.stdout"
-          - "'Timezone=UTC' in __systemd_timedatectl_show.stdout"
+          - "'LocalRTC=no' in __timedatectl_show.stdout"
+          - "'NTP=no' in __timedatectl_show.stdout"
+          - "'Timezone=UTC' in __timedatectl_show.stdout"
 ...

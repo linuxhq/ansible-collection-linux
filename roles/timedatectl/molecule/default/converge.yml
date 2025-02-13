@@ -1,0 +1,7 @@
+---
+- name: Ensure test play is executed
+  hosts: all
+  roles:
+    - role: timedatectl
+      timedatectl_ntp: false
+...

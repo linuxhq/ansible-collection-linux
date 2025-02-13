@@ -1,0 +1,6 @@
+---
+timedatectl_local_rtc: false
+timedatectl_ntp: true
+timedatectl_time: null
+timedatectl_timezone: UTC
+...

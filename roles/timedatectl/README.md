@@ -1,4 +1,4 @@
-# systemd\_timedatectl
+# timedatectl
 
 [![License](https://img.shields.io/badge/license-GPLv3-lightgreen)](https://www.gnu.org/licenses/gpl-3.0.en.html#license-text)
 
@@ -10,10 +10,10 @@ None
 
 ## Role Variables
 
-    systemd_timedatectl_local_rtc: false
-    systemd_timedatectl_ntp: true
-    systemd_timedatectl_time: null
-    systemd_timedatectl_timezone: UTC
+    timedatectl_local_rtc: false
+    timedatectl_ntp: true
+    timedatectl_time: null
+    timedatectl_timezone: UTC
 
 ## Dependencies
 
@@ -23,8 +23,8 @@ None
 
     - hosts: server
       roles:
-        - role: linuxhq.linux.systemd_timedatectl
-          systemd_timedatectl_ntp: false
+        - role: linuxhq.linux.timedatectl
+          timedatectl_ntp: false
 
 ## License
 
