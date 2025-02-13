@@ -1,10 +1,12 @@
 ---
-- name: Converge
+- name: Ensure test play is executed
   hosts: all
   roles:
-    - role: linuxhq.linux.needs_restarting
-      nr_crontab: '*/5 * * * *'
-      nr_packages:
+    - needs_restarting
+
+    - role: needs_restarting
+      needs_restarting_crontab: '*/30 * * * *'
+      needs_restarting_package_list:
         - kernel-lt
         - kernel-ml
 ...

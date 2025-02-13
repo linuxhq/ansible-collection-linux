@@ -10,10 +10,10 @@ None
 
 ## Role Variables
 
-    nr_crontab: null
-    nr_package_dir: /etc/dnf/plugins/needs-restarting.d/
-    nr_packages: []
-    nr_user: root
+    needs_restarting_crontab: null
+    needs_restarting_package_dir: /etc/dnf/plugins/needs-restarting.d
+    needs_restarting_package_list: []
+    needs_restarting_user: root
 
 ## Dependencies
 
@@ -24,8 +24,8 @@ None
     - hosts: server
       roles:
         - role: linuxhq.linux.needs_restarting
-          nr_crontab: '0 8 * * 1'
-          nr_packages:
+          needs_restarting_crontab: '0 8 * * 1'
+          needs_restarting_package_list:
             - kernel-lt
             - kernel-ml
 

@@ -15,27 +15,27 @@
     group: root
     mode: '0755'
     owner: root
-    path: "{{ nr_package_dir }}"
+    path: "{{ needs_restarting_package_dir }}"
     state: directory
   when:
-    - nr_packages | length > 0
+    - needs_restarting_package_list | length > 0
 
 - name: Ensure needs restarting packages are present
   tags:
     - needs_restarting
   become: true
   ansible.builtin.template:
-    dest: "{{ nr_package_dir }}/{{ _pkgname }}.conf"
+    dest: "{{ needs_restarting_package_dir }}/{{ _package }}.conf"
     group: root
     mode: '0644'
     owner: root
     src: pkgname.conf.j2
-  loop: "{{ nr_packages }}"
+  loop: "{{ needs_restarting_package_list }}"
   loop_control:
-    label: "{{ _pkgname | default(none) }}"
-    loop_var: _pkgname
+    label: "{{ _package | d(none) }}"
+    loop_var: _package
   when:
-    - nr_packages | length > 0
+    - needs_restarting_package_list | length > 0
 
 - name: Ensure needs restarting crontab is present
   tags:
@@ -48,5 +48,5 @@
     owner: root
     src: crontab.j2
   when:
-    - nr_crontab is not none
+    - needs_restarting_crontab is not none
 ...

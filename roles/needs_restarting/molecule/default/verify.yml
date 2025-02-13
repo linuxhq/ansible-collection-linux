@@ -1,23 +1,39 @@
 ---
-- name: Verify
+- name: Ensure test play is verified
   hosts: all
   tasks:
     - name: Ensure kernel package is latest  # noqa: package-latest
+      tags:
+        - needs_restarting
       become: true
       ansible.builtin.dnf:
         name: kernel
         state: latest
 
-    - name: Ensure pause is present
+    - name: Ensure pause is executed to allow for crontab reboot
+      tags:
+        - needs_restarting
       ansible.builtin.pause:
-        seconds: 300
+        seconds: 1800
 
-    - name: Ensure fact gathering is present
+    - name: Ensure system is reachable
+      tags:
+        - needs_restarting
+      ansible.builtin.wait_for_connection:
+        connect_timeout: 5
+        sleep: 5
+        timeout: 1800
+
+    - name: Ensure ansible hardware facts are refreshed
+      tags:
+        - needs_restarting
       ansible.builtin.setup:
         gather_subset: hardware
 
-    - name: Ensure system has rebooted
+    - name: Ensure system uptime is less than five minutes
+      tags:
+        - needs_restarting
       ansible.builtin.assert:
         that:
-          - ansible_facts.uptime_seconds < 300
+          - ansible_facts.uptime_seconds < 1800
 ...

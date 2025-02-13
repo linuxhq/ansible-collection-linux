@@ -1,6 +1,6 @@
 ---
-nr_crontab: null
-nr_package_dir: /etc/dnf/plugins/needs-restarting.d/
-nr_packages: []
-nr_user: root
+needs_restarting_crontab: null
+needs_restarting_package_dir: /etc/dnf/plugins/needs-restarting.d
+needs_restarting_package_list: []
+needs_restarting_user: root
 ...
