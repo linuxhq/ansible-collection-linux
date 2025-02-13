@@ -1,19 +1,19 @@
 ---
-- name: Converge
+- name: Ensure test play is executed
   hosts: all
   roles:
-    - role: linuxhq.linux.rpmfusion
-      rpmfusion_package_dist:
-        '7':
-          - kmod-VirtualBox
-          - unrar
-        '8':
-          - kmod-VirtualBox
-          - lpf-spotify-client
-        '9':
-          - kmod-VirtualBox
-          - lpf-spotify-client
-      rpmfusion_packages: "{{ rpmfusion_package_dist[rpmfusion_releasever] }}"
-      rpmfusion_repository_free_updates_source: true
-      rpmfusion_repository_nonfree_updates_source: true
+    - rpmfusion
+
+    - role: rpmfusion
+      rpmfusion_packages:
+        - kmod-VirtualBox
+      rpmfusion_repositories:
+        - name: rpmfusion-free-updates
+          state: enabled
+        - name: rpmfusion-free-updates-source
+          state: enabled
+        - name: rpmfusion-nonfree-updates
+          state: enabled
+        - name: rpmfusion-nonfree-updates-source
+          state: enabled
 ...

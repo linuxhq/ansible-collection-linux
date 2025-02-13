@@ -1,30 +1,60 @@
 ---
-- name: Ensure rpmfusion repository package is present
+- name: Ensure rpmfusion repository packages are present
   tags:
     - rpmfusion
   become: true
   ansible.builtin.dnf:
     disable_gpg_check: true
     name:
-      - "https://mirrors.rpmfusion.org/free/el/{{ _free }}"
-      - "https://mirrors.rpmfusion.org/nonfree/el/{{ _nonfree }}"
+      - "{{ __rpmfusion_rpm_free }}"
+      - "{{ __rpmfusion_rpm_nonfree }}"
     state: present
   vars:
-    _free: "rpmfusion-free-release-{{ rpmfusion_releasever }}.noarch.rpm"
-    _nonfree: "rpmfusion-nonfree-release-{{ rpmfusion_releasever }}.noarch.rpm"
+    __rpmfusion_rpm_free:
+      "{{ __rpmfusion_url_free }}/rpmfusion-free-release-{{ ansible_distribution_major_version }}.noarch.rpm"
+    __rpmfusion_rpm_nonfree:
+      "{{ __rpmfusion_url_nonfree }}/rpmfusion-nonfree-release-{{ ansible_distribution_major_version }}.noarch.rpm"
+    __rpmfusion_url_free:
+      "https://mirrors.rpmfusion.org/free/el"
+    __rpmfusion_url_nonfree:
+      "https://mirrors.rpmfusion.org/nonfree/el"
 
-- name: Ensure rpmfusion dependent repository is enabled
+- name: Ensure rpmfusion repository dependencies are enabled
   tags:
     - rpmfusion
   become: true
-  ansible.builtin.command:
-    cmd: >
-      dnf config-manager --set-enabled "{{ _repo }}"
-  vars:
-    _repo: "{{ 'crb' if rpmfusion_releasever | int >= 9 else 'powertools' }}"
-  changed_when: false
+  community.general.dnf_config_manager:
+    name: powertools
+    state: enabled
+  when:
+    - ansible_distribution_major_version == '8'
 
-- name: Ensure rpmfusion rpm keys are present
+- name: Ensure rpmfusion repository dependencies are enabled
+  tags:
+    - rpmfusion
+  become: true
+  community.general.dnf_config_manager:
+    name: crb
+    state: enabled
+  when:
+    - ansible_distribution_major_version >= '9'
+
+- name: Ensure rpmfusion repositories are managed
+  tags:
+    - rpmfusion
+  become: true
+  community.general.dnf_config_manager:
+    name: "{{ _rpmfusion.name }}"
+    state: "{{ _rpmfusion.state }}"
+  loop: "{{ rpmfusion_repositories }}"
+  loop_control:
+    label: "{{ _rpmfusion.name | d(none) }}"
+    loop_var: _rpmfusion
+  when:
+    - _rpmfusion.name is defined
+    - _rpmfusion.state is defined
+
+- name: Ensure rpmfusion repository gpg keys are present
   tags:
     - rpmfusion
   become: true
@@ -32,30 +62,11 @@
     key: "/etc/pki/rpm-gpg/RPM-GPG-KEY-rpmfusion-{{ _key }}"
     state: present
   loop:
-    - "free-el-{{ rpmfusion_releasever }}"
-    - "nonfree-el-{{ rpmfusion_releasever }}"
+    - "free-el-{{ ansible_distribution_major_version }}"
+    - "nonfree-el-{{ ansible_distribution_major_version }}"
   loop_control:
     label: "{{ _key }}"
     loop_var: _key
-
-- name: Ensure rpmfusion repository templates are present
-  tags:
-    - rpmfusion
-  become: true
-  ansible.builtin.template:
-    dest: "/etc/yum.repos.d/{{ _repo }}"
-    group: root
-    mode: '0644'
-    owner: root
-    src: "{{ _repo }}.j2"
-  loop:
-    - rpmfusion-free-updates.repo
-    - rpmfusion-free-updates-testing.repo
-    - rpmfusion-nonfree-updates.repo
-    - rpmfusion-nonfree-updates-testing.repo
-  loop_control:
-    label: "{{ _repo }}"
-    loop_var: _repo
 
 - name: Ensure rpmfusion packages are present
   tags:

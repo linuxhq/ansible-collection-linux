@@ -1,5 +1,5 @@
 ---
-- name: Verify
+- name: Ensure test play is verified
   hosts: all
   tasks:
     - name: Ensure package facts are gathered
@@ -10,7 +10,5 @@
     - name: Ensure package is present in package facts
       ansible.builtin.assert:
         that:
-          - "'kmod-VirtualBox' in packages"
-          - "'lpf-spotify-client' in packages or
-             'unrar' in packages"
+          - '"kmod-VirtualBox" in packages'
 ...

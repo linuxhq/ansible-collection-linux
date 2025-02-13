@@ -11,19 +11,11 @@ Merger of Dribble, Freshrpms, and Livna
 ## Role Variables
 
     rpmfusion_packages: []
-    rpmfusion_releasever: "{{ ansible_distribution_major_version }}"
-    rpmfusion_repository_free_updates: true
-    rpmfusion_repository_free_updates_debuginfo: false
-    rpmfusion_repository_free_updates_source: false
-    rpmfusion_repository_free_updates_testing: false
-    rpmfusion_repository_free_updates_testing_debuginfo: false
-    rpmfusion_repository_free_updates_testing_source: false
-    rpmfusion_repository_nonfree_updates: true
-    rpmfusion_repository_nonfree_updates_debuginfo: false
-    rpmfusion_repository_nonfree_updates_source: false
-    rpmfusion_repository_nonfree_updates_testing: false
-    rpmfusion_repository_nonfree_updates_testing_debuginfo: false
-    rpmfusion_repository_nonfree_updates_testing_source: false
+    rpmfusion_repositories:
+      - name: rpmfusion-free-updates
+        state: enabled
+      - name: rpmfusion-nonfree-updates
+        state: enabled
 
 ## Dependencies
 
@@ -36,8 +28,15 @@ Merger of Dribble, Freshrpms, and Livna
         - role: linuxhq.linux.rpmfusion
           rpmfusion_packages:
             - kmod-VirtualBox
-          rpmfusion_repository_free_updates_source: true
-          rpmfusion_repository_nonfree_updates_source: true
+          rpmfusion_repositories:
+            - name: rpmfusion-free-updates
+              state: enabled
+            - name: rpmfusion-free-updates-source
+              state: enabled
+            - name: rpmfusion-nonfree-updates
+              state: enabled
+            - name: rpmfusion-nonfree-updates-source
+              state: enabled
 
 ## License
 
