@@ -1,4 +1,4 @@
-# systemd\_localectl
+# localectl
 
 [![License](https://img.shields.io/badge/license-GPLv3-lightgreen)](https://www.gnu.org/licenses/gpl-3.0.en.html#license-text)
 
@@ -10,9 +10,9 @@ None
 
 ## Role Variables
 
-    systemd_localectl_keymap: null
-    systemd_localectl_locale: LANG=C.UTF-8
-    systemd_localectl_x11_keymap: null
+    localectl_keymap: null
+    localectl_locale: LANG=C.UTF-8
+    localectl_x11_keymap: null
 
 ## Dependencies
 
@@ -22,9 +22,9 @@ None
 
     - hosts: server
       roles:
-        - role: linuxhq.linux.systemd_localectl
-          systemd_localectl_keymap: us
-          systemd_localectl_x11_keymap: us
+        - role: linuxhq.linux.localectl
+          localectl_keymap: us
+          localectl_x11_keymap: us
 
 ## License
 

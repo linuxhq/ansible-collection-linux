@@ -1,0 +1,8 @@
+---
+- name: Ensure test play is executed
+  hosts: all
+  roles:
+    - role: localectl
+      localectl_keymap: us
+      localectl_x11_keymap: us
+...

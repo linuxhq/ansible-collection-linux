@@ -1,0 +1,5 @@
+---
+localectl_keymap: null
+localectl_locale: LANG=C.UTF-8
+localectl_x11_keymap: null
+...

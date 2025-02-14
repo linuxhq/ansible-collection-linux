@@ -1,5 +1,0 @@
----
-systemd_localectl_keymap: null
-systemd_localectl_locale: LANG=C.UTF-8
-systemd_localectl_x11_keymap: null
-...

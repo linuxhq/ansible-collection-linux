@@ -1,7 +1,7 @@
 ---
 - name: Ensure systemd package is present
   tags:
-    - systemd_localectl
+    - localectl
   become: true
   ansible.builtin.apt:
     name: systemd
@@ -12,7 +12,7 @@
 
 - name: Ensure systemd package is present
   tags:
-    - systemd_localectl
+    - localectl
   become: true
   ansible.builtin.dnf:
     name: systemd
@@ -20,34 +20,34 @@
   when:
     - ansible_os_family == 'RedHat'
 
-- name: Ensure localectl keymap is present
+- name: Ensure localectl keymap setting is managed
   tags:
-    - systemd_localectl
+    - localectl
   become: true
   ansible.builtin.command:
     cmd: >
-      localectl set-keymap {{ systemd_localectl_keymap }}
+      localectl set-keymap {{ localectl_keymap }}
   when:
-    - systemd_localectl_keymap is not none
+    - localectl_keymap is not none
   changed_when: false
 
-- name: Ensure localectl locale is present
+- name: Ensure localectl locale setting is managed
   tags:
-    - systemd_localectl
+    - localectl
   become: true
   ansible.builtin.command:
     cmd: >
-      localectl set-locale {{ systemd_localectl_locale }}
+      localectl set-locale {{ localectl_locale }}
   changed_when: false
 
-- name: Ensure localectl x11 keymap is present
+- name: Ensure localectl x11 keymap setting is managed
   tags:
-    - systemd_localectl
+    - localectl
   become: true
   ansible.builtin.command:
     cmd: >
-      localectl set-x11-keymap {{ systemd_localectl_x11_keymap }}
+      localectl set-x11-keymap {{ localectl_x11_keymap }}
   when:
-    - systemd_localectl_x11_keymap is not none
+    - localectl_x11_keymap is not none
   changed_when: false
 ...
