@@ -1,0 +1,70 @@
+---
+- name: Ensure systemd package is present
+  tags:
+    - hostnamectl
+  become: true
+  ansible.builtin.apt:
+    name: systemd
+    state: present
+    update_cache: true
+  when:
+    - ansible_os_family == 'Debian'
+
+- name: Ensure systemd package is present
+  tags:
+    - hostnamectl
+  become: true
+  ansible.builtin.dnf:
+    name: systemd
+    state: present
+    update_cache: true
+  when:
+    - ansible_os_family == 'RedHat'
+
+- name: Ensure hostnamectl chassis setting is managed
+  tags:
+    - hostnamectl
+  become: true
+  ansible.builtin.command:
+    cmd: >
+      hostnamectl set-chassis {{ hostnamectl_chassis }}
+  changed_when: false
+
+- name: Ensure hostnamectl deployment setting is managed
+  tags:
+    - hostnamectl
+  become: true
+  ansible.builtin.command:
+    cmd: >
+      hostnamectl set-deployment {{ hostnamectl_deployment }}
+  changed_when: false
+
+- name: Ensure hostnamectl hostname setting is managed
+  tags:
+    - hostnamectl
+  become: true
+  ansible.builtin.command:
+    cmd: >
+      hostnamectl set-hostname {{ hostnamectl_hostname }}
+  changed_when: false
+
+- name: Ensure hostnamectl icon name setting is managed
+  tags:
+    - hostnamectl
+  become: true
+  ansible.builtin.command:
+    cmd: >
+      hostnamectl set-icon-name {{ hostnamectl_icon_name }}
+  changed_when: false
+
+- name: Ensure hostnamectl location setting is managed
+  tags:
+    - hostnamectl
+  become: true
+  ansible.builtin.command:
+    cmd: >
+      hostnamectl set-location {{ hostnamectl_location }}
+  when:
+    - hostnamectl_location is not none
+  changed_when: false
+...

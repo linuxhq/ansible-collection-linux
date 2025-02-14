@@ -1,4 +1,4 @@
-# systemd\_hostnamectl
+# hostnamectl
 
 [![License](https://img.shields.io/badge/license-GPLv3-lightgreen)](https://www.gnu.org/licenses/gpl-3.0.en.html#license-text)
 
@@ -10,11 +10,11 @@ None
 
 ## Role Variables
 
-    systemd_hostnamectl_chassis: server
-    systemd_hostnamectl_deployment: development
-    systemd_hostnamectl_hostname: "{{ inventory_hostname }}"
-    systemd_hostnamectl_icon_name: computer-vm
-    systemd_hostnamectl_location: null
+    hostnamectl_chassis: server
+    hostnamectl_deployment: development
+    hostnamectl_hostname: "{{ inventory_hostname }}"
+    hostnamectl_icon_name: computer-vm
+    hostnamectl_location: null
 
 ## Dependencies
 
@@ -24,8 +24,8 @@ None
 
     - hosts: server
       roles:
-        - role: linuxhq.linux.systemd_hostnamectl
-          systemd_hostnamectl_location: AWS
+        - role: linuxhq.linux.hostnamectl
+          hostnamectl_location: AWS
 
 ## License
 

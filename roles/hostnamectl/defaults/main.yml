@@ -1,0 +1,7 @@
+---
+hostnamectl_chassis: server
+hostnamectl_deployment: development
+hostnamectl_hostname: "{{ inventory_hostname }}"
+hostnamectl_icon_name: computer-vm
+hostnamectl_location: null
+...

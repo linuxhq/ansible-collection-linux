@@ -1,7 +1,0 @@
----
-- name: Converge
-  hosts: all
-  roles:
-    - role: linuxhq.linux.systemd_hostnamectl
-      systemd_hostnamectl_location: AWS
-...

@@ -1,17 +1,21 @@
 ---
-- name: Verify
+- name: Ensure test play is verified
   hosts: all
   tasks:
     - name: Ensure hostnamectl status is gathered
+      tags:
+        - hostnamectl
       become: true
       ansible.builtin.command:
         cmd: >
           hostnamectl status
-      register: _status
+      register: __hostnamectl_status
       changed_when: false
 
     - name: Esnure hostnamectl configuration matches
+      tags:
+        - hostnamectl
       ansible.builtin.assert:
         that:
-          - "'Location: AWS' in _status.stdout"
+          - "'Location: AWS' in __hostnamectl_status.stdout"
 ...
