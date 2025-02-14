@@ -10,9 +10,9 @@ None
 
 ## Role Variables
 
-    pta_actiondir: /etc/dnf/plugins/post-transaction-actions.d/
-    pta_actions: []
-    pta_enabled: true
+    post_transaction_actions_dir: /etc/dnf/plugins/post-transaction-actions.d/
+    post_transaction_actions_enabled: true
+    post_transaction_actions_list: []
 
 ## Dependencies
 
@@ -23,7 +23,7 @@ None
     - hosts: server
       roles:
         - role: linuxhq.linux.post_transaction_actions
-          pta_actions:
+          post_transaction_actions_list:
             - package_filter: kernel
               transaction_state: in
               command: /usr/sbin/grub2-set-default 0

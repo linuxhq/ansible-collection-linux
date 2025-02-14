@@ -1,9 +1,11 @@
 ---
-- name: Converge
+- name: Ensure test play is executed
   hosts: all
   roles:
-    - role: linuxhq.linux.post_transaction_actions
-      pta_actions:
+    - post_transaction_actions
+
+    - role: post_transaction_actions
+      post_transaction_actions_list:
         - package_filter: kernel
           transaction_state: in
           command: /usr/sbin/grub2-set-default 0

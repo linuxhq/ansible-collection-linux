@@ -1,5 +1,5 @@
 # {{ ansible_managed }}
 
 [main]
-enabled = {{ '1' if pta_enabled | bool else '0' }}
-actiondir = {{ pta_actiondir }}
+enabled = {{ '1' if post_transaction_actions_enabled | bool else '0' }}
+actiondir = {{ post_transaction_actions_dir }}

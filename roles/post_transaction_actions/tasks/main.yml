@@ -7,7 +7,7 @@
     name: python3-dnf-plugin-post-transaction-actions
     state: present
 
-- name: Ensure post transaction actions template is present
+- name: Ensure post transaction actions configuration is managed
   tags:
     - post_transaction_actions
   become: true
@@ -18,22 +18,22 @@
     owner: root
     src: post-transaction-actions.conf.j2
 
-- name: Ensure post transaction actions filters are present
+- name: Ensure post transaction actions filters are managed
   tags:
     - post_transaction_actions
   become: true
   ansible.builtin.template:
-    dest: "{{ pta_actiondir }}/{{ _pta.package_filter }}.conf"
+    dest: "{{ post_transaction_actions_dir }}/{{ _pta.package_filter }}.conf"
     group: root
     mode: '0644'
     owner: root
     src: package_filter.conf.j2
-  loop: "{{ pta_actions }}"
+  loop: "{{ post_transaction_actions_list }}"
   loop_control:
-    label: "{{ _pta.package_filter | default(none) }}"
+    label: "{{ _pta.package_filter | d(none) }}"
     loop_var: _pta
   when:
+    - _pta.command is defined
     - _pta.package_filter is defined
     - _pta.transaction_state is defined
-    - _pta.command is defined
 ...

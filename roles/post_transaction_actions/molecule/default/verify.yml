@@ -1,38 +1,51 @@
 ---
-- name: Verify
+- name: Ensure test play is verified
   hosts: all
   tasks:
     - name: Ensure kernel package is latest  # noqa: package-latest
+      tags:
+        - post_transaction_actions
       become: true
       ansible.builtin.dnf:
         name: kernel
         state: latest
 
     - name: Ensure grub information is gathered
+      tags:
+        - post_transaction_actions
       become: true
       ansible.builtin.shell:
         cmd: >
           /usr/sbin/grubby --info DEFAULT
-      register: _grub
+      register: __post_transaction_actions_grub_info
       changed_when: false
 
     - name: Ensure kernel information is gathered  # noqa: command-instead-of-module risky-shell-pipe
+      tags:
+        - post_transaction_actions
       ansible.builtin.shell:
         cmd: >
           /usr/bin/rpm -q kernel | sort -V | tail -1
-      register: _kernel
+      register: __post_transaction_actions_kernel_info
       changed_when: false
 
     - name: Ensure grub and kernel facts are present
+      tags:
+        - post_transaction_actions
       ansible.builtin.set_fact:
-        _grub_ver: "{{ _grub.stdout_lines[1].split('-')[1:] |
-                       join('-') |
-                       regex_replace('\"') }}"
-        _kernel_ver: "{{ _kernel.stdout.split('-')[1:]
-                         | join('-') }}"
+        __post_transaction_actions_grub_version:
+          "{{ __post_transaction_actions_grub_info.stdout_lines[1].split('-')[1:] |
+              join('-') |
+              regex_replace('\"') }}"
+        __post_transaction_actions_kernel_version:
+          "{{ __post_transaction_actions_kernel_info.stdout.split('-')[1:] |
+              join('-') }}"
 
     - name: Ensure grub default kernel is latest
+      tags:
+        - post_transaction_actions
       ansible.builtin.assert:
         that:
-          - _grub_ver == _kernel_ver
+          - __post_transaction_actions_grub_version ==
+            __post_transaction_actions_kernel_version
 ...
