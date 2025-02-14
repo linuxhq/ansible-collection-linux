@@ -1,7 +1,7 @@
 ---
 - name: Ensure test play is verified
   hosts: all
-  pre_tasks:
+  tasks:
     - name: Ensure status of template destinations are gathered
       tags:
         - template

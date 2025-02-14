@@ -1,5 +1,46 @@
 ---
-- name: Verify
+- name: Ensure test play is verified
   hosts: all
-  tasks: []
+  pre_tasks:
+    - name: Ensure status of directories are gathered
+      tags:
+        - directory
+      ansible.builtin.stat:
+        path: "{{ _directory.1 }}"
+      register: __directory_stat
+      loop:
+        "{{ q('ansible.builtin.subelements',
+              directory_list,
+              'paths',
+              {'skip_missing': true}) }}"
+      loop_control:
+        label: "{{ _directory.1 | d(none) }}"
+        loop_var: _directory
+
+    - name: Ensure directory attributes exist
+      tags:
+        - directory
+      ansible.builtin.assert:
+        that:
+          - __directory_stat.results.0.stat.isdir
+          - __directory_stat.results.0.stat.exists
+          - __directory_stat.results.0.stat.gid == 0
+          - __directory_stat.results.0.stat.mode == '0700'
+          - __directory_stat.results.0.stat.uid == 0
+          - __directory_stat.results.0.stat.isdir
+          - __directory_stat.results.1.stat.exists
+          - __directory_stat.results.1.stat.gid == 1000
+          - __directory_stat.results.1.stat.mode == '0644'
+          - __directory_stat.results.1.stat.uid == 1000
+
+    - name: Ensure inventory lists are formatted
+      tags:
+        - directory
+      ansible.builtin.set_fact:
+        directory_list:
+          "{{ directory_list |
+              map('combine', {'state': 'absent'}) }}"
+
+  roles:
+    - directory
 ...

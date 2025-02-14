@@ -10,7 +10,7 @@ None
 
 ## Role Variables
 
-    directories: []
+    directory_list: []
 
 ## Dependencies
 
@@ -21,18 +21,17 @@ None
     - hosts: server
       roles:
         - role: linuxhq.linux.directory
-          directories:
-            - group: daemon
-              mode: '0755'
+          directory_list:
+            - group: root
+              mode: '0700'
               owner: root
               paths:
-                - path: /tmp/linuxhq_root_daemon_0755
-                - path: /tmp/linuxhq_root_root_0700
-                  group: root
-                  mode: '0700'
-                - path: /tmp/linuxhq_daemon_daemon_750
-                  owner: daemon
-                  mode: '0750'
+                - /dev/shm/root
+            - group: vagrant
+              mode: '0644'
+              owner: vagrant
+              paths:
+                - /dev/shm/vagrant
 
 ## License
 
