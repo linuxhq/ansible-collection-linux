@@ -1,5 +1,5 @@
 ---
-- name: Ensure test play is executed
+- name: Converge
   hosts: all
   roles:
     - role: transmission_daemon

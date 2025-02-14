@@ -1,5 +1,5 @@
 ---
-- name: Ensure role is verified
+- name: Verify
   hosts: all
   tasks:
     - name: Ensure service information is gathered

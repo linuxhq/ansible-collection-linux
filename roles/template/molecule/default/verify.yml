@@ -1,5 +1,5 @@
 ---
-- name: Ensure test play is verified
+- name: Verify
   hosts: all
   tasks:
     - name: Ensure status of template destinations are gathered
