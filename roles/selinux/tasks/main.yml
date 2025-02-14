@@ -1,17 +1,13 @@
 ---
-- name: Ensure selinux packages are installed
+- name: Ensure selinux packages are present
   tags:
     - selinux
   become: true
   ansible.builtin.dnf:
-    name: "{{ _packages }}"
+    name: "{{ selinux_packages }}"
     state: present
-  vars:
-    _packages:
-      - python3-libselinux
-      - selinux-policy
 
-- name: Ensure selinux configuration is present
+- name: Ensure selinux configuration is managed
   tags:
     - selinux
   become: true
@@ -20,7 +16,7 @@
     policy: "{{ selinux_policy }}"
     state: "{{ selinux_state }}"
     update_kernel_param: "{{ selinux_update_kernel_param }}"
-  register: _selinux
+  register: __selinux_status
 
 - name: Ensure selinux host is rebooted
   tags:
@@ -30,6 +26,6 @@
     reboot_timeout: "{{ selinux_reboot_timeout }}"
   when:
     - selinux_reboot | bool
-    - _selinux is changed
-    - _selinux.reboot_required | bool
+    - __selinux_status is changed
+    - __selinux_status.reboot_required | bool
 ...

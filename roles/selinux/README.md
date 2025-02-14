@@ -11,6 +11,9 @@ None
 ## Role Variables
 
     selinux_conf: /etc/selinux/config
+    selinux_packages:
+      - python3-libselinux
+      - selinux-policy
     selinux_policy: targeted
     selinux_reboot: false
     selinux_reboot_timeout: 600

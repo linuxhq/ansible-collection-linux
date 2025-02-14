@@ -1,9 +1,10 @@
 ---
-- name: Converge
+- name: Ensure test play is executed
   hosts: all
-  vars:
-    selinux_state: disabled
-    selinux_reboot: true
   roles:
-    - linuxhq.linux.selinux
+    - selinux
+
+    - role: selinux
+      selinux_state: disabled
+      selinux_reboot: true
 ...
