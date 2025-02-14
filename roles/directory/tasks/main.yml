@@ -1,5 +1,5 @@
 ---
-- name: Ensure directories are present
+- name: Ensure directories are managed
   tags:
     - directory
   become: true
