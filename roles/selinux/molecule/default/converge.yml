@@ -3,8 +3,4 @@
   hosts: all
   roles:
     - selinux
-
-    - role: selinux
-      selinux_state: disabled
-      selinux_reboot: true
 ...

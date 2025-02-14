@@ -1,18 +1,20 @@
 ---
-- name: Verify
+- name: Ensure test play is verified
   hosts: all
-  vars:
-    selinux_state: disabled
   tasks:
     - name: Ensure sestatus information is gathered
+      tags:
+        - selinux
       ansible.builtin.command:
         cmd: >
           sestatus
-      register: _sestatus
+      register: __selinux_sestatus
       changed_when: false
 
     - name: Ensure sestatus matches inventory
+      tags:
+        - selinux
       ansible.builtin.assert:
         that:
-          - _sestatus.stdout is match('.*' ~ selinux_state ~ '$')
+          - "'disabled' in __selinux_sestatus.stdout"
 ...

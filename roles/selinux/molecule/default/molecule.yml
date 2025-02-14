@@ -16,6 +16,11 @@ provisioner:
   log: true
   options:
     diff: true
+  inventory:
+    group_vars:
+      all:
+        selinux_state: disabled
+        selinux_reboot: true
 
 verifier:
   name: ansible
