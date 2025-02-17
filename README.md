@@ -52,7 +52,7 @@ An example playbook utilizing roles available in this collection
             "{{ (global_users |
                 json_query('[].{
                   name: name,
-                  gid: id
+                  uid: id
                 }')) |
                 d([]) }}"
 
