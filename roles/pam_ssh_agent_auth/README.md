@@ -23,7 +23,7 @@ None
       roles:
         - role: linuxhq.linux.pam_ssh_agent_auth
           pam_ssh_agent_auth_keys:
-            - ssh-rsa {...}
+            - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDFgaw1OtDFwiaY+lccD1UvXzEU5bNTdGQhOoyYyGcwo
 
 ## License
 

@@ -1,5 +1,20 @@
 ---
 - name: Verify
   hosts: all
-  tasks: []
+  tasks:
+    - name: Ensure key file is gathered
+      tags:
+        - pam_ssh_agent_auth
+      become: true
+      ansible.builtin.slurp:
+        src: /etc/security/authorized_keys
+      register: __pam_ssh_agent_auth_file
+
+    - name: Ensure key is present in key file
+      tags:
+        - pam_ssh_agent_auth
+      ansible.builtin.assert:
+        that:
+          - pam_ssh_agent_auth_keys.0 in
+            __pam_ssh_agent_auth_file.content | b64decode
 ...

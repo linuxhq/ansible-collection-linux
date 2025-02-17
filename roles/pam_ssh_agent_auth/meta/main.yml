@@ -6,6 +6,7 @@ galaxy_info:
   description: PAM module for granting permissions based on SSH agent requests
   license: GPLv3
   min_ansible_version: 2.15.0
+  namespace: linuxhq
   platforms:
     - name: EL
       versions:
