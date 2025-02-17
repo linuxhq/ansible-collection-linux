@@ -28,16 +28,14 @@ A collection of linux roles
 An example playbook utilizing roles available in this collection
 
     - hosts: server
-      collections:
-        - linuxhq.linux
-      vars:
-        groupadd:
-          - name: linuxhq
-            gid: 2000
-        useradd:
-          - name: tkimball
-            group: linuxhq
-            uid: 2001
       roles:
-        - linuxhq.linux.group
-        - linuxhq.linux.user
+        - role: linuxhq.linux.group
+          group_list:
+            - name: linuxhq
+              gid: 2000
+
+        - role: linuxhq.linux.user
+          user_list:
+            - name: linuxhq
+              uid: 2000
+
