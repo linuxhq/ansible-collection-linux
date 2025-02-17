@@ -10,14 +10,10 @@ None
 
 ## Role Variables
 
-    setup_aliases:
-      - key: mailer-daemon
-        value: postmaster
-      - key: postmaster
-        value: root
+    setup_aliases: []
     setup_environment: []
     setup_hosts: []
-    setup_hostname: "{{ inventory_hostname }}"
+    setup_hostname: null
     setup_motd: null
     setup_profile_d: []
 
@@ -30,6 +26,9 @@ None
     - hosts: server
       roles:
         - role: linuxhq.linux.setup
+          setup_aliases:
+            - key: postmaster
+              value: root
           setup_environment:
             - key: linuxhq
               value: development
@@ -40,7 +39,7 @@ None
                 - linuxhq.net
                 - linuxhq.org
           setup_motd: |
-            bW90ZAo=
+            QWxsIHlvdXIgYmFzZSBhcmUgYmVsb25nIHRvIHVzCg==
           setup_profile_d:
             - name: linuxhq.sh
               script: |

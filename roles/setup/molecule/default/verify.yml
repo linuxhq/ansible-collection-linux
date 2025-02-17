@@ -1,5 +1,11 @@
 ---
 - name: Verify
   hosts: all
-  tasks: []
+  tasks:
+    - name: Ensure environment variable is present
+      tags:
+        - setup
+      ansible.builtin.assert:
+        that:
+          - ansible_env.LINUXHQ == 'development'
 ...

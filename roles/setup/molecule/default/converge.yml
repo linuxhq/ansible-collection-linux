@@ -2,7 +2,12 @@
 - name: Converge
   hosts: all
   roles:
-    - role: linuxhq.linux.setup
+    - setup
+
+    - role: setup
+      setup_aliases:
+        - key: postmaster
+          value: root
       setup_environment:
         - key: linuxhq
           value: development
@@ -13,7 +18,7 @@
             - linuxhq.net
             - linuxhq.org
       setup_motd: |
-        bW90ZAo=
+        QWxsIHlvdXIgYmFzZSBhcmUgYmVsb25nIHRvIHVzCg==
       setup_profile_d:
         - name: linuxhq.sh
           script: |
