@@ -21,7 +21,7 @@ None
 
 ## Dependencies
 
-None
+* [linuxhq.linux.epel](https://github.com/linuxhq/ansible-collection-linux/tree/main/roles/epel)
 
 ## Example Playbook
 
