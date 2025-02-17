@@ -1,18 +1,18 @@
 ---
-dependencies: []
+dependencies:
+  - role: epel
+    tags: rush
 galaxy_info:
   role_name: rush
   author: Taylor Kimball
   description: Restricted user shell
   license: GPLv3
   min_ansible_version: 2.15.0
+  namespace: linuxhq
   platforms:
-    - name: Debian
-      versions:
-        - all
     - name: EL
       versions:
-        - all
+        - 9
   galaxy_tags:
     - linux
     - rush

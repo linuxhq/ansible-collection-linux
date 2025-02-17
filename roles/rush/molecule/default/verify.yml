@@ -3,11 +3,15 @@
   hosts: all
   tasks:
     - name: Ensure stat is executed
+      tags:
+        - rush
       ansible.builtin.stat:
         path: /usr/sbin/rush
       register: _stat
 
     - name: Ensure rush binary is present
+      tags:
+        - rush
       ansible.builtin.assert:
         that:
           - _stat.stat.exists | bool

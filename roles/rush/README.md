@@ -18,7 +18,6 @@ None
           - clrenv
           - keepenv USER LOGNAME HOME PATH
           - fall-through
-    rush_version: 2.3
 
 ## Dependencies
 

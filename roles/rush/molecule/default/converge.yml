@@ -2,7 +2,7 @@
 - name: Converge
   hosts: all
   roles:
-    - role: linuxhq.linux.rush
+    - role: rush
       rush_global:
         - debug 1
         - include-security all
