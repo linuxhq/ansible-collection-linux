@@ -28,14 +28,40 @@ A collection of linux roles
 An example playbook utilizing roles available in this collection
 
     - hosts: server
+      vars:
+        global_users:
+          - name: johnd
+            id: 2000
+            key: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIRtpHq0ih6ZsXzskVMqHLc3bvCp82l1lS/V9i3wXwQQ
+          - name: janed
+            id: 2001
+            key: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEQYZwthruEeeRtn4QE2x5xeVosMNha99UOVptoNjVbs
+
       roles:
         - role: linuxhq.linux.group
           group_list:
-            - name: linuxhq
-              gid: 2000
+            "{{ (global_users |
+                json_query('[].{
+                  name: name,
+                  gid: id
+                }')) |
+                d([]) }}"
 
         - role: linuxhq.linux.user
           user_list:
-            - name: linuxhq
-              uid: 2000
+            "{{ (global_users |
+                json_query('[].{
+                  name: name,
+                  gid: id
+                }')) |
+                d([]) }}"
 
+        - role: linuxhq.linux.authorized_key
+          authorized_key_list:
+            "{{ (global_users |
+                json_query('[].{
+                  user: name,
+                  key: key,
+                  exclusive: `true`
+                }')) |
+                d([]) }}"
