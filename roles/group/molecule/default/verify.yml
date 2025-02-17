@@ -1,17 +1,32 @@
 ---
 - name: Verify
   hosts: all
-  tasks:
+  pre_tasks:
     - name: Ensure group information is gathered
+      tags:
+        - group
       ansible.builtin.getent:
         database: group
         fail_key: false
-      register: _getent
 
     - name: Ensure groups are in expected state
+      tags:
+        - group
       ansible.builtin.assert:
         that:
-          - "'linuxhq' in getent_group"
-          - "'wheel' not in getent_group"
-          - getent_group.linuxhq[1] == '2000'
+          - "'johndoe' in getent_group"
+          - "'janedoe' in getent_group"
+          - getent_group.johndoe.1 == '1001'
+          - getent_group.janedoe.1 == '1002'
+
+    - name: Ensure inventory lists are formatted
+      tags:
+        - group
+      ansible.builtin.set_fact:
+        group_list:
+          "{{ group_list |
+              map('combine', {'state': 'absent'}) }}"
+
+  roles:
+    - group
 ...

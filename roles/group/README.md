@@ -10,8 +10,7 @@ None
 
 ## Role Variables
 
-    groupadd: []
-    groupdel: []
+    group_list: []
 
 ## Dependencies
 
@@ -22,11 +21,11 @@ None
     - hosts: server
       roles:
         - role: linuxhq.linux.group
-          groupadd:
-            - name: linuxhq
-              gid: 2000
-          groupdel:
-            - name: linuxhq
+          group_list:
+            - name: johndoe
+              uid: 1001
+            - name: janedoe
+              uid: 1002
 
 ## License
 

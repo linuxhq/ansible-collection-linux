@@ -2,10 +2,8 @@
 - name: Converge
   hosts: all
   roles:
-    - role: linuxhq.linux.group
-      groupadd:
-        - name: linuxhq
-          gid: 2000
-      groupdel:
-        - name: wheel
+    - role: group
+      group_list: []
+
+    - group
 ...
