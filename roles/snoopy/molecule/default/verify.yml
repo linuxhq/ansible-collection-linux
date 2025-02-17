@@ -3,11 +3,15 @@
   hosts: all
   tasks:
     - name: Ensure ld.so.preload is slurped
+      tags:
+        - snoopy
       ansible.builtin.slurp:
         src: /etc/ld.so.preload
       register: _ld_so_preload
 
     - name: Ensure snoopy library is present
+      tags:
+        - snoopy
       ansible.builtin.assert:
         that:
           - "'snoopy' in _ld_so_preload['content'] | b64decode"

@@ -21,8 +21,6 @@ None
     snoopy_output: devlog
     snoopy_packages:
       - snoopy
-    snoopy_releasever: "{{ ansible_distribution_major_version }}"
-    snoopy_repository_stable: true
     snoopy_rpm_key: https://a2o.github.io/snoopy-packages/snoopy-packages-key.pub
     snoopy_syslog_facility: LOG_AUTHPRIV
     snoopy_syslog_ident: snoopy

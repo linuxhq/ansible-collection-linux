@@ -1,5 +1,5 @@
 [snoopy-stable]
 name=Snoopy Upstream Stable Repository
-baseurl=https://a2o.github.io/snoopy-packages/repo/centos/{{ snoopy_releasever }}/stable/
-enabled={{ '1' if snoopy_repository_stable | bool else '0' }}
+baseurl=https://a2o.github.io/snoopy-packages/repo/centos/{{ ansible_distribution_major_version }}/stable/
+enabled=1
 gpgcheck=1

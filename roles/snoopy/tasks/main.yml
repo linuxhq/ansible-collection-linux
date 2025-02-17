@@ -1,5 +1,5 @@
 ---
-- name: Ensure snoopy package repository is present
+- name: Ensure snoopy repository is present
   tags:
     - snoopy
   become: true
@@ -27,7 +27,7 @@
     name: "{{ snoopy_packages }}"
     state: present
 
-- name: Ensure snoopy configuration is present
+- name: Ensure snoopy configuration is managed
   tags:
     - snoopy
   become: true
