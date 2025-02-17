@@ -1,9 +1,0 @@
----
-- name: Converge
-  hosts: all
-  roles:
-    - role: linuxhq.linux.systemd_logind
-      systemd_logind_killonlyusers:
-        - linuxhq
-        - tkimball
-...

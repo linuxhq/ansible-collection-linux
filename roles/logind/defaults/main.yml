@@ -1,0 +1,35 @@
+---
+logind_handlehibernatekey: hibernate
+logind_handlehibernatekeylongpress: ignore
+logind_handlelidswitch: suspend
+logind_handlelidswitchdocked: ignore
+logind_handlelidswitchexternalpower: suspend
+logind_handlepowerkey: poweroff
+logind_handlepowerkeylongpress: ignore
+logind_handlerebootkey: reboot
+logind_handlerebootkeylongpress: poweroff
+logind_handlesuspendkey: suspend
+logind_handlesuspendkeylongpress: hibernate
+logind_hibernatekeyignoreinhibited: false
+logind_holdofftimeoutsec: 30s
+logind_idleaction: ignore
+logind_idleactionsec: 30min
+logind_inhibitdelaymaxsec: 5
+logind_inhibitorsmax: 8192
+logind_killexcludeusers:
+  - root
+logind_killonlyusers: []
+logind_killuserprocesses: false
+logind_lidswitchignoreinhibited: true
+logind_nautovts: 6
+logind_powerkeyignoreinhibited: false
+logind_rebootkeyignoreinhibited: false
+logind_removeipc: true
+logind_reservevt: 6
+logind_runtimedirectorysize: 10%
+logind_runtimedirectoryinodesmax: null
+logind_sessionsmax: 8192
+logind_stopidlesessionsec: infinity
+logind_suspendkeyignoreinhibited: false
+logind_userstopdelaysec: 10
+...

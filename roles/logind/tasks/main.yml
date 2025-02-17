@@ -1,7 +1,7 @@
 ---
 - name: Ensure systemd package is present
   tags:
-    - systemd_logind
+    - logind
   become: true
   ansible.builtin.apt:
     name: systemd
@@ -12,7 +12,7 @@
 
 - name: Ensure systemd package is present
   tags:
-    - systemd_logind
+    - logind
   become: true
   ansible.builtin.dnf:
     name: systemd
@@ -20,9 +20,9 @@
   when:
     - ansible_os_family == 'RedHat'
 
-- name: Ensure systemd-logind template is present
+- name: Ensure systemd-logind configuration is managed
   tags:
-    - systemd-logind
+    - logind
   become: true
   ansible.builtin.template:
     dest: /etc/systemd/logind.conf
@@ -30,11 +30,12 @@
     mode: '0644'
     owner: root
     src: logind.conf.j2
-  notify: Restart systemd-logind
+  notify:
+    - Restart systemd-logind
 
 - name: Ensure systemd-logind is started and enabled on boot
   tags:
-    - systemd-logind
+    - logind
   become: true
   ansible.builtin.systemd_service:
     enabled: true

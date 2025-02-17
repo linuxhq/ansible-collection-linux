@@ -1,0 +1,35 @@
+# {{ ansible_managed }}
+
+[Login]
+HandleHibernateKey={{ logind_handlehibernatekey }}
+HandleHibernateKeyLongPress={{ logind_handlehibernatekeylongpress }}
+HandleLidSwitch={{ logind_handlelidswitch }}
+HandleLidSwitchExternalPower={{ logind_handlelidswitchexternalpower }}
+HandleLidSwitchDocked={{ logind_handlelidswitchdocked }}
+HandlePowerKey={{ logind_handlepowerkey }}
+HandlePowerKeyLongPress={{ logind_handlepowerkeylongpress }}
+HandleRebootKey={{ logind_handlerebootkey }}
+HandleRebootKeyLongPress={{ logind_handlerebootkeylongpress }}
+HandleSuspendKey={{ logind_handlesuspendkey }}
+HandleSuspendKeyLongPress={{ logind_handlesuspendkeylongpress }}
+HibernateKeyIgnoreInhibited={{ 'yes' if logind_hibernatekeyignoreinhibited | bool else 'no' }}
+HoldoffTimeoutSec={{ logind_holdofftimeoutsec }}
+IdleAction={{ logind_idleaction }}
+IdleActionSec={{ logind_idleactionsec }}
+InhibitDelayMaxSec={{ logind_inhibitdelaymaxsec }}
+InhibitorsMax={{ logind_inhibitorsmax }}
+KillExcludeUsers={{ logind_killexcludeusers | join(' ') }}
+KillOnlyUsers={{ logind_killonlyusers | join(' ') }}
+KillUserProcesses={{ 'yes' if logind_killuserprocesses | bool else 'no' }}
+LidSwitchIgnoreInhibited={{ 'yes' if logind_lidswitchignoreinhibited | bool else 'no' }}
+NAutoVTs={{ logind_nautovts }}
+PowerKeyIgnoreInhibited={{ 'yes' if logind_powerkeyignoreinhibited | bool else 'no' }}
+RebootKeyIgnoreInhibited={{ 'yes' if logind_rebootkeyignoreinhibited | bool else 'no' }}
+RemoveIPC={{ 'yes' if logind_removeipc|bool else 'no' }}
+ReserveVT={{ logind_reservevt }}
+RuntimeDirectorySize={{ logind_runtimedirectorysize }}
+RuntimeDirectoryInodesMax={{ logind_runtimedirectoryinodesmax if logind_runtimedirectoryinodesmax is not none }}
+SessionsMax={{ logind_sessionsmax }}
+StopIdleSessionSec={{ logind_stopidlesessionsec }}
+SuspendKeyIgnoreInhibited={{ 'yes' if logind_suspendkeyignoreinhibited | bool else 'no' }}
+UserStopDelaySec={{ logind_userstopdelaysec }}
