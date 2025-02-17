@@ -1,5 +1,0 @@
-# {{ ansible_managed }}
-
-{% for net in network | sort(attribute='key') %}
-{{ net.key | upper }}={{ net.value | string }}
-{% endfor %}
