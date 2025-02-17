@@ -7,7 +7,7 @@
     name: libpwquality
     state: present
 
-- name: Ensure libpwquality template is present
+- name: Ensure libpwquality configuration is managed
   tags:
     - pam_pwquality
   become: true

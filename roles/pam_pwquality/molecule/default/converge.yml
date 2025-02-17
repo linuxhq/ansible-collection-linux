@@ -4,11 +4,13 @@
   roles:
     - role: linuxhq.linux.pam_pwquality
       pam_pwquality_dcredit: -1
+      pam_pwquality_difok: 8
+      pam_pwquality_gecoscheck: 1
       pam_pwquality_lcredit: -1
+      pam_pwquality_maxrepeat: 4
+      pam_pwquality_maxclassrepeat: 4
+      pam_pwquality_minclass: 4
+      pam_pwquality_minlen: 15
       pam_pwquality_ocredit: -1
       pam_pwquality_ucredit: -1
-      pam_pwquality_gecoscheck: 1
-      pam_pwquality_enforce_for_root: true
-      pam_pwquality_maxrepeat: 3
-      pam_pwquality_minlen: 16
 ...

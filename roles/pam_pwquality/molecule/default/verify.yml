@@ -1,5 +1,20 @@
 ---
 - name: Verify
   hosts: all
-  tasks: []
+  tasks:
+    - name: Ensure string is passed to password scoring tool
+      tags:
+        - pam_pwquality
+      ansible.builtin.shell:
+        cmd: >
+          echo "U#AJ)8pv,uv,KgzQcACxF:?5iZz]@NCd" | pwscore
+      register: __pam_pwquality_pwscore
+      changed_when: false
+
+    - name: Ensure string score is passing
+      tags:
+        - pam_pwquality
+      ansible.builtin.assert:
+        that:
+          - '"100" in __pam_pwquality_pwscore.stdout'
 ...
