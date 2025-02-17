@@ -12,9 +12,9 @@ None
 
     speedtest_packages:
       - speedtest
-    speedtest_releasever: "{{ ansible_distribution_major_version }}"
-    speedtest_repository_cli: true
-    speedtest_repository_cli_source: false
+    speedtest_repositories:
+      - name: ookla_speedtest-cli
+        state: enabled
 
 ## Dependencies
 

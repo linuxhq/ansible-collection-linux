@@ -18,6 +18,21 @@
     owner: root
     src: ookla_speedtest-cli.repo.j2
 
+- name: Ensure ookla speedtest repositories are managed
+  tags:
+    - speedtest
+  become: true
+  community.general.dnf_config_manager:
+    name: "{{ _speedtest.name }}"
+    state: "{{ _speedtest.state }}"
+  loop: "{{ speedtest_repositories }}"
+  loop_control:
+    label: "{{ _speedtest.name | d(none) }}"
+    loop_var: _speedtest
+  when:
+    - _speedtest.name is defined
+    - _speedtest.state is defined
+
 - name: Ensure ookla speedtest packages are present
   tags:
     - speedtest

@@ -2,5 +2,8 @@
 - name: Converge
   hosts: all
   roles:
-    - role: linuxhq.linux.speedtest
+    - role: speedtest
+      speedtest_packages: []
+
+    - speedtest
 ...
