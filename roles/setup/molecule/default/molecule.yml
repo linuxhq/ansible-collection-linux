@@ -16,6 +16,27 @@ provisioner:
   log: true
   options:
     diff: true
+  inventory:
+    group_vars:
+      all:
+        setup_aliases:
+          - key: postmaster
+            value: root
+        setup_environment:
+          - key: linuxhq
+            value: development
+        setup_hostname: linuxhq.net
+        setup_hosts:
+          - ip: 1.1.1.1
+            hosts:
+              - linuxhq.net
+              - linuxhq.org
+        setup_motd: |
+          QWxsIHlvdXIgYmFzZSBhcmUgYmVsb25nIHRvIHVzCg==
+        setup_profile_d:
+          - name: linuxhq.sh
+            script: |
+              ZXhwb3J0IFRNT1VUPTMwMAo=
 
 verifier:
   name: ansible
