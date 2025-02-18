@@ -7,7 +7,7 @@
     name: pam
     state: present
 
-- name: Ensure pam limits template is present
+- name: Ensure pam limits configuration is managed
   tags:
     - pam_limit
   become: true
@@ -18,22 +18,22 @@
     owner: root
     src: limits.conf.j2
 
-- name: Ensure pam limits.d templates are present
+- name: Ensure pam limits.d configurations are managed
   tags:
     - pam_limit
   become: true
   ansible.builtin.template:
-    dest: "/etc/security/limits.d/{{ _limit_d.file }}.conf"
+    dest: "/etc/security/limits.d/{{ _limit.file }}.conf"
     group: root
     mode: '0644'
     owner: root
     src: limits_d.j2
-  loop: "{{ pam_limits_d }}"
+  loop: "{{ pam_limit_d }}"
   loop_control:
-    label: "{{ _limit_d.file | default(none) }}"
-    loop_var: _limit_d
+    label: "{{ _limit.file | d(none) }}"
+    loop_var: _limit
   when:
-    - _limit_d.file is defined
-    - _limit_d.limits is defined
-    - _limit_d.limits | length > 0
+    - _limit.file is defined
+    - _limit.limits is defined
+    - _limit.limits | length > 0
 ...

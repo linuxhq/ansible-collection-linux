@@ -1,6 +1,6 @@
 # {{ ansible_managed }}
 
-{% for limit in _limit_d.limits %}
+{% for limit in _limit.limits %}
 {%   if limit.domain is defined and
         limit.limit_item is defined and
         limit.limit_type is defined and
