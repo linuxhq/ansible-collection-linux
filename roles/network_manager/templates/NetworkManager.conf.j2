@@ -1,0 +1,10 @@
+# {{ ansible_managed }}
+
+{% if network_manager_conf | length > 0 %}
+{%   for section in network_manager_conf.keys() %}
+[{{ section }}]
+{%     for key, value in network_manager_conf[section] | dictsort %}
+{{ key }}={{ value }}
+{%     endfor %}
+{%   endfor %}
+{% endif %}
