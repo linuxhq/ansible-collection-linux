@@ -2,7 +2,6 @@
 - name: Converge
   hosts: all
   roles:
-    - role: linuxhq.linux.nscd
+    - role: nscd
       nscd_debug_level: 1
-      nscd_logfile: /tmp/nscd.log
 ...

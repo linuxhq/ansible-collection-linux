@@ -7,7 +7,7 @@
     name: nscd
     state: present
 
-- name: Ensure nscd configuration is present
+- name: Ensure nscd configuration is managed
   tags:
     - nscd
   become: true
@@ -17,7 +17,8 @@
     mode: '0644'
     owner: root
     src: nscd.conf.j2
-  notify: Restart nscd
+  notify:
+    - Restart nscd
 
 - name: Ensure nscd is started and enabled on boot
   tags:
