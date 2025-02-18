@@ -1,4 +1,4 @@
-# nmcli
+# network\_manager
 
 [![License](https://img.shields.io/badge/license-GPLv3-lightgreen)](https://www.gnu.org/licenses/gpl-3.0.en.html#license-text)
 
@@ -10,7 +10,8 @@ None
 
 ## Role Variables
 
-    nmcli: []
+    network_manager_conf: {}
+    network_manater_connections: []
 
 ## Dependencies
 
@@ -20,15 +21,19 @@ None
 
     - hosts: server
       roles:
-        - role: linuxhq.linux.nmcli
-          nmcli:
+        - role: linuxhq.linux.network_manager
+          network_manager_conf:
+            main:
+              plugins: ifcfg-rh
+          network_manager_connections:
             - conn_name: "{{ ansible_default_ipv4.interface }}"
               dns4:
-                - "{{ ansible_lo.ipv4.address }}"
+                - 1.1.1.1
+                - 1.1.1.2
               ip4: "{{ ansible_default_ipv4.address }}/{{ ansible_default_ipv4.prefix }}"
               gw4: "{{ ansible_default_ipv4.gateway }}"
               type: ethernet
-            - conn_name: enp36s0
+            - conn_name: eth1
               state: absent
             - conn_name: usb0
               state: absent

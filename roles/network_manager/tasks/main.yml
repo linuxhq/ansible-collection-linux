@@ -1,0 +1,126 @@
+---
+- name: Ensure network manager package is present
+  tags:
+    - network_manager
+  become: true
+  ansible.builtin.dnf:
+    name: NetworkManager
+    state: present
+
+- name: Ensure network manager configuration is managed
+  tags:
+    - network_manager
+  become: true
+  ansible.builtin.template:
+    dest: /etc/NetworkManager/NetworkManager.conf
+    group: root
+    mode: '0644'
+    owner: root
+    src: NetworkManager.conf.j2
+  notify:
+    - Restart NetworkManager
+  when:
+    - network_manager_conf | length > 0
+
+- name: Ensure network manager connections are managed
+  tags:
+    - network_manager
+  become: true
+  community.general.nmcli:
+    addr_gen_mode6: "{{ _connection.addr_gen_mode6 | d(omit) }}"
+    ageingtime: "{{ _connection.ageingtime | d(omit) }}"
+    arp_interval: "{{ _connection.arp_interval | d(omit) }}"
+    arp_ip_target: "{{ _connection.arp_ip_target | d(omit) }}"
+    autoconnect: "{{ _connection.autoconnect | d(true) }}"
+    conn_name: "{{ _connection.conn_name }}"
+    dhcp_client_id: "{{ _connection.dhcp_client_id | d(omit) }}"
+    dns4: "{{ _connection.dns4 | d(omit) }}"
+    dns4_ignore_auto: "{{ _connection.dns4_ignore_auto | d(omit) }}"
+    dns4_options: "{{ _connection.dns4_options | d(omit) }}"
+    dns4_search: "{{ _connection.dns4_search | d(omit) }}"
+    dns6: "{{ _connection.dns6 | d(omit) }}"
+    dns6_ignore_auto: "{{ _connection.dns6_ignore_auto | d(omit) }}"
+    dns6_options: "{{ _connection.dns6_options | d(omit) }}"
+    dns6_search: "{{ _connection.dns6_search | d(omit) }}"
+    downdelay: "{{ _connection.downdelay | d(omit) }}"
+    egress: "{{ _connection.egress | d(omit) }}"
+    flags: "{{ _connection.flags | d(omit) }}"
+    forwarddelay: "{{ _connection.forwarddelay | d(omit) }}"
+    gsm: "{{ _connection.gsm | d(omit) }}"
+    gw4: "{{ _connection.gw4 | d(omit) }}"
+    gw4_ignore_auto: "{{ _connection.gw4_ignore_auto | d(omit) }}"
+    gw6: "{{ _connection.gw6 | d(omit) }}"
+    gw6_ignore_auto: "{{ _connection.gw6_ignore_auto | d(omit) }}"
+    hairpin: "{{ _connection.hairpin | d(omit) }}"
+    hellotime: "{{ _connection.hellotime | d(omit) }}"
+    ifname: "{{ _connection.ifname | d(omit) }}"
+    ignore_unsupported_suboptions: "{{ _connection.ignore_unsupported_suboptions | d(omit) }}"
+    ingress: "{{ _connection.ingress | d(omit) }}"
+    ip4: "{{ _connection.ip4 | d(omit) }}"
+    ip6: "{{ _connection.ip6 | d(omit) }}"
+    ip_privacy6: "{{ _connection.ip_privacy6 | d(omit) }}"
+    ip_tunnel_dev: "{{ _connection.ip_tunnel_dev | d(omit) }}"
+    ip_tunnel_input_key: "{{ _connection.ip_tunnel_input_key | d(omit) }}"
+    ip_tunnel_local: "{{ _connection.ip_tunnel_local | d(omit) }}"
+    ip_tunnel_output_key: "{{ _connection.ip_tunnel_output_key | d(omit) }}"
+    ip_tunnel_remote: "{{ _connection.ip_tunnel_remote | d(omit) }}"
+    mac: "{{ _connection.mac | d(omit) }}"
+    macvlan: "{{ _connection.macvlan | d(omit) }}"
+    master: "{{ _connection.master | d(omit) }}"
+    maxage: "{{ _connection.maxage | d(omit) }}"
+    may_fail4: "{{ _connection.may_fail4 | d(omit) }}"
+    method4: "{{ _connection.method4 | d(omit) }}"
+    method6: "{{ _connection.method6 | d(omit) }}"
+    miimon: "{{ _connection.miimon | d(omit) }}"
+    mtu: "{{ _connection.mtu | d(omit) }}"
+    never_default4: "{{ _connection.never_default4 | d(omit) }}"
+    path_cost: "{{ _connection.path_cost | d(omit) }}"
+    primary: "{{ _connection.primary | d(omit) }}"
+    priority: "{{ _connection.priority | d(omit) }}"
+    route_metric4: "{{ _connection.route_metric4 | d(omit) }}"
+    route_metric6: "{{ _connection.route_metric6 | d(omit) }}"
+    routes4: "{{ _connection.routes4 | d(omit) }}"
+    routes4_extended: "{{ _connection.routes4_extended | d(omit) }}"
+    routes6: "{{ _connection.routes6 | d(omit) }}"
+    routes6_extended: "{{ _connection.routes6_extended | d(omit) }}"
+    routing_rules4: "{{ _connection.routing_rules4 | d(omit) }}"
+    runner: "{{ _connection.runner | d(omit) }}"
+    runner_fast_rate: "{{ _connection.runner_fast_rate | d(omit) }}"
+    runner_hwaddr_policy: "{{ _connection.runner_hwaddr_policy | d(omit) }}"
+    slave_type: "{{ _connection.slave_type | d(omit) }}"
+    slavepriority: "{{ _connection.slavepriority | d(omit) }}"
+    ssid: "{{ _connection.ssid | d(omit) }}"
+    state: "{{ _connection.state | d('present') }}"
+    stp: "{{ _connection.stp | d(omit) }}"
+    transport_mode: "{{ _connection.transport_mode | d(omit) }}"
+    type: "{{ _connection.type | d(omit) }}"
+    updelay: "{{ _connection.updelay | d(omit) }}"
+    vlandev: "{{ _connection.vlandev | d(omit) }}"
+    vlanid: "{{ _connection.vlanid | d(omit) }}"
+    vpn: "{{ _connection.vpn | d(omit) }}"
+    vxlan_id: "{{ _connection.vxlan_id | d(omit) }}"
+    vxlan_local: "{{ _connection.vxlan_local | d(omit) }}"
+    vxlan_remote: "{{ _connection.vxlan_remote | d(omit) }}"
+    wifi: "{{ _connection.wifi | d(omit) }}"
+    wifi_sec: "{{ _connection.wifi_sec | d(omit) }}"
+    wireguard: "{{ _connection.wireguard | d(omit) }}"
+    xmit_hash_policy: "{{ _connection.xmit_hash_policy | d(omit) }}"
+    zone: "{{ _connection.zone | d(omit) }}"
+  notify:
+    - Restart NetworkManager
+  loop: "{{ network_manager_connections }}"
+  loop_control:
+    label: "{{ _connection.conn_name | d(none) }}"
+    loop_var: _connection
+  when:
+    - _connection.conn_name is defined
+
+- name: Ensure network manager is started and enabled on boot
+  tags:
+    - network_manager
+  become: true
+  ansible.builtin.service:
+    enabled: true
+    name: NetworkManager
+    state: started
+...
