@@ -3,25 +3,21 @@
   hosts: all
   roles:
     - role: linuxhq.linux.pam_limit
-      pam_limits:
+      pam_limit_list:
         - domain: '*'
           limit_item: core
           limit_type: hard
           value: 0
-        - domain: '*'
-          limit_item: nofile
-          limit_type: hard
-          value: 39693561
 
-      pam_limits_d:
-        - file: 99-linuxhq
+      pam_limit_d:
+        - file: 99-vagrant
           limits:
-            - domain: joe
-              limit_item: soft
-              limit_type: nofile
-              value: 64000
-            - domain: smith
+            - domain: vagrant
+              limit_item: locks
               limit_type: hard
-              limit_item: fsize
-              value: 1000000
+              value: 1024
+            - domain: vagrant
+              limit_item: memlock
+              limit_type: hard
+              value: 4096
 ...

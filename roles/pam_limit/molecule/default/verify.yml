@@ -1,5 +1,29 @@
 ---
 - name: Verify
   hosts: all
-  tasks: []
+  tasks:
+    - name: Ensure ulimit values are gathered
+      tags:
+        - pam_limit
+      ansible.builtin.command:
+        cmd: >
+          {{ _ulimit }}
+      register: __pam_limit_ulimit
+      loop:
+        - ulimit -c
+        - ulimit -l
+        - ulimit -x
+      loop_control:
+        label: "{{ _ulimit | d(none) }}"
+        loop_var: _ulimit
+      changed_when: false
+
+    - name: Ensure ulimit values are verified
+      tags:
+        - pam_limit
+      ansible.builtin.assert:
+        that:
+          - __pam_limit_ulimit.results.0.stdout == '0'
+          - __pam_limit_ulimit.results.1.stdout == '4096'
+          - __pam_limit_ulimit.results.2.stdout == '1024'
 ...

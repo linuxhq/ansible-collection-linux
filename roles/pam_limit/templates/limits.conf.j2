@@ -1,7 +1,7 @@
 # {{ ansible_managed }}
 
-{% if pam_limits | length > 0 %}
-{%   for limit in pam_limits %}
+{% if pam_limit_list | length > 0 %}
+{%   for limit in pam_limit_list %}
 {%     if limit.domain is defined and
           limit.limit_item is defined and
           limit.limit_type is defined and
