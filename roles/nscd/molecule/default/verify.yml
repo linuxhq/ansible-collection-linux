@@ -3,13 +3,17 @@
   hosts: all
   tasks:
     - name: Ensure stat is executed against log file
+      tags:
+        - nscd
       ansible.builtin.stat:
-        path: /tmp/nscd.log
-      register: _stat
+        path: /var/log/nscd.log
+      register: __nscd_stat
 
     - name: Ensure nscd log file exists
+      tags:
+        - nscd
       ansible.builtin.assert:
         that:
-          - _stat.stat.exists | bool
-          - not _stat.stat.isdir | bool
+          - __nscd_stat.stat.exists | bool
+          - not __nscd_stat.stat.isdir | bool
 ...
