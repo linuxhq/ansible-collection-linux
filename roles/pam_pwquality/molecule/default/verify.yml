@@ -6,7 +6,8 @@
       tags:
         - pam_pwquality
       ansible.builtin.shell:
-        cmd: >
+        cmd: |
+          set -o pipefail
           echo "U#AJ)8pv,uv,KgzQcACxF:?5iZz]@NCd" | pwscore
       register: __pam_pwquality_pwscore
       changed_when: false
