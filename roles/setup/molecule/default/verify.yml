@@ -2,10 +2,30 @@
 - name: Verify
   hosts: all
   tasks:
-    - name: Ensure environment variable is present
+    - name: Ensure setup settings are gathered
+      tags:
+        - setup
+      ansible.builtin.slurp:
+        src: "{{ _file }}"
+      register: __setup_slurp
+      loop:
+        - /etc/aliases
+        - /etc/environment
+        - /etc/hostname
+        - /etc/hosts
+        - /etc/motd
+      loop_control:
+        label: "{{ _file }}"
+        loop_var: _file
+
+    - name: Ensure setup settings are validated
       tags:
         - setup
       ansible.builtin.assert:
         that:
-          - ansible_env.LINUXHQ == 'development'
+          - setup_aliases.0.key in __setup_slurp.results.0.content | b64decode
+          - setup_environment.0.value in __setup_slurp.results.1.content | b64decode
+          - setup_hostname in __setup_slurp.results.2.content | b64decode
+          - setup_hosts.0.ip in __setup_slurp.results.3.content | b64decode
+          - setup_motd | b64decode in __setup_slurp.results.4.content | b64decode
 ...
