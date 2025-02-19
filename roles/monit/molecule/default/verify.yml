@@ -1,5 +1,38 @@
 ---
 - name: Verify
   hosts: all
-  tasks: []
+  tasks:
+    - name: Ensure monit has started
+      tags:
+        - monit
+      ansible.builtin.pause:
+        seconds: 120
+
+    - name: Ensure monit service statuses are gathered
+      tags:
+        - monit
+      become: true
+      ansible.builtin.command:
+        cmd: >
+          monit status {{ _service }}
+      register: __monit_status
+      loop:
+        - almalinux9
+        - httpd
+        - https
+        - root_linuxhq
+      loop_control:
+        label: "{{ _service }}"
+        loop_var: _service
+      changed_when: false
+
+    - name: Ensure monit service statuses are verified
+      tags:
+        - monit
+      ansible.builtin.assert:
+        that:
+          - __monit_status.results.0.rc == 0
+          - __monit_status.results.1.rc == 0
+          - __monit_status.results.2.rc == 0
+          - __monit_status.results.3.rc == 0
 ...

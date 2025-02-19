@@ -38,60 +38,48 @@ set httpd
 {%   endfor %}
     }
 {% endif %}
-
 {% for filesystem in monit_filesystem %}
 {%   if filesystem.name is defined and
         filesystem.rules is defined and
         filesystem.rules | length > 0 %}
+
 check filesystem {{ filesystem.name }}
 {%     for rule in filesystem.rules %}
       {{ rule }}
 {%     endfor %}
 {%   endif %}
-{%   if not loop.last %}
-
-{%   endif %}
 {% endfor %}
-
 {% for host in monit_host %}
 {%   if host.name is defined and
         host.rules is defined and
         host.rules | length > 0 %}
+
 check host {{ host.name }}
 {%     for rule in host.rules %}
       {{ rule }}
 {%     endfor %}
 {%   endif %}
-{%   if not loop.last %}
-
-{%   endif %}
 {% endfor %}
-
 {% for process in monit_process %}
 {%   if process.name is defined and
         process.rules is defined and
         process.rules | length > 0 %}
+
 check process {{ process.name }}
 {%     for rule in process.rules %}
       {{ rule }}
 {%     endfor %}
 {%   endif %}
-{%   if not loop.last %}
-
-{%   endif %}
 {% endfor %}
-
 {% for program in monit_program %}
 {%   if program.name is defined and
         program.rules is defined and
         program.rules | length > 0 %}
+
 check program {{ program.name }}
 {%     for rule in program.rules %}
       {{ rule }}
 {%     endfor %}
-{%   endif %}
-{%   if not loop.last %}
-
 {%   endif %}
 {% endfor %}
 

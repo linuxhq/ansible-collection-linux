@@ -7,7 +7,7 @@
     name: monit
     state: present
 
-- name: Ensure monit template is present
+- name: Ensure monit configuration is managed
   tags:
     - monit
   become: true
@@ -18,7 +18,8 @@
     owner: root
     src: monitrc.j2
     validate: '/bin/monit -t -c %s'
-  notify: Reload monit
+  notify:
+    - Reload monit
 
 - name: Ensure monit exec scripts directory is present
   tags:
@@ -51,7 +52,7 @@
     src: exec.j2
   loop: "{{ monit_exec }}"
   loop_control:
-    label: "{{ _exec.name | default(none) }}"
+    label: "{{ _exec.name | d(none) }}"
     loop_var: _exec
   when:
     - _exec.name is defined

@@ -2,7 +2,7 @@
 - name: Converge
   hosts: all
   roles:
-    - role: linuxhq.linux.monit
+    - role: monit
       monit_alert:
         - name: monit@linuxhq.net
           rules:
