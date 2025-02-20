@@ -11,9 +11,11 @@ None
 ## Role Variables
 
     lux_packages: []
-    lux_releasever: "{{ ansible_distribution_major_version }}"
-    lux_repository_frank: false
-    lux_repository_lux: true
+    lux_repositories:
+      - name: frank
+        state: enabled
+      - name: lux
+        state: enabled
 
 ## Dependencies
 

@@ -2,7 +2,9 @@
 - name: Converge
   hosts: all
   roles:
-    - role: linuxhq.linux.lux
+    - lux
+
+    - role: lux
       lux_packages:
         - ppp
 ...

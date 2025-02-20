@@ -5,10 +5,15 @@
   become: true
   ansible.builtin.dnf:
     disable_gpg_check: true
-    name: "http://repo.iotti.biz/CentOS/{{ lux_releasever }}/noarch/{{ _pkg }}"
+    name: "{{ __lux_url }}/{{ __lux_uri }}/{{ __lux_package }}"
     state: present
   vars:
-    _pkg: "lux-release-{{ lux_releasever }}-1.noarch.rpm"
+    __lux_package:
+      "lux-release-{{ ansible_distribution_major_version }}-1.noarch.rpm"
+    __lux_uri:
+      "/CentOS/{{ ansible_distribution_major_version }}/noarch"
+    __lux_url:
+      "http://repo.iotti.biz"
 
 - name: Ensure lux repository gpg key is present
   tags:
@@ -18,22 +23,20 @@
     key: /etc/pki/rpm-gpg/RPM-GPG-KEY-LUX
     state: present
 
-- name: Ensure lux repository templates are present
+- name: Ensure lux repositories are managed
   tags:
     - lux
   become: true
-  ansible.builtin.template:
-    dest: "/etc/yum.repos.d/{{ _repo }}.repo"
-    group: root
-    mode: '0644'
-    owner: root
-    src: "{{ _repo }}.repo.j2"
-  loop:
-    - frank
-    - lux
+  community.general.dnf_config_manager:
+    name: "{{ _lux.name }}"
+    state: "{{ _lux.state }}"
+  loop: "{{ lux_repositories }}"
   loop_control:
-    label: "{{ _repo }}"
-    loop_var: _repo
+    label: "{{ _lux.name | d(none) }}"
+    loop_var: _lux
+  when:
+    - _lux.name is defined
+    - _lux.state is defined
 
 - name: Ensure lux repository packages are present
   tags:
