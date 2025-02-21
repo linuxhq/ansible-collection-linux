@@ -2,6 +2,8 @@
 - name: Converge
   hosts: all
   roles:
+    - docker_compose
+
     - role: docker_compose
       docker_compose_projects:
         - name: linuxhq
