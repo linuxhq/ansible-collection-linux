@@ -1,11 +1,12 @@
 ---
 dependencies: []
 galaxy_info:
-  role_name: file
+  role_name: permission
   author: Taylor Kimball
-  description: Manage presence of files on a host
+  description: Manage file permissions on a host
   license: GPLv3
   min_ansible_version: 2.15.0
+  namespace: linuxhq
   platforms:
     - name: GenericLinux
       versions:
@@ -13,4 +14,5 @@ galaxy_info:
   galaxy_tags:
     - file
     - linux
+    - permission
 ...

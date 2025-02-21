@@ -1,0 +1,24 @@
+---
+- name: Verify
+  hosts: all
+  tasks:
+    - name: Ensure file stats are gathered
+      tags:
+        - permission
+      become: true
+      ansible.builtin.stat:
+        path: "{{ _file.path }}"
+      register: __permission_stat
+      loop: "{{ permission_list }}"
+      loop_control:
+        label: "{{ _file.path | d(none) }}"
+        loop_var: _file
+
+    - name: Ensure file perimssions are verified
+      tags:
+        - permission
+      ansible.builtin.assert:
+        that:
+          - __permission_stat.results.0.stat.exists | bool
+          - __permission_stat.results.0.stat.mode == '0755'
+...

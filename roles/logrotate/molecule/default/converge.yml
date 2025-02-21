@@ -3,7 +3,7 @@
   hosts: all
   roles:
     - role: logrotate
-      logrorate_conf:
+      logrotate_conf:
         - compress
         - create
         - daily

@@ -1,0 +1,18 @@
+---
+- name: Ensure file permissions are managed
+  tags:
+    - permission
+  become: true
+  ansible.builtin.file:
+    group: "{{ _permission.group | d(omit) }}"
+    mode: "{{ _permission.mode | d(omit) }}"
+    owner: "{{ _permission.owner | d(omit) }}"
+    path: "{{ _permission.path }}"
+    state: file
+  loop: "{{ permission_list }}"
+  loop_control:
+    label: "{{ _permission.path | d(none) }}"
+    loop_var: _permission
+  when:
+    - _permission.path is defined
+...

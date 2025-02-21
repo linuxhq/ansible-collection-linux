@@ -1,8 +1,8 @@
-# file
+# permission
 
 [![License](https://img.shields.io/badge/license-GPLv3-lightgreen)](https://www.gnu.org/licenses/gpl-3.0.en.html#license-text)
 
-Manage presence of files on a host
+Manage file permissions on a host
 
 ## Requirements
 
@@ -10,7 +10,7 @@ None
 
 ## Role Variables
 
-    files: []
+    permission_list: []
 
 ## Dependencies
 
@@ -20,8 +20,8 @@ None
 
     - hosts: server
       roles:
-        - role: linuxhq.linux.file
-          files:
+        - role: linuxhq.linux.permission
+          permission_list:
             - path: /usr/bin/su
               mode: '0755'
 
