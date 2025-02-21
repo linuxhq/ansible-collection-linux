@@ -10,11 +10,11 @@ Run multi-container applications with Docker
 
 ## Role Variables
 
-    docker_compose: []
     docker_compose_bin: /usr/libexec/docker/cli-plugins/docker-compose
     docker_compose_dir: /etc/docker/compose
     docker_compose_packages:
       - docker-compose-plugin
+    docker_compose_projects: []
 
 ## Dependencies
 
@@ -25,9 +25,8 @@ Run multi-container applications with Docker
     - hosts: server
       roles:
         - role: linuxhq.linux.docker_compose
-          docker_compose:
+          docker_compose_projects:
             - name: linuxhq
-              version: '3'
               env:
                 LINUXHQ_TZ: America/Los_Angeles
                 LINUXHQ_UMASK: 2
