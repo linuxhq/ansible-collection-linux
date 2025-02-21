@@ -2,10 +2,10 @@
 - name: Converge
   hosts: all
   roles:
-    - role: linuxhq.linux.docker_container
-      docker_containers:
+    - docker_container
+
+    - role: docker_container
+      docker_container_list:
         - name: linuxhq
           image: nginxinc/nginx-unprivileged:latest
-      docker_users:
-        - linuxhq
 ...
