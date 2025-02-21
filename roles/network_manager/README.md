@@ -11,7 +11,7 @@ None
 ## Role Variables
 
     network_manager_conf: {}
-    network_manater_connections: []
+    network_manager_connections: []
 
 ## Dependencies
 
