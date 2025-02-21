@@ -10,7 +10,7 @@ Manage docker networks
 
 ## Role Variables
 
-    docker_networks: []
+    docker_network_list: []
 
 ## Dependencies
 
@@ -21,7 +21,7 @@ Manage docker networks
     - hosts: server
       roles:
         - role: linuxhq.linux.docker_network
-          docker_networks:
+          docker_network_list:
             - name: linuxhq
               ipam_config:
                 - subnet: 192.168.0.0/24

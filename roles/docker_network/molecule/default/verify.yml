@@ -3,13 +3,17 @@
   hosts: all
   tasks:
     - name: Ensure docker network information is gathered
+      tags:
+        - docker_network
       community.docker.docker_network_info:
         name: linuxhq
-      register: _docker_network_info
+      register: __docker_newtork_info
 
     - name: Ensure docker network exists
+      tags:
+        - docker_network
       ansible.builtin.assert:
         that:
-          - _docker_network_info.network.Name == 'linuxhq'
-          - _docker_network_info.network.IPAM.Config[0].Subnet == '192.168.0.0/24'
+          - __docker_newtork_info.network.Name == 'linuxhq'
+          - __docker_newtork_info.network.IPAM.Config[0].Subnet == '192.168.0.0/24'
 ...
