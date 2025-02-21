@@ -2,5 +2,21 @@
 - name: Converge
   hosts: all
   roles:
-    - linuxhq.linux.logrotate
+    - role: logrotate
+      logrorate_conf:
+        - compress
+        - create
+        - daily
+        - dateext
+        - include /etc/logrotate.d
+        - rotate 1
+        - shred
+      logrotate_d:
+        - file: linuxhq
+          logs:
+            - path: /var/log/dnf.log
+              options:
+                - compress
+                - daily
+                - shred
 ...

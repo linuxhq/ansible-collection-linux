@@ -3,8 +3,19 @@
   hosts: all
   tasks:
     - name: Ensure logrotate debug exits successfully
+      tags:
+        - logrotate
       ansible.builtin.command:
         cmd: >
           logrotate -d /etc/logrotate.conf
+      changed_when: false
+
+    - name: Ensure logrotate rotation is forced
+      tags:
+        - logrotate
+      become: true
+      ansible.builtin.command:
+        cmd: >
+          logrotate -f /etc/logrotate.d/linuxhq
       changed_when: false
 ...

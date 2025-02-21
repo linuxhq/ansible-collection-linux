@@ -7,7 +7,7 @@
     name: logrotate
     state: present
 
-- name: Ensure logrotate.conf is present
+- name: Ensure logrotate configuration is managed
   tags:
     - logrotate
   become: true
@@ -18,7 +18,7 @@
     owner: root
     src: logrotate.conf.j2
 
-- name: Ensure logrotate.d configurations are present
+- name: Ensure logrotate.d configurations are managed
   tags:
     - logrotate
   become: true
@@ -30,7 +30,7 @@
     src: logrotate_d.j2
   loop: "{{ logrotate_d }}"
   loop_control:
-    label: "{{ _logrotate.file }}"
+    label: "{{ _logrotate.file | d(none) }}"
     loop_var: _logrotate
   when:
     - _logrotate.file is defined
