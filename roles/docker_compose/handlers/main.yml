@@ -4,10 +4,10 @@
     - docker_compose
   become: true
   ansible.builtin.systemd_service:
-    name: "docker-compose@{{ _restart }}.service"
+    name: "docker-compose@{{ _project }}.service"
     state: restarted
-  loop: "{{ _docker_compose_changed | unique }}"
+  loop: "{{ __docker_compose_changed | unique }}"
   loop_control:
-    label: "{{ _restart }}"
-    loop_var: _restart
+    label: "{{ _project | d(none) }}"
+    loop_var: _project
 ...

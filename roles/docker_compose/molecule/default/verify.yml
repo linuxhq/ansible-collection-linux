@@ -2,26 +2,42 @@
 - name: Verify
   hosts: all
   tasks:
+    - name: Ensure docker python packages are present
+      tags:
+        - docker_compose
+      become: true
+      ansible.builtin.dnf:
+        name: python3-requests
+        state: present
+
     - name: Ensure docker container information is gathered
+      tags:
+        - docker_compose
       community.docker.docker_container_info:
         name: watchtower
-      register: _docker_container_info
+      register: __docker_compose_container_info
 
     - name: Ensure docker network information is gathered
+      tags:
+        - docker_compose
       community.docker.docker_network_info:
         name: linuxhq_watchtower
-      register: _docker_network_info
+      register: __docker_compose_network_info
 
-    - name: Ensure docker container exists
+    - name: Ensure docker compose project container exists
+      tags:
+        - docker_compose
       ansible.builtin.assert:
         that:
-          - _docker_container_info.container.Config.Image == 'containrrr/watchtower:latest'
-          - _docker_container_info.container.Name == '/watchtower'
-          - _docker_container_info.container.State.Status == 'running'
+          - __docker_compose_container_info.container.Config.Image == 'containrrr/watchtower:latest'
+          - __docker_compose_container_info.container.Name == '/watchtower'
+          - __docker_compose_container_info.container.State.Status == 'running'
 
-    - name: Ensure docker network exists
+    - name: Ensure docker compose project network exists
+      tags:
+        - docker_compose
       ansible.builtin.assert:
         that:
-          - _docker_network_info.network.Name == 'linuxhq_watchtower'
-          - _docker_network_info.network.IPAM.Config[0].Subnet == '192.168.0.0/24'
+          - __docker_compose_network_info.network.Name == 'linuxhq_watchtower'
+          - __docker_compose_network_info.network.IPAM.Config[0].Subnet == '192.168.0.0/24'
 ...

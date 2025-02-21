@@ -2,10 +2,9 @@
 - name: Converge
   hosts: all
   roles:
-    - role: linuxhq.linux.docker_compose
-      docker_compose:
+    - role: docker_compose
+      docker_compose_projects:
         - name: linuxhq
-          version: '3'
           env:
             LINUXHQ_TZ: America/Los_Angeles
             LINUXHQ_UMASK: 2

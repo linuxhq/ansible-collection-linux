@@ -29,9 +29,9 @@
     owner: root
     path: "{{ docker_compose_dir }}/{{ _project.name }}"
     state: directory
-  loop: "{{ docker_compose }}"
+  loop: "{{ docker_compose_projects }}"
   loop_control:
-    label: "{{ _project.name | default(none) }}"
+    label: "{{ _project.name | d(none) }}"
     loop_var: _project
   when:
     - _project.name is defined
@@ -46,9 +46,10 @@
     mode: '0640'
     owner: root
     src: docker-compose.env.j2
-  notify: Restart docker-compose
-  register: _docker_compose_env
-  loop: "{{ docker_compose }}"
+  notify:
+    - Restart docker-compose
+  register: __docker_compose_env
+  loop: "{{ docker_compose_projects }}"
   loop_control:
     label: "{{ _project.name }}"
     loop_var: _project
@@ -67,9 +68,10 @@
     mode: '0640'
     owner: root
     src: docker-compose.yml.j2
-  notify: Restart docker-compose
-  register: _docker_compose_service
-  loop: "{{ docker_compose }}"
+  notify:
+    - Restart docker-compose
+  register: __docker_compose_svc
+  loop: "{{ docker_compose_projects }}"
   loop_control:
     label: "{{ _project.name }}"
     loop_var: _project
@@ -80,18 +82,18 @@
   tags:
     - docker_compose
   ansible.builtin.set_fact:
-    _docker_compose_changed: "{{ _docker_compose_changed |
-                                 default([]) +
-                                 [_name] }}"
-  loop: "{{ _docker_compose_env.results +
-            _docker_compose_service.results }}"
+    __docker_compose_changed:
+      "{{ __docker_compose_changed |
+          default([]) +
+          [_result._project.name] }}"
+  loop:
+    "{{ __docker_compose_env.results +
+        __docker_compose_svc.results }}"
   loop_control:
-    label: "{{ _name }}"
+    label: "{{ _result._project.name | d(none) }}"
     loop_var: _result
-  vars:
-    _name: "{{ _result._project.name | d(none) }}"
   when:
-    - _name is not none
+    - _result._project.name is defined
     - _result.changed | bool
 
 - name: Ensure docker-compose systemd unit is present
@@ -118,14 +120,12 @@
   become: true
   ansible.builtin.systemd_service:
     enabled: true
-    name: "docker-compose@{{ _name }}.service"
+    name: "docker-compose@{{ _project.name }}.service"
     state: started
-  loop: "{{ docker_compose }}"
+  loop: "{{ docker_compose_projects }}"
   loop_control:
-    label: "{{ _name }}"
+    label: "{{ _project.name | d(none) }}"
     loop_var: _project
-  vars:
-    _name: "{{ _project.name | d(none) }}"
   when:
-    - _name is not none
+    - _project.name is defined
 ...
