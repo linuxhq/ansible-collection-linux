@@ -3,45 +3,97 @@
   tags:
     - git
   become: true
-  ansible.builtin.package:
+  ansible.builtin.apt:
     name: "{{ git_packages }}"
     state: present
+    update_cache: true
+  when:
+    - ansible_os_family == 'Debian'
+
+- name: Ensure git packages are present
+  tags:
+    - git
+  become: true
+  ansible.builtin.dnf:
+    name: "{{ git_packages }}"
+    state: present
+    update_cache: true
+  when:
+    - ansible_os_family == 'RedHat'
 
 - name: Ensure git repositories are present
   tags:
     - git
-  become: "{{ git_become | bool }}"
-  become_user: "{{ git_become_user }}"
+  become: true
   ansible.builtin.git:
-    accept_newhostkey: "{{ _repository.accept_newhostkey | default(false) }}"
-    archive: "{{ _repository.archive | default(omit) }}"
-    archive_prefix: "{{ _repository.archive_prefix | default(omit) }}"
-    bare: "{{ _repository.bare | default(false) }}"
-    clone: "{{ _repository.clone | default(true) }}"
-    depth: "{{ _repository.depth | default(omit) }}"
+    accept_newhostkey: "{{ _repository.accept_newhostkey | d(false) }}"
+    archive: "{{ _repository.archive | d(omit) }}"
+    archive_prefix: "{{ _repository.archive_prefix | d(omit) }}"
+    bare: "{{ _repository.bare | d(false) }}"
+    clone: "{{ _repository.clone | d(true) }}"
+    depth: "{{ _repository.depth | d(omit) }}"
     dest: "{{ _repository.dest }}"
-    executable: "{{ _repository.executable | default(omit) }}"
-    force: "{{ _repository.force | default(false) }}"
-    gpg_whitelist: "{{ _repository.gpg_whitelist | default([]) }}"
-    key_file: "{{ _repository.key_file | default(omit) }}"
-    recursive: "{{ _repository.recursive | default(true) }}"
-    reference: "{{ _repository.reference | default(omit) }}"
-    refspec: "{{ _repository.refspec | default(omit) }}"
-    remote: "{{ _repository.remote | default('origin') }}"
+    executable: "{{ _repository.executable | d(omit) }}"
+    force: "{{ _repository.force | d(false) }}"
+    key_file: "{{ _repository.key_file | d(omit) }}"
+    recursive: "{{ _repository.recursive | d(true) }}"
+    reference: "{{ _repository.reference | d(omit) }}"
+    refspec: "{{ _repository.refspec | d(omit) }}"
+    remote: "{{ _repository.remote | d('origin') }}"
     repo: "{{ _repository.repo }}"
-    separate_git_dir: "{{ _repository.separate_git_dir | default(omit) }}"
-    single_branch: "{{ _repository.single_branch | default(false) }}"
-    ssh_opts: "{{ _repository.ssh_opts | default(omit) }}"
-    track_submodules: "{{ _repository.track_submodules | default(false) }}"
-    umask: "{{ _repository.umask | default(omit) }}"
-    update: "{{ _repository.update_repository | default(true) }}"
-    verify_commit: "{{ _repository.verify_commit | default(false) }}"
-    version: "{{ _repository.version | default('HEAD') }}"
+    separate_git_dir: "{{ _repository.separate_git_dir | d(omit) }}"
+    single_branch: "{{ _repository.single_branch | d(false) }}"
+    ssh_opts: "{{ _repository.ssh_opts | d(omit) }}"
+    track_submodules: "{{ _repository.track_submodules | d(false) }}"
+    umask: "{{ _repository.umask | d(omit) }}"
+    update: "{{ _repository.update_repository | d(true) }}"
+    verify_commit: "{{ _repository.verify_commit | d(false) }}"
+    version: "{{ _repository.version | d('HEAD') }}"
   loop: "{{ git_repositories }}"
   loop_control:
-    label: "{{ _repository.repo.split('/')[-1] }}"
+    label: "{{ _repository.repo.split('/')[-1]  | d(none) }}"
     loop_var: _repository
   when:
     - _repository.dest is defined
     - _repository.repo is defined
+    - _repository.become is defined
+    - _repository.become | bool == true
+
+- name: Ensure git repositories are present
+  tags:
+    - git
+  become: false
+  ansible.builtin.git:
+    accept_newhostkey: "{{ _repository.accept_newhostkey | d(false) }}"
+    archive: "{{ _repository.archive | d(omit) }}"
+    archive_prefix: "{{ _repository.archive_prefix | d(omit) }}"
+    bare: "{{ _repository.bare | d(false) }}"
+    clone: "{{ _repository.clone | d(true) }}"
+    depth: "{{ _repository.depth | d(omit) }}"
+    dest: "{{ _repository.dest }}"
+    executable: "{{ _repository.executable | d(omit) }}"
+    force: "{{ _repository.force | d(false) }}"
+    key_file: "{{ _repository.key_file | d(omit) }}"
+    recursive: "{{ _repository.recursive | d(true) }}"
+    reference: "{{ _repository.reference | d(omit) }}"
+    refspec: "{{ _repository.refspec | d(omit) }}"
+    remote: "{{ _repository.remote | d('origin') }}"
+    repo: "{{ _repository.repo }}"
+    separate_git_dir: "{{ _repository.separate_git_dir | d(omit) }}"
+    single_branch: "{{ _repository.single_branch | d(false) }}"
+    ssh_opts: "{{ _repository.ssh_opts | d(omit) }}"
+    track_submodules: "{{ _repository.track_submodules | d(false) }}"
+    umask: "{{ _repository.umask | d(omit) }}"
+    update: "{{ _repository.update_repository | d(true) }}"
+    verify_commit: "{{ _repository.verify_commit | d(false) }}"
+    version: "{{ _repository.version | d('HEAD') }}"
+  loop: "{{ git_repositories }}"
+  loop_control:
+    label: "{{ _repository.repo.split('/')[-1]  | d(none) }}"
+    loop_var: _repository
+  when:
+    - _repository.dest is defined
+    - _repository.repo is defined
+    - _repository.become is not defined or
+      _repository.become | bool == false
 ...

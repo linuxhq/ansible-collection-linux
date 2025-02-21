@@ -2,14 +2,26 @@
 - name: Verify
   hosts: all
   tasks:
-    - name: Ensure stat against git config directory is executed
+    - name: Ensure git directory information is gathered
+      tags:
+        - git
       ansible.builtin.stat:
-        path: /tmp/linuxhq.linux/.git
-      register: _stat
+        path: "{{ _path }}"
+      register: __git_stat
+      loop:
+        - /home/vagrant/ansible-collection-linux
+        - /usr/local/ansible-collection-aws
+      loop_control:
+        label: "{{ _path | d(none) }}"
+        loop_var: _path
 
-    - name: Ensure git config directory exists
+    - name: Ensure git directory destinations exist
+      tags:
+        - git
       ansible.builtin.assert:
         that:
-          - _stat.stat.exists | bool
-          - _stat.stat.isdir | bool
+          - __git_stat.results.0.stat.exists | bool
+          - __git_stat.results.0.stat.isdir | bool
+          - __git_stat.results.1.stat.exists | bool
+          - __git_stat.results.1.stat.isdir | bool
 ...

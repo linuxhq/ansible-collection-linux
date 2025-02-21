@@ -10,8 +10,6 @@ None
 
 ## Role Variables
 
-    git_become: false
-    git_become_user: root
     git_packages:
       - git
     git_repositories: []
@@ -25,11 +23,13 @@ None
     - hosts: server
       roles:
         - role: linuxhq.linux.git
-          git_become: true
-          git_become_user: linuxhq
           git_repositories:
+            - repo: https://github.com/linuxhq/ansible-collection-aws.git
+              dest: /usr/local/ansible-collection-aws
+              become: true
+
             - repo: https://github.com/linuxhq/ansible-collection-linux.git
-              dest: /home/linuxhq/git/linuxhq.linux
+              dest: /home/vagrant/ansible-collection-linux
 
 ## License
 
