@@ -1,6 +1,6 @@
 ---
 dependencies:
-  - role: linuxhq.linux.docker
+  - role: docker
     tags: docker_network
 galaxy_info:
   role_name: docker_network
@@ -8,6 +8,7 @@ galaxy_info:
   description: Manage docker networks
   license: GPLv3
   min_ansible_version: 2.15.0
+  namespace: linuxhq
   platforms:
     - name: EL
       versions:
