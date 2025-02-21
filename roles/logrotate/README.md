@@ -55,7 +55,7 @@ None
           logrotate_d:
             - file: linuxhq
               logs:
-                - path: /var/log/linuxhq
+                - path: /var/log/dnf.log
                   options:
                     - compress
                     - daily
