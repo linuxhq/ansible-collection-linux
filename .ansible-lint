@@ -3,6 +3,4 @@ exclude_paths:
   - .ansible
   - venv
 offline: false
-skip_list:
-  - var-naming[no-role-prefix]
 ...

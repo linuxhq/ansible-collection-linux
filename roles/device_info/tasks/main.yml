@@ -25,9 +25,7 @@
   ansible.builtin.set_fact:
     _device_info_dict:
       "{{ (_device_info_list |
-          items2dict(
-            key_name='device',
-            value_name='partitions'
-          )) |
+          items2dict(key_name='device',
+                     value_name='partitions')) |
           d({}) }}"
 ...
