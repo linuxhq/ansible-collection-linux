@@ -3,14 +3,18 @@
   hosts: all
   tasks:
     - name: Ensure docker container information is gathered
+      tags:
+        - docker_container
       community.docker.docker_container_info:
         name: linuxhq
-      register: _docker_container_info
+      register: __docker_container_info
 
     - name: Ensure docker container exists
+      tags:
+        - docker_container
       ansible.builtin.assert:
         that:
-          - _docker_container_info.container.Config.Image == 'nginxinc/nginx-unprivileged:latest'
-          - _docker_container_info.container.Name == '/linuxhq'
-          - _docker_container_info.container.State.Status == 'running'
+          - __docker_container_info.container.Config.Image == 'nginxinc/nginx-unprivileged:latest'
+          - __docker_container_info.container.Name == '/linuxhq'
+          - __docker_container_info.container.State.Status == 'running'
 ...

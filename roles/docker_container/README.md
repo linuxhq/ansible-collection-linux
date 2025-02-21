@@ -10,7 +10,7 @@ Manage docker containers
 
 ## Role Variables
 
-    docker_containers: []
+    docker_container_list: []
 
 ## Dependencies
 
@@ -21,11 +21,9 @@ Manage docker containers
     - hosts: server
       roles:
         - role: linuxhq.linux.docker_container
-          docker_containers:
+          docker_container_list:
             - name: linuxhq
               image: nginxinc/nginx-unprivileged:latest
-          docker_users:
-            - linuxhq
 
 ## License
 
