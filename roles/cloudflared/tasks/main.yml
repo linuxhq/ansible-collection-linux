@@ -63,47 +63,50 @@
     - cloudflared
   become: true
   ansible.builtin.template:
-    dest: "{{ cloudflared_dir }}/{{ _tunnel.name }}.yml"
+    dest: "{{ cloudflared_dir }}/{{ _yaml.name }}.yaml"
     group: "{{ cloudflared_group }}"
     mode: '0600'
     owner: "{{ cloudflared_user }}"
-    src: cloudflared.yml.j2
+    src: cloudflared.yaml.j2
   loop: "{{ cloudflared_tunnels }}"
   loop_control:
-    label: "{{ _tunnel.name | d(none) }}"
-    loop_var: _tunnel
+    label: "{{ _yaml.name | d(none) }}"
+    loop_var: _yaml
+  vars:
+    __cloudflared_yaml:
+      credentials-file: "{{ cloudflared_dir }}/{{ _yaml.name }}.json"
+      ingress: "{{ _yaml.ingress }}"
+      tunnel: "{{ _yaml.id }}"
   when:
-    - _tunnel.ingress is defined
-    - _tunnel.ingress | length > 0
-    - _tunnel.id is defined
-    - _tunnel.name is defined
+    - _yaml.ingress is defined
+    - _yaml.id is defined
+    - _yaml.name is defined
 
 - name: Ensure cloudflared tunnel json configurations are managed
   tags:
     - cloudflared
   become: true
   ansible.builtin.template:
-    dest: "{{ cloudflared_dir }}/{{ _tunnel.name }}.json"
+    dest: "{{ cloudflared_dir }}/{{ _json.name }}.json"
     group: "{{ cloudflared_group }}"
     mode: '0600'
     owner: "{{ cloudflared_user }}"
     src: cloudflared.json.j2
   loop: "{{ cloudflared_tunnels }}"
   loop_control:
-    label: "{{ _tunnel.name | d(none) }}"
-    loop_var: _tunnel
+    label: "{{ _json.name | d(none) }}"
+    loop_var: _json
   vars:
     __cloudflared_json:
-      AccountTag: "{{ _tunnel.account_tag }}"
-      TunnelID: "{{ _tunnel.id }}"
-      TunnelName: "{{ _tunnel.name }}"
-      TunnelSecret: "{{ _tunnel.secret }}"
+      AccountTag: "{{ _json.account_tag }}"
+      TunnelID: "{{ _json.id }}"
+      TunnelName: "{{ _json.name }}"
+      TunnelSecret: "{{ _json.secret }}"
   when:
-    - _tunnel.account_tag is defined
-    - _tunnel.id is defined
-    - _tunnel.name is defined
-    - _tunnel.name is defined
-    - _tunnel.secret is defined
+    - _json.account_tag is defined
+    - _json.id is defined
+    - _json.name is defined
+    - _json.secret is defined
 
 - name: Ensure cloudflared tunnels are started and enabled on boot
   tags:
