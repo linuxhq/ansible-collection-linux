@@ -1,5 +1,15 @@
 ---
 - name: Verify
   hosts: all
-  tasks: []
+  roles:
+    - device_info
+
+  post_tasks:
+    - name: Ensure device info information is displayed
+      tags:
+        - device_info
+      ansible.builtin.debug:
+        msg: |
+          {{ _device_info_dict | to_nice_yaml }}
+          {{ _device_info_list | to_nice_yaml }}
 ...
