@@ -2,11 +2,11 @@
 - name: Converge
   hosts: all
   roles:
-    - role: linuxhq.linux.cronie
+    - role: cronie
       cronie_allow:
-        - tkimball
+        - vagrant
       cronie_deny:
-        - linuxhq
+        - vagrant
       cronie_jobs:
         - cron_file: ansible
           jobs:

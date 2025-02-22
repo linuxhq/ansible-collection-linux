@@ -17,7 +17,6 @@
   ansible.builtin.dnf:
     name: "{{ git_packages }}"
     state: present
-    update_cache: true
   when:
     - ansible_os_family == 'RedHat'
 
