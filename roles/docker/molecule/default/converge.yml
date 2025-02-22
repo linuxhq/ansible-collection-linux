@@ -2,7 +2,14 @@
 - name: Converge
   hosts: all
   roles:
-    - role: linuxhq.linux.docker
+    - docker
+
+    - role: docker
+      docker_daemon:
+        experimental: false
+        ipv6: false
+        ip6tables: false
+        live-restore: true
       docker_users:
-        - linuxhq
+        - vagrant
 ...

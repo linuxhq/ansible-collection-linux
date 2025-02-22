@@ -14,15 +14,9 @@ None
     docker_packages:
       - containerd.io
       - docker-ce
-    docker_repository_stable: true
-    docker_repository_stable_debuginfo: false
-    docker_repository_stable_source: false
-    docker_repository_test: false
-    docker_repository_test_debuginfo: false
-    docker_repository_test_source: false
-    docker_repository_nightly: false
-    docker_repository_nightly_debuginfo: false
-    docker_repository_nightly_source: false
+    docker_repositories:
+      - name: docker-ce-stable
+        state: enabled
     docker_systemd:
       - containerd.service
       - docker.service
@@ -38,7 +32,7 @@ None
       roles:
         - role: linuxhq.linux.docker
           docker_users:
-            - linuxhq
+            - vagrant
 
 ## License
 

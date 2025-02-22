@@ -3,13 +3,31 @@
   hosts: all
   tasks:
     - name: Ensure docker group information is gathered
+      tags:
+        - docker
       ansible.builtin.getent:
         database: group
         fail_key: false
         key: docker
 
-    - name: Ensure docker group is in expected state
+    - name: Ensure docker group information is verified
+      tags:
+        - docker
       ansible.builtin.assert:
         that:
-          - "'linuxhq' in getent_group.docker"
+          - "'vagrant' in getent_group.docker"
+
+    - name: Ensure docker service information is gathered
+      tags:
+        - docker
+      ansible.builtin.service_facts:
+
+    - name: Ensure docker service information is verified
+      tags:
+        - docker
+      ansible.builtin.assert:
+        that:
+          - services['docker.service'] is defined
+          - services['docker.service'].state  == 'running'
+          - services['docker.service'].status == 'enabled'
 ...
