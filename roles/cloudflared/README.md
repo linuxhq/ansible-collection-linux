@@ -15,8 +15,6 @@ None
     cloudflared_group: root
     cloudflared_packages:
       - cloudflared
-    cloudflared_repository_stable: true
-    cloudflared_rpm_key: https://pkg.cloudflare.com/cloudflare-ascii-pubkey.gpg
     cloudflared_tunnels: []
     cloudflared_user: root
 
@@ -29,7 +27,6 @@ None
     - hosts: server
       roles:
         - role: linuxhq.linux.cloudflared
-          cloudflared_command: tunnel run -p http2
           cloudflared_tunnels:
             - name: linuxhq.net
               account_tag: 68b329da9893e34099c7d8ad5cb9c940
@@ -39,6 +36,15 @@ None
                   service: ssh://localhost:22
                 - service: http_status:404
               secret: bUZVQVZ0UnNBcWtUUGV4M0N2WHpMUHpleVdxZ3RWZlQ3VldqeHFoN0plUHdqTkpGSnR0N1hxZm5IM0E3RXZDeg==
+
+            - name: linuxhq.org
+              account_tag: 68b329da9893e34099c7d8ad5cb9c940
+              id: dd261e95-29a7-4653-93f4-3222b852cd8b
+              ingress:
+                - hostname: linuxhq.net
+                  service: ssh://localhost:22
+                - service: http_status:404
+              secret: zUZVQVX0UnNBcWtURGV4M0N2WHpMUHpleVdxZ3RWZlC3VldqeHFoN0plUHdqTkpGSnRaN1hxZm5IM0E3RXZDegF2
 
 ## License
 

@@ -1,5 +1,21 @@
 ---
 - name: Verify
   hosts: all
-  tasks: []
+  tasks:
+    - name: Ensure cloudflared service info is gathered
+      tags:
+        - cloudflared
+      ansible.builtin.service_facts:
+
+    - name: Ensure cloudflared service info is verified
+      tags:
+        - cloudflared
+      ansible.builtin.assert:
+        that:
+          - services['cloudflared@linuxhq.net.service'] is defined
+          - services['cloudflared@linuxhq.net.service'].state  == 'running'
+          - services['cloudflared@linuxhq.net.service'].status == 'enabled'
+          - services['cloudflared@linuxhq.org.service'] is defined
+          - services['cloudflared@linuxhq.org.service'].state  == 'running'
+          - services['cloudflared@linuxhq.org.service'].status == 'enabled'
 ...
