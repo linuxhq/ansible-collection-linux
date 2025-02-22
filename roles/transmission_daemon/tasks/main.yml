@@ -27,7 +27,7 @@
   ansible.builtin.include_vars:
     file: "{{ ansible_os_family }}.yml"
 
-- name: Esnure transmission-daemon configuration directories are present
+- name: Ensure transmission-daemon configuration directories are present
   tags:
     - transmission_daemon
   become: true
@@ -47,7 +47,7 @@
   when:
     - ansible_os_family == 'RedHat'
 
-- name: Esnure transmission-daemon download directories are present
+- name: Ensure transmission-daemon download directories are present
   tags:
     - transmission_daemon
   become: true

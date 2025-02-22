@@ -1,5 +1,5 @@
 ---
-- name: Ensure dnf versionlock package is installed
+- name: Ensure dnf versionlock package is present
   tags:
     - dnf_versionlock
   become: true
@@ -7,7 +7,7 @@
     name: python3-dnf-plugin-versionlock
     state: present
 
-- name: Esnure dnf versionlock config template is present
+- name: Ensure dnf versionlock configuration is managed
   tags:
     - dnf_versionlock
   become: true
@@ -18,7 +18,7 @@
     owner: root
     src: versionlock.conf.j2
 
-- name: Ensure dnf versionlock locklist template is present
+- name: Ensure dnf versionlock locklist is managed
   tags:
     - dnf_versionlock
   become: true
@@ -28,6 +28,4 @@
     mode: '0644'
     owner: root
     src: versionlock.list.j2
-  when:
-    - dnf_versionlock_packages | length > 0
 ...
