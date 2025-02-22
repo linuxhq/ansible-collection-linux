@@ -1,0 +1,40 @@
+---
+dependency:
+  name: galaxy
+  options:
+    requirements-file: ../../requirements.yml
+
+driver:
+  name: vagrant
+
+platforms:
+  - name: almalinux9
+    box: bento/almalinux-9
+
+  - name: debian12
+    box: bento/debian-12
+
+provisioner:
+  name: ansible
+  log: true
+  options:
+    diff: true
+  inventory:
+    host_vars:
+      almalinux9:
+        package_list:
+          - name: httpd
+          - name: tuned
+            state: absent
+      debian12:
+        package_apt_update_cache: true
+        package_list:
+          - name: apache2
+          - name: tuned
+            state: absent
+
+verifier:
+  name: ansible
+  options:
+    diff: true
+...
