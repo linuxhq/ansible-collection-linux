@@ -1,21 +1,23 @@
 ---
-- name: Ensure cloudflared package repository is present
+- name: Ensure cloudflared repository file is present
   tags:
     - cloudflared
   become: true
-  ansible.builtin.template:
-    dest: /etc/yum.repos.d/cloudflared-ascii.repo
-    group: root
-    mode: '0644'
-    owner: root
-    src: cloudflared-ascii.repo.j2
+  ansible.builtin.yum_repository:
+    baseurl: https://pkg.cloudflare.com/cloudflared/rpm
+    description: cloudflared-stable
+    enabled: true
+    gpgcheck: true
+    gpgkey: https://pkg.cloudflare.com/cloudflare-ascii-pubkey.gpg
+    file: cloudflared
+    name: cloudflared-stable
 
-- name: Ensure cloudflared rpm key is present
+- name: Ensure cloudflared repository key is present
   tags:
     - cloudflared
   become: true
   ansible.builtin.rpm_key:
-    key: "{{ cloudflared_rpm_key }}"
+    key: https://pkg.cloudflare.com/cloudflare-ascii-pubkey.gpg
     state: present
     validate_certs: true
 
@@ -23,7 +25,7 @@
   tags:
     - cloudflared
   become: true
-  ansible.builtin.package:
+  ansible.builtin.dnf:
     name: "{{ cloudflared_packages }}"
     state: present
 
@@ -38,14 +40,14 @@
     owner: root
     src: cloudflared.systemd.j2
 
-- name: Ensure systemd is reloaded
+- name: Ensure cloudflare systemd unit is reloaded
   tags:
     - cloudflared
   become: true
   ansible.builtin.systemd_service:
     daemon_reload: true
 
-- name: Ensure cloudflared configuration directory is present
+- name: Ensure cloudflared tunnel directory is present
   tags:
     - cloudflared
   become: true
@@ -56,7 +58,7 @@
     path: "{{ cloudflared_dir }}"
     state: directory
 
-- name: Ensure cloudflared tunnel yml configurations are present
+- name: Ensure cloudflared tunnel yaml configurations are managed
   tags:
     - cloudflared
   become: true
@@ -68,7 +70,7 @@
     src: cloudflared.yml.j2
   loop: "{{ cloudflared_tunnels }}"
   loop_control:
-    label: "{{ _tunnel.name }}"
+    label: "{{ _tunnel.name | d(none) }}"
     loop_var: _tunnel
   when:
     - _tunnel.ingress is defined
@@ -76,7 +78,7 @@
     - _tunnel.id is defined
     - _tunnel.name is defined
 
-- name: Ensure cloudflared tunnel json configurations are present
+- name: Ensure cloudflared tunnel json configurations are managed
   tags:
     - cloudflared
   become: true
@@ -88,10 +90,10 @@
     src: cloudflared.json.j2
   loop: "{{ cloudflared_tunnels }}"
   loop_control:
-    label: "{{ _tunnel.name }}"
+    label: "{{ _tunnel.name | d(none) }}"
     loop_var: _tunnel
   vars:
-    _json:
+    __cloudflared_json:
       AccountTag: "{{ _tunnel.account_tag }}"
       TunnelID: "{{ _tunnel.id }}"
       TunnelName: "{{ _tunnel.name }}"
@@ -111,11 +113,12 @@
     enabled: true
     name: "cloudflared@{{ _service }}.service"
     state: started
-  loop: "{{ cloudflared_tunnels |
-            map(attribute='name') |
-            list |
-            default([], true) }}"
+  loop:
+    "{{ cloudflared_tunnels |
+        map(attribute='name') |
+        list |
+        default([], true) }}"
   loop_control:
-    label: "{{ _service }}"
+    label: "{{ _service | d(none) }}"
     loop_var: _service
 ...
