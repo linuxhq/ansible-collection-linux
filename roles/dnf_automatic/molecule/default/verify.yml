@@ -3,14 +3,25 @@
   hosts: all
   tasks:
     - name: Ensure service facts are gathered
+      tags:
+        - dnf_automatic
       ansible.builtin.service_facts:
-      register: _service_facts
 
     - name: Ensure service is present in service facts
+      tags:
+        - dnf_automatic
       ansible.builtin.assert:
         that:
           - services['dnf-automatic-download.service'] is defined
+          - services['dnf-automatic-download.service'].state  == 'inactive'
+          - services['dnf-automatic-download.service'].status == 'static'
           - services['dnf-automatic-install.service'] is defined
+          - services['dnf-automatic-install.service'].state  == 'stopped'
+          - services['dnf-automatic-install.service'].status == 'static'
           - services['dnf-automatic-notifyonly.service'] is defined
+          - services['dnf-automatic-notifyonly.service'].state  == 'inactive'
+          - services['dnf-automatic-notifyonly.service'].status == 'static'
           - services['dnf-automatic.service'] is defined
+          - services['dnf-automatic.service'].state  == 'inactive'
+          - services['dnf-automatic.service'].status == 'static'
 ...

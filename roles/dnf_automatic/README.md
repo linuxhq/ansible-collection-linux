@@ -31,7 +31,7 @@ None
     dnf_automatic_email_email_port: 25
     dnf_automatic_email_email_to: root
     dnf_automatic_emitters_emit_via: stdio
-    dnf_automatic_emitters_system_name: "{{ inventory_hostname }}"
+    dnf_automatic_emitters_system_name: localhost
     dnf_automatic_timer: dnf-automatic-notifyonly.timer
     dnf_automatic_timer_on_calendar: '*-*-* 6:00'
     dnf_automatic_timer_persistent: true

@@ -2,7 +2,7 @@
 - name: Converge
   hosts: all
   roles:
-    - role: linuxhq.linux.dnf_versionlock
+    - role: dnf_versionlock
       dnf_versionlock_packages:
         - name: docker-ce
           version: '3:25.0.5-1.el9.*'
