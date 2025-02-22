@@ -1,5 +1,5 @@
 ---
-- name: Ensure package lists are generated
+- name: Ensure package lists are generated  # noqa: jinja[invalid]
   tags:
     - package
   ansible.builtin.set_fact:
