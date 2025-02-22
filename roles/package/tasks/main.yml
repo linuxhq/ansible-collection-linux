@@ -1,0 +1,108 @@
+---
+- name: Ensure package lists are generated
+  tags:
+    - package
+  ansible.builtin.set_fact:
+    __package_list_present:
+      "{{ (__package_list |
+          selectattr('state', 'equalto', 'present') |
+          map(attribute='name')) |
+          d([]) }}"
+    __package_list_absent:
+      "{{ (__package_list |
+          selectattr('state', 'equalto', 'absent') |
+          map(attribute='name')) |
+          d([]) }}"
+  vars:
+    __package_list:
+      "{{ (package_list |
+          json_query('[].{
+            name: name
+            state: state || `present`
+          }')) |
+          d([]) }}"
+
+- name: Ensure packages are present
+  tags:
+    - package
+  become: true
+  ansible.builtin.apt:
+    allow_change_held_packages: "{{ package_apt_allow_change_held_packages }}"
+    allow_downgrade: "{{ package_apt_allow_downgrade }}"
+    allow_unauthenticated: "{{ package_apt_allow_unauthenticated }}"
+    autoclean: "{{ package_apt_autoclean }}"
+    clean: "{{ package_apt_clean }}"
+    dpkg_options: "{{ package_apt_dpkg_options | join(',') }}"
+    force: "{{ package_apt_force }}"
+    force_apt_get: "{{ package_apt_force_apt_get }}"
+    lock_timeout: "{{ package_apt_lock_timeout }}"
+    only_upgrade: "{{ package_apt_only_upgrade }}"
+    name: "{{ __package_list_present }}"
+    state: present
+    update_cache: "{{ package_apt_update_cache }}"
+    update_cache_retries: "{{ package_apt_update_cache_retries }}"
+    update_cache_retry_max_delay: "{{ package_apt_update_cache_retry_max_delay }}"
+  when:
+    - __package_list_present | length > 0
+    - ansible_os_family == 'Debian'
+
+- name: Ensure packages are present
+  tags:
+    - package
+  become: true
+  ansible.builtin.dnf:
+    allow_downgrade: "{{ package_dnf_allow_downgrade }}"
+    allowerasing: "{{ package_dnf_allowerasing }}"
+    cacheonly: "{{ package_dnf_cacheonly }}"
+    disable_gpg_check: "{{ package_dnf_disable_gpg_check }}"
+    disable_plugin: "{{ package_dnf_disable_plugin }}"
+    disablerepo: "{{ package_dnf_disablerepo }}"
+    enable_plugin: "{{ package_dnf_enable_plugin }}"
+    enablerepo: "{{ package_dnf_enablerepo }}"
+    exclude: "{{ package_dnf_exclude }}"
+    install_weak_deps: "{{ package_dnf_install_weak_deps }}"
+    installroot: "{{ package_dnf_installroot }}"
+    lock_timeout: "{{ package_dnf_lock_timeout }}"
+    name: "{{ __package_list_present }}"
+    skip_broken: "{{ package_dnf_skip_broken }}"
+    sslverify: "{{ package_dnf_sslverify }}"
+    state: present
+    update_cache: "{{ package_dnf_update_cache }}"
+    use_backend: "{{ package_dnf_use_backend }}"
+    validate_certs: "{{ package_dnf_validate_certs }}"
+  when:
+    - __package_list_present | length > 0
+    - ansible_os_family == 'RedHat'
+
+- name: Ensure packages are absent
+  tags:
+    - package
+  become: true
+  ansible.builtin.apt:
+    autoremove: "{{ package_apt_autoremove }}"
+    dpkg_options: "{{ package_apt_dpkg_options | join(',') }}"
+    fail_on_autoremove: "{{ package_apt_fail_on_autoremove }}"
+    force_apt_get: "{{ package_apt_force_apt_get }}"
+    lock_timeout: "{{ package_apt_lock_timeout }}"
+    name: "{{ __package_list_absent }}"
+    purge: "{{ package_apt_purge }}"
+    state: absent
+  when:
+    - __package_list_absent | length > 0
+    - ansible_os_family == 'Debian'
+
+- name: Ensure packages are absent
+  tags:
+    - package
+  become: true
+  ansible.builtin.dnf:
+    autoremove: "{{ package_dnf_autoremove }}"
+    lock_timeout: "{{ package_dnf_lock_timeout }}"
+    name: "{{ __package_list_absent }}"
+    state: absent
+    use_backend: "{{ package_dnf_use_backend }}"
+    validate_certs: "{{ package_dnf_validate_certs }}"
+  when:
+    - __package_list_absent | length > 0
+    - ansible_os_family == 'RedHat'
+...

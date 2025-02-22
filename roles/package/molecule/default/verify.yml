@@ -1,0 +1,32 @@
+---
+- name: Verify
+  hosts: all
+  tasks:
+    - name: Ensure package list is gathered
+      tags:
+        - package
+      ansible.builtin.package_facts:
+        manager: auto
+        strategy: first
+
+    - name: Ensure package list is verified
+      tags:
+        - package
+      ansible.builtin.assert:
+        that:
+          - '"apache2" in packages.keys()'
+          - '"tuned" not in packages.keys()'
+      when:
+        - ansible_os_family == 'Debian'
+
+    - name: Ensure package list is verified
+      tags:
+        - package
+      ansible.builtin.assert:
+        that:
+        that:
+          - '"httpd" in packages.keys()'
+          - '"tuned" not in packages.keys()'
+      when:
+        - ansible_os_family == 'RedHat'
+...
