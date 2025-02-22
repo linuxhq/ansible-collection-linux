@@ -10,18 +10,17 @@ None
 
 ## Role Variables
 
-    dnf_absent: []
-    dnf_best: true
-    dnf_clean_requirements_on_remove: true
-    dnf_disablerepo: []
-    dnf_enablerepo: []
-    dnf_gpgcheck: true
-    dnf_installonly_limit: 3
-    dnf_present: []
-    dnf_protected_d: []
-    dnf_skip_if_unavailable: false
-    dnf_update: false
-    dnf_update_cache: false
+    dnf_conf:
+      main:
+        best: true
+        clean_requirements_on_remove: true
+        gpgcheck: true
+        installonly_limit: 3
+        skip_if_unavailable: false
+    dnf_protected_d:
+      - name: dnf
+        packages:
+          - dnf
 
 ## Dependencies
 
@@ -32,8 +31,6 @@ None
     - hosts: server
       roles:
         - role: linuxhq.linux.dnf
-          dnf_present:
-            - python-virtualenv
           dnf_protected_d:
             - name: shim
               packages:
@@ -41,7 +38,6 @@ None
                 - shim-arm
                 - shim-ia32
                 - shim-x64
-          dnf_update: true
 
 ## License
 
