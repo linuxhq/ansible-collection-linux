@@ -24,7 +24,6 @@
         - package
       ansible.builtin.assert:
         that:
-        that:
           - '"httpd" in packages.keys()'
           - '"tuned" not in packages.keys()'
       when:
