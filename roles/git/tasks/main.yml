@@ -51,13 +51,13 @@
     version: "{{ _repository.version | d('HEAD') }}"
   loop: "{{ git_repositories }}"
   loop_control:
-    label: "{{ _repository.repo.split('/')[-1]  | d(none) }}"
+    label: "{{ _repository.repo.split('/')[-1] | d(none) }}"
     loop_var: _repository
   when:
     - _repository.dest is defined
     - _repository.repo is defined
     - _repository.become is defined
-    - _repository.become | bool == true
+    - _repository.become | bool
 
 - name: Ensure git repositories are present
   tags:
@@ -89,11 +89,11 @@
     version: "{{ _repository.version | d('HEAD') }}"
   loop: "{{ git_repositories }}"
   loop_control:
-    label: "{{ _repository.repo.split('/')[-1]  | d(none) }}"
+    label: "{{ _repository.repo.split('/')[-1] | d(none) }}"
     loop_var: _repository
   when:
     - _repository.dest is defined
     - _repository.repo is defined
     - _repository.become is not defined or
-      _repository.become | bool == false
+      not _repository.become | bool
 ...
