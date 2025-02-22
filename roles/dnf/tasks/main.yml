@@ -1,5 +1,5 @@
 ---
-- name: Ensure dnf configuration is present
+- name: Ensure dnf configuration is managed
   tags:
     - dnf
   become: true
@@ -10,7 +10,7 @@
     owner: root
     src: dnf.conf.j2
 
-- name: Ensure dnf protected.d templates are present
+- name: Ensure dnf protected.d configurations are managed
   tags:
     - dnf
   become: true
@@ -22,55 +22,10 @@
     src: protected_d.conf.j2
   loop: "{{ dnf_protected_d }}"
   loop_control:
-    label: "{{ _protected.name | default(none) }}"
+    label: "{{ _protected.name | d(none) }}"
     loop_var: _protected
   when:
     - _protected.name
     - _protected.packages is defined
     - _protected.packages | length > 0
-
-- name: Ensure dnf packages are present
-  tags:
-    - dnf
-  become: true
-  ansible.builtin.dnf:
-    disablerepo: "{{ dnf_disablerepo | join(',') }}"
-    enablerepo: "{{ dnf_disablerepo | join(',') }}"
-    name: "{{ _present }}"
-    state: present
-    update_cache: "{{ dnf_update_cache }}"
-    validate_certs: true
-  loop: "{{ dnf_present }}"
-  loop_control:
-    label: "{{ _present }}"
-    loop_var: _present
-
-- name: Ensure dnf packages are absent
-  tags:
-    - dnf
-  become: true
-  ansible.builtin.dnf:
-    disablerepo: "{{ dnf_disablerepo | join(',') }}"
-    enablerepo: "{{ dnf_disablerepo | join(',') }}"
-    name: "{{ _absent }}"
-    state: absent
-    validate_certs: true
-  loop: "{{ dnf_absent }}"
-  loop_control:
-    label: "{{ _absent }}"
-    loop_var: _absent
-
-- name: Ensure dnf packages are latest  # noqa: package-latest
-  tags:
-    - dnf
-  become: true
-  ansible.builtin.dnf:
-    disablerepo: "{{ dnf_disablerepo | join(',') }}"
-    enablerepo: "{{ dnf_disablerepo | join(',') }}"
-    name: '*'
-    state: latest
-    update_cache: "{{ dnf_update_cache }}"
-    validate_certs: true
-  when:
-    - dnf_update | bool
 ...

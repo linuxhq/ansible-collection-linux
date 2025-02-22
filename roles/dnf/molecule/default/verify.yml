@@ -2,15 +2,17 @@
 - name: Verify
   hosts: all
   tasks:
-    - name: Ensure package facts are gathered
-      ansible.builtin.package_facts:
-        manager: auto
-        strategy: first
-      register: _package_facts
+    - name: Ensure stat of protected files is gathered
+      tags:
+        - dnf
+      ansible.builtin.stat:
+        path: /etc/dnf/protected.d/shim.conf
+      register: __dnf_stat
 
-    - name: Ensure packages are in correct state
+    - name: Ensure stat of protected files is verified
+      tags:
+        - dnf
       ansible.builtin.assert:
         that:
-          - "'python3-six' not in ansible_facts.packages"
-          - "'python3-pysocks' in ansible_facts.packages"
+          - __dnf_stat.stat.exists | bool
 ...
