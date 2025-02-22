@@ -1,5 +1,5 @@
 ---
-- name: Ensure dnf-automatic package is installed
+- name: Ensure dnf-automatic package is present
   tags:
     - dnf_automatic
   become: true
@@ -7,7 +7,7 @@
     name: dnf-automatic
     state: present
 
-- name: Ensure dnf-automatic template is present
+- name: Ensure dnf-automatic configuration is managed
   tags:
     - dnf_automatic
   become: true
@@ -18,7 +18,7 @@
     owner: root
     src: automatic.conf.j2
 
-- name: Ensure dnf-automatic timer templates are present
+- name: Ensure dnf-automatic timer configurations are managed
   tags:
     - dnf_automatic
   become: true
@@ -28,7 +28,8 @@
     mode: '0644'
     owner: root
     src: "{{ _timer }}.j2"
-  notify: Reload systemd
+  notify:
+    - Reload systemd
   loop:
     - dnf-automatic.timer
     - dnf-automatic-download.timer
@@ -43,9 +44,13 @@
     - dnf_automatic
   become: true
   ansible.builtin.service:
-    enabled: "{{ _enabled }}"
     name: "{{ _timer }}"
-    state: "{{ 'started' if _enabled | bool else 'stopped' }}"
+    enabled:
+      "{{ (_timer == dnf_automatic_timer) |
+          ternary(true, false) }}"
+    state:
+      "{{ (_timer == dnf_automatic_timer) |
+          ternary('started', 'stopped') }}"
   loop:
     - dnf-automatic.timer
     - dnf-automatic-download.timer
@@ -54,6 +59,4 @@
   loop_control:
     label: "{{ _timer }}"
     loop_var: _timer
-  vars:
-    _enabled: "{{ true if _timer == dnf_automatic_timer else false }}"
 ...
