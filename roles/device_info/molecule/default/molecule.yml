@@ -10,9 +10,13 @@ driver:
 platforms:
   - name: almalinux9
     box: bento/almalinux-9
+    instance_raw_config_args:
+      - 'vm.disk :disk, name: "parted", size: "5GB"'
 
   - name: debian12
     box: bento/debian-12
+    instance_raw_config_args:
+      - 'vm.disk :disk, name: "parted", size: "5GB"'
 
 provisioner:
   name: ansible
