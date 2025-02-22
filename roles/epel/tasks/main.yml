@@ -6,7 +6,6 @@
   ansible.builtin.dnf:
     name: epel-release
     state: present
-    update_cache: true
 
 - name: Ensure epel repository dependencies are enabled
   tags:
@@ -58,5 +57,4 @@
   ansible.builtin.dnf:
     name: "{{ epel_packages }}"
     state: present
-    update_cache: true
 ...

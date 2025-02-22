@@ -6,50 +6,62 @@
   ansible.builtin.dnf:
     name: cronie
     state: present
-    update_cache: true
 
-- name: Ensure cronie templates are present
+- name: Ensure cronie allow configuration is managed
   tags:
     - cronie
   become: true
   ansible.builtin.template:
-    dest: "{{ _template.dest }}"
-    group: root
-    mode: "{{ _template.mode }}"
-    owner: root
-    src: "{{ _template.src }}"
-  notify: Restart crond
-  loop:
-    - { src: cron.allow.j2, dest: /etc/cron.allow, mode: '0600' }
-    - { src: cron.deny.j2, dest: /etc/cron.deny, mode: '0600' }
-    - { src: cron.sysconfig.j2, dest: /etc/sysconfig/crond, mode: '0644' }
-  loop_control:
-    label: "{{ _template.dest }}"
-    loop_var: _template
+    dest: /etc/cron.allow
+    mode: '0600'
+    src: cron.allow.j2
 
-- name: Ensure cronie jobs are present
+- name: Ensure cronie deny configuration is managed
+  tags:
+    - cronie
+  become: true
+  ansible.builtin.template:
+    dest: /etc/cron.deny
+    mode: '0600'
+    src: cron.deny.j2
+
+- name: Ensure cronie sysconfig configuration is managed
+  tags:
+    - cronie
+  become: true
+  ansible.builtin.template:
+    dest: /etc/sysconfig/crond
+    mode: '0644'
+    src: cron.sysconfig.j2
+
+- name: Ensure cronie jobs are managed
   tags:
     - cronie
   become: true
   ansible.builtin.cron:
-    backup: "{{ _cron.0.backup | default(false) }}"
-    cron_file: "{{ _cron.0.cron_file | default(omit) }}"
-    day: "{{ _cron.1.day | default('*') }}"
-    hour: "{{ _cron.1.hour | default('*') }}"
-    insertafter: "{{ _cron.1.insertafter | default(omit) }}"
-    insertbefore: "{{ _cron.1.insertbefore | default(omit) }}"
+    backup: "{{ _cron.0.backup | d(false) }}"
+    cron_file: "{{ _cron.0.cron_file | d(omit) }}"
+    day: "{{ _cron.1.day | d('*') }}"
+    hour: "{{ _cron.1.hour | d('*') }}"
+    insertafter: "{{ _cron.1.insertafter | d(omit) }}"
+    insertbefore: "{{ _cron.1.insertbefore | d(omit) }}"
     job: "{{ _cron.1.job }}"
-    minute: "{{ _cron.1.minute | default('*') }}"
-    month: "{{ _cron.1.month | default('*') }}"
+    minute: "{{ _cron.1.minute | d('*') }}"
+    month: "{{ _cron.1.month | d('*') }}"
     name: "{{ _cron.1.name }}"
-    special_time: "{{ _cron.1.special_time | default(omit) }}"
+    special_time: "{{ _cron.1.special_time | d(omit) }}"
     state: present
     user: "{{ _cron.1.user }}"
-    weekday: "{{ _cron.1.weekday | default('*') }}"
-  notify: Restart crond
-  loop: "{{ q('ansible.builtin.subelements', cronie_jobs, 'jobs', {'skip_missing': true}) }}"
+    weekday: "{{ _cron.1.weekday | d('*') }}"
+  notify:
+    - Restart crond
+  loop:
+    "{{ q('ansible.builtin.subelements',
+          cronie_jobs,
+          'jobs',
+          {'skip_missing': true}) }}"
   loop_control:
-    label: "{{ _cron.0.cron_file | default(omit) }}"
+    label: "{{ _cron.0.cron_file | d(omit) }}"
     loop_var: _cron
   when:
     - _cron.0.cron_file is defined

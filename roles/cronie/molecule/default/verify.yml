@@ -2,13 +2,17 @@
 - name: Verify
   hosts: all
   tasks:
-    - name: Ensure stat information is gathered
+    - name: Ensure cronie job result information is gathered
+      tags:
+        - cronie
       ansible.builtin.stat:
         path: /tmp/cronie
-      register: _stat
+      register: __cronie_stat
 
-    - name: Ensure file is present
+    - name: Ensure cronie job result is verified
+      tags:
+        - cronie
       ansible.builtin.assert:
         that:
-          - _stat.stat.exists | bool
+          - __cronie_stat.stat.exists | bool
 ...

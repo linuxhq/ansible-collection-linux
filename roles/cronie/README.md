@@ -25,9 +25,9 @@ None
       roles:
         - role: linuxhq.linux.cronie
           cronie_allow:
-            - tkimball
+            - vagrant
           cronie_deny:
-            - linuxhq
+            - vagrant
           cronie_jobs:
             - cron_file: ansible
               jobs:

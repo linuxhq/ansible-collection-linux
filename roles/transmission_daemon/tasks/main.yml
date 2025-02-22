@@ -18,7 +18,6 @@
     enablerepo: epel
     name: transmission-daemon
     state: present
-    update_cache: true
   when:
     - ansible_os_family == 'RedHat'
 
