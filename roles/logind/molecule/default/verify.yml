@@ -6,7 +6,6 @@
       tags:
         - logind
       ansible.builtin.service_facts:
-      register: _service_facts
 
     - name: Ensure service is present in service facts
       tags:

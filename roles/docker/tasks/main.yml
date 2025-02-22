@@ -10,16 +10,28 @@
     owner: root
     src: docker-ce.repo.j2
 
+- name: Ensure docker repositories are managed
+  tags:
+    - docker
+  become: true
+  community.general.dnf_config_manager:
+    name: "{{ _docker.name }}"
+    state: "{{ _docker.state }}"
+  loop: "{{ docker_repositories }}"
+  loop_control:
+    label: "{{ _docker.name | d(none) }}"
+    loop_var: _docker
+  when:
+    - _docker.name is defined
+    - _docker.state is defined
+
 - name: Ensure docker packages are present
   tags:
     - docker
   become: true
   ansible.builtin.dnf:
-    enablerepo: docker-ce-stable
     name: "{{ docker_packages }}"
     state: present
-  when:
-    - docker_packages | length > 0
 
 - name: Ensure users are appended to docker group
   tags:
@@ -34,10 +46,8 @@
   loop_control:
     label: "{{ docker_user }}"
     loop_var: docker_user
-  when:
-    - docker_users | length > 0
 
-- name: Ensure docker daemon template is present
+- name: Ensure docker daemon configuration is managed
   tags:
     - docker
   become: true
@@ -47,7 +57,8 @@
     mode: '0640'
     owner: root
     src: daemon.json.j2
-  notify: Reload docker
+  notify:
+    - Reload docker
   when:
     - docker_daemon | length > 0
 
@@ -61,8 +72,6 @@
     state: started
   loop: "{{ docker_systemd }}"
   loop_control:
-    label: "{{ _service | default(none) }}"
+    label: "{{ _service | d(none) }}"
     loop_var: _service
-  when:
-    - docker_systemd | length > 0
 ...
