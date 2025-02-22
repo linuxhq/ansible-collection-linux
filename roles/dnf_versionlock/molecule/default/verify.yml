@@ -1,5 +1,21 @@
 ---
 - name: Verify
   hosts: all
-  tasks: []
+  tasks:
+    - name: Ensure dnf versionlock locklist is gathered
+      tags:
+        - dnf_versionlock
+      ansible.builtin.slurp:
+        src: /etc/dnf/plugins/versionlock.list
+      register: __dnf_versionlock_slurp
+
+    - name: Ensure dnf versionlock locklist is validated
+      tags:
+        - dnf_versionlock
+      ansible.builtin.assert:
+        that:
+          - '"docker-ce" in __dnf_versionlock_slurp.content | b64decode'
+          - '"docker-ce-cli" in __dnf_versionlock_slurp.content | b64decode'
+          - '"docker-ce-rootless-extras" in __dnf_versionlock_slurp.content | b64decode'
+          - '"containerd.io" in __dnf_versionlock_slurp.content | b64decode'
 ...

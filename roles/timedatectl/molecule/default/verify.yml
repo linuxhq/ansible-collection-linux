@@ -12,7 +12,7 @@
       register: __timedatectl_show
       changed_when: false
 
-    - name: Esnure timedatectl configuration matches
+    - name: Ensure timedatectl configuration matches
       tags:
         - timedatectl
       ansible.builtin.assert:

@@ -12,7 +12,7 @@
       register: __localectl_status
       changed_when: false
 
-    - name: Esnure localectl configuration matches
+    - name: Ensure localectl configuration matches
       tags:
         - localectl
       ansible.builtin.assert:
