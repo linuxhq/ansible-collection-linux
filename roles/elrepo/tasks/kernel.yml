@@ -1,69 +1,50 @@
 ---
-- name: Ensure old kernel devel and tools packages are absent
+- name: Ensure kernel subpackages are absent
   tags:
     - elrepo
   become: true
-  ansible.builtin.package:
+  ansible.builtin.dnf:
     name:
       - kernel-devel
       - kernel-tools
       - kernel-tools-libs
     state: absent
 
+- name: Ensure elrepo kernel repository is enabled
+  tags:
+    - elrepo
+  become: true
+  community.general.dnf_config_manager:
+    name: elrepo-kernel
+    state: enabled
+
 - name: Ensure elrepo kernel package is present
   tags:
     - elrepo
   become: true
   ansible.builtin.dnf:
-    enablerepo: elrepo-kernel
     name:
-      - kernel-headers
       - "kernel-{{ elrepo_kernel_version }}"
       - "kernel-{{ elrepo_kernel_version }}-devel"
     state: present
-  register: _kernel
 
-- name: Ensure elrepo kernel is grub default
-  tags:
-    - elrepo
-  become: true
-  ansible.builtin.command:
-    cmd: >
-      /usr/sbin/grub2-set-default 0
-  register: _grub
-  when:
-    - _kernel is changed
-    - elrepo_kernel_default | bool
-  changed_when: false
-
-- name: Ensure system is rebooted to pickup new kernel
-  tags:
-    - elrepo
-  become: true
-  ansible.builtin.reboot:
-    reboot_timeout: 600
-    test_command: >
-      uname -r
-  register: _reboot
-  when:
-    - _kernel is changed
-    - _grub is success
-    - elrepo_kernel_reboot | bool
-
-- name: Ensure old kernel core and module packages are absent
-  tags:
-    - elrepo
-  become: true
-  ansible.builtin.package:
-    name:
-      - kernel
-      - kernel-core
-      - kernel-modules
-      - kernel-modules-core
-    state: absent
-  when:
-    - _kernel is changed
-    - _grub is success
-    - _reboot is success
-    - elrepo_kernel_absent | bool
+# https://elrepo.org/bugs/view.php?id=1495
+#
+# - name: Ensure elrepo kernel family is default
+#   tags:
+#     - elrepo
+#   become: true
+#   ansible.builtin.lineinfile:
+#     line: "DEFAULTKERNEL=kernel-{{ elrepo_kernel_version }}-core"
+#     path: /etc/sysconfig/kernel
+#     regexp: '^DEFAULTKERNEL='
+#
+# - name: Ensure grub default boot index is 0
+#   tags:
+#     - elrepo
+#   become: true
+#   ansible.builtin.command:
+#     cmd: >
+#       grub2-set-default 0
+#   changed_when: false
 ...

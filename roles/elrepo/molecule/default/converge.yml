@@ -1,10 +1,25 @@
 ---
 - name: Converge
   hosts: all
+  pre_tasks:
+    # https://access.redhat.com/solutions/7101587
+    - name: Ensure openssh and openssl are upgraded
+      tags:
+        - elrepo
+      become: true
+      ansible.builtin.dnf:
+        name:
+          - openssh
+          - openssl
+        state: latest
+        update_only: true
+
   roles:
-    - role: linuxhq.linux.elrepo
+    - elrepo
+
+    - role: elrepo
       elrepo_kernel: true
-      elrepo_kernel_version: lt
+      elrepo_kernel_version: ml
       elrepo_packages:
         - kmod-a3818
 ...

@@ -11,21 +11,11 @@ None
 ## Role Variables
 
     elrepo_kernel: false
-    elrepo_kernel_absent: false
-    elrepo_kernel_default: false
-    elrepo_kernel_reboot: false
-    elrepo_kernel_version: ml
+    elrepo_kernel_version: lt
     elrepo_packages: []
-    elrepo_releasever: "{{ ansible_distribution_major_version }}"
-    elrepo_repository_elrepo: true
-    elrepo_repository_elrepo_mirrorlist: true
-    elrepo_repository_elrepo_testing: false
-    elrepo_repository_elrepo_testing_mirrorlist: true
-    elrepo_repository_elrepo_kernel: false
-    elrepo_repository_elrepo_kernel_mirrorlist: true
-    elrepo_repository_elrepo_extras: false
-    elrepo_repository_elrepo_extras_mirrorlist: true
-    elrepo_rpm_key: https://www.elrepo.org/RPM-GPG-KEY-elrepo.org
+    elrepo_repositories:
+      - name: elrepo
+        state: enabled
 
 ## Dependencies
 
@@ -37,13 +27,9 @@ None
       roles:
         - role: linuxhq.linux.elrepo
           elrepo_kernel: true
-          elrepo_kernel_absent: true
-          elrepo_kernel_default: true
-          elrepo_kernel_reboot: true
-          elrepo_kernel_version: lt
+          elrepo_kernel_version: ml
           elrepo_packages:
             - kmod-a3818
-          elrepo_repository_elrepo_kernel: true
 
 ## License
 

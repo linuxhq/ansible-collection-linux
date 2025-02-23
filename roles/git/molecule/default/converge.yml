@@ -1,6 +1,19 @@
 ---
 - name: Converge
   hosts: all
+  pre_tasks:
+    # https://access.redhat.com/solutions/7101587
+    - name: Ensure openssh and openssl are upgraded
+      tags:
+        - git
+      become: true
+      ansible.builtin.dnf:
+        name:
+          - openssh
+          - openssl
+        state: latest
+        update_only: true
+
   roles:
     - git
 
