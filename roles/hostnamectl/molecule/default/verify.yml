@@ -12,7 +12,7 @@
       register: __hostnamectl_status
       changed_when: false
 
-    - name: Ensure hostnamectl configuration matches
+    - name: Ensure hostnamectl status is verified
       tags:
         - hostnamectl
       ansible.builtin.assert:

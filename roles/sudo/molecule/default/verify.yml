@@ -2,7 +2,7 @@
 - name: Verify
   hosts: all
   tasks:
-    - name: Ensure sudo config syntax is valid
+    - name: Ensure sudo config syntax is verified
       tags:
         - sudo
       become: true

@@ -9,7 +9,7 @@
         database: group
         fail_key: false
 
-    - name: Ensure groups are in expected state
+    - name: Ensure group information is verified
       tags:
         - group
       ansible.builtin.assert:

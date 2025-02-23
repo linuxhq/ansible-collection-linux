@@ -2,7 +2,7 @@
 - name: Verify
   hosts: all
   tasks:
-    - name: Ensure file stats are gathered
+    - name: Ensure file information is gathered
       tags:
         - permission
       become: true
@@ -14,7 +14,7 @@
         label: "{{ _file.path | d(none) }}"
         loop_var: _file
 
-    - name: Ensure file perimssions are verified
+    - name: Ensure file information is verified
       tags:
         - permission
       ansible.builtin.assert:

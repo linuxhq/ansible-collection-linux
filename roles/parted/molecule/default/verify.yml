@@ -2,7 +2,7 @@
 - name: Verify
   hosts: all
   tasks:
-    - name: Ensure devices are present
+    - name: Ensure devices are verified
       tags:
         - parted
       ansible.builtin.assert:

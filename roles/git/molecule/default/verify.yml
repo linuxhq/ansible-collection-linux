@@ -15,7 +15,7 @@
         label: "{{ _path | d(none) }}"
         loop_var: _path
 
-    - name: Ensure git directory destinations exist
+    - name: Ensure git directory information is verified
       tags:
         - git
       ansible.builtin.assert:

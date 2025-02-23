@@ -2,7 +2,7 @@
 - name: Verify
   hosts: all
   pre_tasks:
-    - name: Ensure status of directories are gathered
+    - name: Ensure directory attributes are gathered
       tags:
         - directory
       ansible.builtin.stat:
@@ -17,7 +17,7 @@
         label: "{{ _directory.1 | d(none) }}"
         loop_var: _directory
 
-    - name: Ensure directory attributes exist
+    - name: Ensure directory attributes are verified
       tags:
         - directory
       ansible.builtin.assert:

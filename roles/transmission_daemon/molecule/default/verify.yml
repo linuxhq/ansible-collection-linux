@@ -2,12 +2,12 @@
 - name: Verify
   hosts: all
   tasks:
-    - name: Ensure service information is gathered
+    - name: Ensure transmission-daemon service information is gathered
       tags:
         - transmission_daemon
       ansible.builtin.service_facts:
 
-    - name: Ensure service is present in service facts
+    - name: Ensure transmission-daemon service information is verified
       tags:
         - transmission_daemon
       ansible.builtin.assert:
@@ -16,7 +16,7 @@
           - services['transmission-daemon.service'].state  == 'running'
           - services['transmission-daemon.service'].status == 'enabled'
 
-    - name: Ensure service port is accessible
+    - name: Ensure stransmission-daemon service port is accessible
       tags:
         - transmission_daemon
       ansible.builtin.wait_for:

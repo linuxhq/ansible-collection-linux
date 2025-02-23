@@ -18,7 +18,7 @@
         label: "{{ _file }}"
         loop_var: _file
 
-    - name: Ensure setup settings are validated
+    - name: Ensure setup settings are verified
       tags:
         - setup
       ansible.builtin.assert:

@@ -2,7 +2,7 @@
 - name: Verify
   hosts: all
   tasks:
-    - name: Ensure file information is gathered
+    - name: Ensure openssh-client file information is gathered
       tags:
         - openssh_client
       ansible.builtin.stat:
@@ -16,7 +16,7 @@
         label: "{{ _stat }}"
         loop_var: _stat
 
-    - name: Ensure files are present
+    - name: Ensure openssh-client file information is verified
       tags:
         - openssh_client
       ansible.builtin.assert:

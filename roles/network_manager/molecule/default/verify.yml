@@ -16,7 +16,7 @@
         label: "{{ _file | d(none) }}"
         loop_var: _file
 
-    - name: Ensure network manager connection file states are verified
+    - name: Ensure network manager connection files are verified
       tags:
         - network_manager
       ansible.builtin.assert:

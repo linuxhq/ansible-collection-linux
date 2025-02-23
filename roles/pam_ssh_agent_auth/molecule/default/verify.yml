@@ -2,7 +2,7 @@
 - name: Verify
   hosts: all
   tasks:
-    - name: Ensure key file is gathered
+    - name: Ensure key file information is gathered
       tags:
         - pam_ssh_agent_auth
       become: true
@@ -10,7 +10,7 @@
         src: /etc/security/authorized_keys
       register: __pam_ssh_agent_auth_file
 
-    - name: Ensure key is present in key file
+    - name: Ensure key file information is verified
       tags:
         - pam_ssh_agent_auth
       ansible.builtin.assert:

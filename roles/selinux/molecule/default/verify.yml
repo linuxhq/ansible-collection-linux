@@ -11,7 +11,7 @@
       register: __selinux_sestatus
       changed_when: false
 
-    - name: Ensure sestatus matches inventory
+    - name: Ensure sestatus information is verified
       tags:
         - selinux
       ansible.builtin.assert:

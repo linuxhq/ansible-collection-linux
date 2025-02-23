@@ -2,14 +2,14 @@
 - name: Verify
   hosts: all
   tasks:
-    - name: Ensure stat is executed
+    - name: Ensure rush stat information is gathered
       tags:
         - rush
       ansible.builtin.stat:
         path: /usr/sbin/rush
       register: _stat
 
-    - name: Ensure rush binary is present
+    - name: Ensure rush stat information is verified
       tags:
         - rush
       ansible.builtin.assert:

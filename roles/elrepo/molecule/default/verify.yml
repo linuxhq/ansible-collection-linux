@@ -6,7 +6,6 @@
       ansible.builtin.package_facts:
         manager: rpm
         strategy: first
-      register: _package_facts
 
     - name: Ensure packages are present in package facts
       ansible.builtin.assert:

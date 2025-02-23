@@ -2,7 +2,7 @@
 - name: Verify
   hosts: all
   tasks:
-    - name: Ensure partition is mounted correctly
+    - name: Ensure partition mount is verified
       tags:
         - mount
       ansible.builtin.assert:

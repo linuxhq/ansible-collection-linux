@@ -2,12 +2,12 @@
 - name: Verify
   hosts: all
   tasks:
-    - name: Ensure service information is gathered
+    - name: Ensure chrony service information is gathered
       tags:
         - chrony
       ansible.builtin.service_facts:
 
-    - name: Ensure service is present in service facts
+    - name: Ensure chrony service information is verified
       tags:
         - chrony
       ansible.builtin.assert:

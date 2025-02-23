@@ -2,14 +2,14 @@
 - name: Verify
   hosts: all
   tasks:
-    - name: Ensure stat is executed against log file
+    - name: Ensure nscd stat information is gathered
       tags:
         - nscd
       ansible.builtin.stat:
         path: /var/log/nscd.log
       register: __nscd_stat
 
-    - name: Ensure nscd log file exists
+    - name: Ensure nscd stat information is verified
       tags:
         - nscd
       ansible.builtin.assert:

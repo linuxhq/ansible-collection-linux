@@ -1,5 +1,18 @@
 ---
 - name: Verify
   hosts: all
-  tasks: []
+  tasks:
+    - name: Ensure kopia service information is gathered
+      tags:
+        - kopia
+      ansible.builtin.service_facts:
+
+    - name: Ensure kopia service information is verified
+      tags:
+        - kopia
+      ansible.builtin.assert:
+        that:
+          - services['kopia.service'] is defined
+          - services['kopia.service'].state  == 'running'
+          - services['kopia.service'].status == 'enabled'
 ...

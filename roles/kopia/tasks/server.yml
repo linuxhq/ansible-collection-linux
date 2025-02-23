@@ -1,5 +1,5 @@
 ---
-- name: Ensure kopia systemd templates are present
+- name: Ensure kopia systemd configuration is managed
   tags:
     - kopia
   become: true
@@ -9,9 +9,10 @@
     mode: '0644'
     owner: root
     src: kopia.systemd.j2
-  notify: Restart kopia
+  notify:
+    - Restart kopia
 
-- name: Ensure systemd is reloaded
+- name: Ensure kopia systemd is reloaded
   tags:
     - kopia
   become: true
@@ -34,7 +35,7 @@
   ansible.builtin.command:
     cmd: >
       kopia repository status
-  register: _kopia_repository_status
+  register: __kopia_repository_status
   when:
     - kopia_repository | length > 0
   changed_when: false
@@ -52,8 +53,8 @@
         {{ kopia_repository.location }}
         {{ kopia_repository.flags | join(' ') }}
   when:
-    - _kopia_repository_status is not skipped
-    - _kopia_repository_status.rc == 1
+    - __kopia_repository_status is not skipped
+    - __kopia_repository_status.rc == 1
     - kopia_repository.location is defined
     - kopia_repository.flags is defined
     - kopia_repository.flags | length > 0
@@ -67,8 +68,8 @@
     cmd: >
       kopia repository validate-provider
   when:
-    - _kopia_repository_status is not skipped
-    - _kopia_repository_status.rc == 1
+    - __kopia_repository_status is not skipped
+    - __kopia_repository_status.rc == 1
     - kopia_repository.location is defined
     - kopia_repository.flags is defined
     - kopia_repository.flags | length > 0

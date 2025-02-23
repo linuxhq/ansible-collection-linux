@@ -9,7 +9,7 @@
         database: passwd
         fail_key: false
 
-    - name: Ensure users are in expected state
+    - name: Ensure users information is verified
       tags:
         - user
       ansible.builtin.assert:
