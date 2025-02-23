@@ -1,10 +1,10 @@
 ---
-- name: Ensure elrepo repository gpg key is present
+- name: Ensure elrepo repository key is present
   tags:
     - elrepo
   become: true
   ansible.builtin.rpm_key:
-    key: "{{ elrepo_rpm_key }}"
+    key: https://www.elrepo.org/RPM-GPG-KEY-elrepo.org
     state: present
 
 - name: Ensure elrepo repository package is present
@@ -12,21 +12,34 @@
     - elrepo
   become: true
   ansible.builtin.dnf:
-    name: "https://www.elrepo.org/elrepo-release-{{ _ver }}.elrepo.noarch.rpm"
+    name: "https://www.elrepo.org/elrepo-release-{{ __elrepo_version }}.elrepo.noarch.rpm"
     state: present
   vars:
-    _ver: "{{ elrepo_releasever }}.el{{ elrepo_releasever }}"
+    __elrepo_version:
+      "{{ ansible_distribution_major_version }}.el{{ ansible_distribution_major_version }}"
 
-- name: Ensure elrepo repository templates are present
+- name: Ensure elrepo repositories are managed
   tags:
     - elrepo
   become: true
-  ansible.builtin.template:
-    dest: /etc/yum.repos.d/elrepo.repo
-    group: root
-    mode: '0644'
-    owner: root
-    src: "{{ 'elrepo.repo.' ~ elrepo_releasever ~ '.j2' }}"
+  community.general.dnf_config_manager:
+    name: "{{ _elrepo.name }}"
+    state: "{{ _elrepo.state }}"
+  loop: "{{ elrepo_repositories }}"
+  loop_control:
+    label: "{{ _elrepo.name | d(none) }}"
+    loop_var: _elrepo
+  when:
+    - _elrepo.name is defined
+    - _elrepo.state is defined
+
+- name: Ensure elrepo packages are present
+  tags:
+    - elrepo
+  become: true
+  ansible.builtin.dnf:
+    name: "{{ elrepo_packages }}"
+    state: present
 
 - name: Ensure elrepo kernel tasks are included
   tags:
@@ -38,12 +51,4 @@
     file: kernel.yml
   when:
     - elrepo_kernel | bool
-
-- name: Ensure elrepo packages are present
-  tags:
-    - elrepo
-  become: true
-  ansible.builtin.dnf:
-    name: "{{ elrepo_packages }}"
-    state: present
 ...

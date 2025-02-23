@@ -2,14 +2,18 @@
 - name: Verify
   hosts: all
   tasks:
-    - name: Ensure package facts are gathered
+    - name: Ensure elrepo package facts are gathered
+      tags:
+        - elrepo
       ansible.builtin.package_facts:
         manager: rpm
         strategy: first
 
-    - name: Ensure packages are present in package facts
+    - name: Ensure elrepo package facts are verified
+      tags:
+        - elrepo
       ansible.builtin.assert:
         that:
-          - "'kernel-lt' in ansible_facts.packages"
-          - "'kmod-a3818' in ansible_facts.packages"
+          - "'kernel-ml' in packages"
+          - "'kmod-a3818' in packages"
 ...
