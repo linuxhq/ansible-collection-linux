@@ -2,12 +2,12 @@
 - name: Verify
   hosts: all
   tasks:
-    - name: Ensure service facts are gathered
+    - name: Ensure logind service facts are gathered
       tags:
         - logind
       ansible.builtin.service_facts:
 
-    - name: Ensure service is present in service facts
+    - name: Ensure logind service facts are verified
       tags:
         - logind
       ansible.builtin.assert:

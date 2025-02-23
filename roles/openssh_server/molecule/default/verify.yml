@@ -2,12 +2,12 @@
 - name: Verify
   hosts: all
   tasks:
-    - name: Ensure service information is gathered
+    - name: Ensure openssh-server service information is gathered
       tags:
         - openssh_server
       ansible.builtin.service_facts:
 
-    - name: Ensure service is present in service facts
+    - name: Ensure openssh-server service information is verified
       tags:
         - openssh_server
       ansible.builtin.assert:
@@ -16,7 +16,7 @@
           - services['sshd.service'].state  == 'running'
           - services['sshd.service'].status == 'enabled'
 
-    - name: Ensure service port is accessible
+    - name: Ensure openssh-server service port is accessible
       tags:
         - openssh_server
       ansible.builtin.wait_for:

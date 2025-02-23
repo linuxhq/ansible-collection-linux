@@ -9,7 +9,7 @@
         src: /etc/ld.so.preload
       register: _ld_so_preload
 
-    - name: Ensure snoopy library is present
+    - name: Ensure ld.so.preload is verified
       tags:
         - snoopy
       ansible.builtin.assert:

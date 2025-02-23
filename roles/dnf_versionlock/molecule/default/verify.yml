@@ -9,7 +9,7 @@
         src: /etc/dnf/plugins/versionlock.list
       register: __dnf_versionlock_slurp
 
-    - name: Ensure dnf versionlock locklist is validated
+    - name: Ensure dnf versionlock locklist is verified
       tags:
         - dnf_versionlock
       ansible.builtin.assert:

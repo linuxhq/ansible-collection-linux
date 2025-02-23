@@ -10,12 +10,12 @@
         name: net-tools
         state: present
 
-    - name: Ensure service information is gathered
+    - name: Ensure tftp-server service information is gathered
       tags:
         - tftp_server
       ansible.builtin.service_facts:
 
-    - name: Ensure service is present in service facts
+    - name: Ensure tftp-server service information is verified
       tags:
         - tftp_server
       ansible.builtin.assert:
@@ -30,7 +30,7 @@
       community.general.listen_ports_facts:
         command: netstat
 
-    - name: Ensure listen port is present in listen port facts
+    - name: Ensure listen port information is verified
       tags:
         - tftp_server
       ansible.builtin.assert:

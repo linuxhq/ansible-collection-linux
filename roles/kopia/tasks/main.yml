@@ -1,22 +1,24 @@
 ---
-- name: Ensure kopia rpm key is present
+- name: Ensure kopia repository key is present
   tags:
     - kopia
   become: true
   ansible.builtin.rpm_key:
-    key: "{{ kopia_rpm_key }}"
+    key: https://kopia.io/signing-key
     state: present
 
-- name: Ensure kopia repository template is present
+- name: Ensure kopia repository file is present
   tags:
     - kopia
   become: true
-  ansible.builtin.template:
-    dest: /etc/yum.repos.d/kopia.repo
-    group: root
-    mode: '0644'
-    owner: root
-    src: kopia.repo.j2
+  ansible.builtin.yum_repository:
+    baseurl: http://packages.kopia.io/rpm/stable/$basearch/
+    description: Kopia
+    enabled: true
+    gpgcheck: true
+    gpgkey: https://kopia.io/signing-key
+    file: kopia
+    name: Kopia
 
 - name: Ensure kopia packages are present
   tags:

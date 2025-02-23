@@ -2,12 +2,12 @@
 - name: Verify
   hosts: all
   tasks:
-    - name: Ensure service facts are gathered
+    - name: Ensure rc-local service facts are gathered
       tags:
         - rc_local
       ansible.builtin.service_facts:
 
-    - name: Ensure service is present in service facts
+    - name: Ensure rc-local service facts are verified
       tags:
         - rc_local
       ansible.builtin.assert:

@@ -2,12 +2,12 @@
 - name: Verify
   hosts: all
   tasks:
-    - name: Ensure service facts are gathered
+    - name: Ensure dnf automatic service facts are gathered
       tags:
         - dnf_automatic
       ansible.builtin.service_facts:
 
-    - name: Ensure service is present in service facts
+    - name: Ensure dnf automatic service facts are verified
       tags:
         - dnf_automatic
       ansible.builtin.assert:

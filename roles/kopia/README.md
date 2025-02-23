@@ -15,8 +15,6 @@ None
       - kopia
     kopia_password: kopia
     kopia_policies: []
-    kopia_repository: {}
-    kopia_rpm_key: 'https://kopia.io/signing-key'
     kopia_server: false
     kopia_server_args:
       - --address=127.0.0.1:51515
@@ -37,7 +35,7 @@ None
           kopia_maintenance:
             - --enable-quick true
           kopia_policies:
-            - target: /home/linuxhq/containers
+            - target: /home/vagrant
               flags:
                 - --compression gzip
                 - --keep-annual 0
@@ -49,12 +47,12 @@ None
           kopia_repository:
             location: s3
             flags:
-              - "--access-key {{ aws_access_key_id }}"
-              - "--bucket kopia-backups"
+              - "--access-key AKIATG524EM7GHSXQNUA"
+              - "--bucket vagrant-kopia-backup"
               - "--endpoint s3.us-west-1.amazonaws.com"
-              - "--prefix {{ inventory_hostname }}/"
+              - "--prefix vagrant/"
               - "--region us-west-1"
-              - "--secret-access-key {{ aws_secret_access_key }}"
+              - "--secret-access-key 5D4Oa6QGInHvwBEWJwJoImmAjsQi2hO65+FfhGUK"
           kopia_server: true
 
 ## License

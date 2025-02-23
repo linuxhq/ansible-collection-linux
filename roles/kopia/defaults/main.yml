@@ -4,8 +4,6 @@ kopia_packages:
   - kopia
 kopia_password: kopia
 kopia_policies: []
-kopia_repository: {}
-kopia_rpm_key: 'https://kopia.io/signing-key'
 kopia_server: false
 kopia_server_args:
   - --address=127.0.0.1:51515

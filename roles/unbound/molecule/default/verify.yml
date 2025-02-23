@@ -2,12 +2,12 @@
 - name: Verify
   hosts: all
   tasks:
-    - name: Ensure service information is gathered
+    - name: Ensure unbound service information is gathered
       tags:
         - unbound
       ansible.builtin.service_facts:
 
-    - name: Ensure service is present in service facts
+    - name: Ensure unbound service information is verified
       tags:
         - unbound
       ansible.builtin.assert:
@@ -16,7 +16,7 @@
           - services['unbound.service'].state  == 'running'
           - services['unbound.service'].status == 'enabled'
 
-    - name: Ensure service port is accessible
+    - name: Ensure unbound service port is accessible
       tags:
         - unbound
       ansible.builtin.wait_for:

@@ -2,12 +2,16 @@
 - name: Verify
   hosts: all
   tasks:
-    - name: Ensure package facts are gathered
+    - name: Ensure speedtest package facts are gathered
+      tags:
+        - speedtest
       ansible.builtin.package_facts:
         manager: rpm
         strategy: first
 
-    - name: Ensure package is present in package facts
+    - name: Ensure speedtest package facts are verified
+      tags:
+        - speedtest
       ansible.builtin.assert:
         that:
           - '"speedtest" in packages'

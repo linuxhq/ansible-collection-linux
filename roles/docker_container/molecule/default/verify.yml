@@ -9,7 +9,7 @@
         name: linuxhq
       register: __docker_container_info
 
-    - name: Ensure docker container exists
+    - name: Ensure docker container information is verified
       tags:
         - docker_container
       ansible.builtin.assert:

@@ -9,7 +9,7 @@
         name: linuxhq
       register: __docker_newtork_info
 
-    - name: Ensure docker network exists
+    - name: Ensure docker network information is verified
       tags:
         - docker_network
       ansible.builtin.assert:
