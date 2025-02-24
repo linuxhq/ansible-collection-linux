@@ -23,7 +23,6 @@ None
         value: false
       - key: visiblepw
         value: false
-    sudo_includedir: /etc/sudoers.d
     sudo_pam: []
 
 ## Dependencies
