@@ -7,6 +7,15 @@
     name: rush
     state: present
 
+# Fixes: setgroups: Operation not permitted
+- name: Ensure rush shell permissions are managed
+  tags:
+    - rush
+  become: true
+  ansible.builtin.file:
+    mode: u+s
+    path: /usr/sbin/rush
+
 - name: Ensure rush shell is a valid login shell
   tags:
     - rush
