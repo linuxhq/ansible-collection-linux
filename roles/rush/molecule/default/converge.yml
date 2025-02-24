@@ -3,6 +3,10 @@
   hosts: all
   roles:
     - role: rush
+      tags:
+        - molecule-idempotence-notest
+
+    - role: rush
       rush_global:
         - debug 1
         - include-security all

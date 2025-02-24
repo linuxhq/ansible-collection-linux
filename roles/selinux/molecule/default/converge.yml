@@ -2,5 +2,11 @@
 - name: Converge
   hosts: all
   roles:
-    - selinux
+    - role: selinux
+      tags:
+        - molecule-idempotence-notest
+
+    - role: selinux
+      selinux_state: disabled
+      selinux_reboot: true
 ...

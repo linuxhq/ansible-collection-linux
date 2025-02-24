@@ -3,6 +3,10 @@
   hosts: all
   roles:
     - role: monit
+      tags:
+        - molecule-idempotence-notest
+
+    - role: monit
       monit_alert:
         - name: monit@linuxhq.net
           rules:

@@ -3,5 +3,9 @@
   hosts: all
   roles:
     - role: nscd
+      tags:
+        - molecule-idempotence-notest
+
+    - role: nscd
       nscd_debug_level: 1
 ...

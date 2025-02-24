@@ -3,6 +3,10 @@
   hosts: all
   roles:
     - role: chrony
+      tags:
+        - molecule-idempotence-notest
+
+    - role: chrony
       chrony_conf:
         - authselectmode require
         - cmdport 0

@@ -3,6 +3,10 @@
   hosts: all
   roles:
     - role: transmission_daemon
+      tags:
+        - molecule-idempotence-notest
+
+    - role: transmission_daemon
       transmission_daemon_bind_address_ipv6: "fe80::"
       transmission_daemon_dht_enabled: false
       transmission_daemon_pex_enabled: false

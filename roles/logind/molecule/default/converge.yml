@@ -3,6 +3,10 @@
   hosts: all
   roles:
     - role: logind
+      tags:
+        - molecule-idempotence-notest
+
+    - role: logind
       logind_killonlyusers:
         - vagrant
 ...
