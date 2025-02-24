@@ -1,33 +1,17 @@
 ---
-sudo_alias_cmnds: []
-sudo_alias_hosts: []
-sudo_alias_runas: []
-sudo_alias_users: []
-
-sudo_always_set_home: true
-sudo_env_keep: []
-sudo_env_reset: true
-sudo_includedir: /etc/sudoers.d
-sudo_match_group_by_gid: true
-sudo_requiretty: false
-sudo_visiblepw: false
-
+sudo_aliases: []
 sudo_d: []
-
-sudo_nopasswd_root: false
-sudo_nopasswd_wheel: false
-
-sudo_pam:
-  - module_interface: auth
-    control_flag: include
-    module_name: system-auth
-  - module_interface: account
-    control_flag: include
-    module_name: system-auth
-  - module_interface: password
-    control_flag: include
-    module_name: system-auth
-  - module_interface: session
-    control_flag: include
-    module_name: system-auth
+sudo_defaults:
+  - key: always_set_home
+    value: true
+  - key: env_reset
+    value: true
+  - key: match_group_by_gid
+    value: true
+  - key: requiretty
+    value: false
+  - key: visiblepw
+    value: false
+sudo_includedir: /etc/sudoers.d
+sudo_pam: []
 ...
