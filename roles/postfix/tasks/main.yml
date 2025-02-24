@@ -17,6 +17,8 @@
     mode: '0644'
     owner: root
     src: main.cf.j2
+  notify:
+    - Restart postfix
 
 - name: Ensure postfix master configuration is managed
   tags:
@@ -28,6 +30,8 @@
     mode: '0644'
     owner: root
     src: master.cf.j2
+  notify:
+    - Restart postfix
 
 - name: Ensure postfix lookup tables are managed
   tags:
@@ -56,6 +60,8 @@
   ansible.builtin.command:
     cmd: >
       postmap {{ _table.database }}:/etc/postfix/{{ _table.name }}
+  notify:
+    - Restart postfix
   loop: "{{ postfix_lookup_tables }}"
   loop_control:
     label: "{{ _table.name | d(none) }}"
