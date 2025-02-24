@@ -2,13 +2,33 @@
 - name: Verify
   hosts: all
   tasks:
-    - name: Ensure generic map db is present
-      ansible.builtin.stat:
-        path: /etc/postfix/generic.db
-      register: _stat
+    - name: Ensure postfix service info is gathered
+      tags:
+        - postfix
+      ansible.builtin.service_facts:
 
-    - name: Ensure postfix and mappings are present
+    - name: Ensure postfix service info is verified
+      tags:
+        - postfix
       ansible.builtin.assert:
         that:
-          - _stat.stat.exists | bool
+          - services['postfix.service'] is defined
+          - services['postfix.service'].state  == 'running'
+          - services['postfix.service'].status == 'enabled'
+
+    - name: Ensure postfix smtp service port is accessible
+      tags:
+        - postfix
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: 25
+        state: started
+
+    - name: Ensure postfix submission service port is accessible
+      tags:
+        - postfix
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: 587
+        state: started
 ...
