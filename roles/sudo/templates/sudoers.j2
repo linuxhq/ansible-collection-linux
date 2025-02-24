@@ -1,63 +1,35 @@
 ## {{ ansible_managed }}
 
-{% if sudo_alias_cmnds | length > 0 %}
-{%   for cmnd in sudo_alias_cmnds | sort %}
-{%     if cmnd.name is defined and
-          cmnd.cmnds is defined and
-          cmnd.cmnds | length > 0 %}
-Cmnd_Alias {{ cmnd.name | upper }} = {{ cmnd.cmnds | join(', ') }}
+{% if sudo_aliases | length > 0 %}
+{%   for alias in q('ansible.builtin.subelements', sudo_aliases, 'aliases', {'skip_missing': true}) %}
+{%     if alias.0.type is defined and
+          alias.1.name is defined and
+          alias.1.list is defined and
+          alias.1.list | length > 0 %}
+{{ alias.0.type | capitalize }}_Alias {{ alias.1.name | upper }} = {{ alias.1.list | join(', ') }}
 {%     endif %}
-{%     if loop.last %}
+{%   endfor %}
 
+{%   endif %}
+{% if sudo_defaults | length > 0 %}
+{%   for default in sudo_defaults %}
+{%     if default.value is sameas true %}
+Defaults {{ default.key }}
+{%     elif default.value is sameas false %}
+Defaults !{{ default.key }}
+{%     elif default.value is string %}
+Defaults {{ default.key }} = "{{ default.value | string }}"
+{%     elif default.value is number %}
+Defaults {{ default.key }} = "{{ default.value | int }}"
+{%     elif default.value is iterable %}
+Defaults {{ default.key }} = "{{ default.value | join(' ') }}"
+{%     else %}
+Defaults {{ default.key }} = "{{ default.value }}"
 {%     endif %}
 {%   endfor %}
 {% endif %}
-{% if sudo_alias_hosts | length > 0 %}
-{%   for host in sudo_alias_hosts | sort %}
-{%     if host.name is defined and
-          host.hosts is defined and
-          host.hosts | length > 0 %}
-Host_Alias {{ host.name | upper }} = {{ host.hosts | join(', ') }}
-{%     endif %}
-{%     if loop.last %}
 
-{%     endif %}
-{%   endfor %}
-{% endif %}
-{% if sudo_alias_runas | length > 0 %}
-{%   for runas in sudo_alias_runas | sort %}
-{%     if runas.name is defined and
-          runas.runas is defined and
-          runas.runas | length > 0 %}
-Runas_Alias {{ runas.name | upper }} = {{ runas.runas | join(', ') }}
-{%     endif %}
-{%     if loop.last %}
-
-{%     endif %}
-{%   endfor %}
-{% endif %}
-{% if sudo_alias_users | length > 0 %}
-{%   for user in sudo_alias_users | sort %}
-{%     if user.name is defined and
-          user.users is defined and
-          user.users | length > 0 %}
-User_Alias {{ user.name | upper }} = {{ user.users | join(', ') }}
-{%     endif %}
-{%     if loop.last %}
-
-{%     endif %}
-{%   endfor %}
-{% endif %}
-Defaults {{ '!' if not sudo_always_set_home | bool }}always_set_home
-{% if sudo_env_keep | length > 0 %}
-Defaults env_keep += "{{ sudo_env_keep | join(' ') }}"
-{% endif %}
-Defaults {{ '!' if not sudo_env_reset | bool }}env_reset
-Defaults {{ '!' if not sudo_match_group_by_gid | bool }}match_group_by_gid
-Defaults {{ '!' if not sudo_requiretty | bool }}requiretty
-Defaults {{ '!' if not sudo_visiblepw | bool }}visiblepw
-
-root      ALL=(ALL) {{ 'NOPASSWD:' if sudo_nopasswd_root  | bool else '' }}ALL
-%wheel    ALL=(ALL) {{ 'NOPASSWD:' if sudo_nopasswd_wheel | bool else '' }}ALL
+root      ALL=(ALL) NOPASSWD:ALL
+%wheel    ALL=(ALL) NOPASSWD:ALL
 
 #includedir {{ sudo_includedir }}

@@ -7,15 +7,57 @@
         - molecule-idempotence-notest
 
     - role: sudo
+      sudo_aliases:
+        - type: cmnd
+          aliases:
+            - name: admin
+              list:
+                - /usr/sbin/passwd
+                - /usr/sbin/useradd
+                - /usr/sbin/userdel
+            - name: shutdown
+              list:
+                - /sbin/halt
+                - /sbin/poweroff
+                - /sbin/reboot
+        - type: host
+          aliases:
+            - name: network
+              list:
+                - 192.168.0.0/255.255.255.0
+        - type: runas
+          aliases:
+            - name: admins
+              list:
+                - root
+        - type: user
+          aliases:
+            - name: users
+              list:
+                - tom
+                - mary
       sudo_d:
-        - file: linuxhq
-          user: '%linuxhq'
+        - file: vagrant
+          user: vagrant
           host: ALL
           runas: ALL
-          cmnds:
+          commands:
             - NOPASSWD:ALL
-      sudo_env_keep:
-        - SSH_AUTH_SOCK
+      sudo_defaults:
+        - key: always_set_home
+          value: true
+        - key: env_reset
+          value: true
+        - key: match_group_by_gid
+          value: true
+        - key: requiretty
+          value: false
+        - key: visiblepw
+          value: false
+        - key: env_keep
+          value:
+            - HOME
+            - SSH_AUTH_SOCK
       sudo_pam:
         - module_interface: auth
           control_flag: sufficient

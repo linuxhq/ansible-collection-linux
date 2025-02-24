@@ -24,7 +24,7 @@
     - sudo
   become: true
   ansible.builtin.template:
-    dest: "/etc/sudoers.d/{{ _sudoers.file }}"
+    dest: "{{ '/etc/sudoers.d/' ~ _sudoers.file }}"
     group: root
     mode: '0440'
     owner: root
@@ -32,15 +32,15 @@
     validate: '/usr/sbin/visudo -cf %s'
   loop: "{{ sudo_d }}"
   loop_control:
-    label: "{{ _sudoers.file | default(none) }}"
+    label: "{{ _sudoers.file | d(none) }}"
     loop_var: _sudoers
   when:
     - _sudoers.file is defined
     - _sudoers.user is defined
     - _sudoers.host is defined
     - _sudoers.runas is defined
-    - _sudoers.cmnds is defined
-    - _sudoers.cmnds | length > 0
+    - _sudoers.commands is defined
+    - _sudoers.commands | length > 0
 
 - name: Ensure sudo pam configuration is managed
   tags:
