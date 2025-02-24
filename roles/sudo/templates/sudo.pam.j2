@@ -3,10 +3,6 @@
 {%   if pam.module_interface is defined and
         pam.control_flag is defined and
         pam.module_name is defined %}
-{%     set pmi = pam.module_interface %}
-{%     set pcf = pam.control_flag %}
-{%     set pmn = pam.module_name %}
-{%     set pma = pam.module_arguments if pam.module_arguments is defined else '' %}
-{{ "{:<10} {:<12} {}".format(pmi, pcf, pmn) }}{{ " {}".format(pma) if pma | length > 0 }}
+{{ "{:<10} {:<12} {}".format(pam.module_interface, pam.control_flag, pam.module_name) }}{{ " {}".format(pam.module_arguments) if pam.module_arguments is defined }}
 {%   endif %}
 {% endfor %}
