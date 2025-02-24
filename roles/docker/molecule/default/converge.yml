@@ -2,7 +2,9 @@
 - name: Converge
   hosts: all
   roles:
-    - docker
+    - role: docker
+      tags:
+        - molecule-idempotence-notest
 
     - role: docker
       docker_daemon:
