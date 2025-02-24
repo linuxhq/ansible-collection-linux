@@ -1,5 +1,5 @@
 ansible>11,<12
-ansible-lint==25.1.0
+ansible-lint==25.1.3
 jmespath==1.0.1
 molecule==25.1.0
 molecule-plugins==23.7.0
