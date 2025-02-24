@@ -7,7 +7,7 @@
     name: "{{ postfix_packages }}"
     state: present
 
-- name: Ensure postfix main configuration is present
+- name: Ensure postfix main configuration is managed
   tags:
     - postfix
   become: true
@@ -17,69 +17,55 @@
     mode: '0644'
     owner: root
     src: main.cf.j2
-  notify: Restart postfix
 
-- name: Ensure postfix generic maps are present
+- name: Ensure postfix master configuration is managed
   tags:
     - postfix
   become: true
   ansible.builtin.template:
-    dest: "{{ postfix_parameters.smtp_generic_maps.split(':')[1] }}"
+    dest: /etc/postfix/master.cf
     group: root
     mode: '0644'
     owner: root
-    src: generic.j2
-  notify: Postmap generic
-  when:
-    - postfix_parameters.smtp_generic_maps is defined
-    - postfix_generic_maps | length > 0
+    src: master.cf.j2
 
-- name: Ensure postfix sender canonical maps are present
+- name: Ensure postfix lookup tables are managed
   tags:
     - postfix
   become: true
-  ansible.builtin.template:
-    dest: "{{ postfix_parameters.sender_canonical_maps.split(':')[1] }}"
-    group: root
-    mode: '0644'
-    owner: root
-    src: sender_canonical.j2
-  notify: Postmap sender_canonical
-  when:
-    - postfix_parameters.sender_canonical_maps is defined
-    - postfix_sender_canonical_maps | length > 0
-
-- name: Ensure postfix recipient canonical maps are present
-  tags:
-    - postfix
-  become: true
-  ansible.builtin.template:
-    dest: "{{ postfix_parameters.recipient_canonical_maps.split(':')[1] }}"
-    group: root
-    mode: '0644'
-    owner: root
-    src: recipient_canonical.j2
-  notify: Postmap recipient_canonical
-  when:
-    - postfix_parameters.recipient_canonical_maps is defined
-    - postfix_recipient_canonical_maps | length > 0
-
-- name: Ensure postmap sasl password maps are present
-  tags:
-    - postfix
-  become: true
-  ansible.builtin.template:
-    dest: "{{ postfix_parameters.smtp_sasl_password_maps.split(':')[1] }}"
+  ansible.builtin.copy:
+    content: "{{ _table.content }}"
+    dest: "{{ '/etc/postfix/' ~ _table.name }}"
     group: root
     mode: '0600'
     owner: root
-    src: sasl_passwd.j2
-  notify: Postmap sasl_passwd
+  notify:
+    - Restart postfix
+  loop: "{{ postfix_lookup_tables }}"
+  loop_control:
+    label: "{{ _table.name | d(none) }}"
+    loop_var: _table
   when:
-    - postfix_parameters.relayhost is defined
-    - postfix_parameters.smtp_sasl_password_maps is defined
-    - postfix_sasl_password is defined
-    - postfix_sasl_username is defined
+    - _table.content is defined
+    - _table.name is defined
+
+- name: Ensure postfix lookup tables are updated
+  tags:
+    - postfix
+  become: true
+  ansible.builtin.command:
+    cmd: >
+      postmap {{ _table.database }}:/etc/postfix/{{ _table.name }}
+  loop: "{{ postfix_lookup_tables }}"
+  loop_control:
+    label: "{{ _table.name | d(none) }}"
+    loop_var: _table
+  when:
+    - _table.database is defined
+    - _table.name is defined
+    - _table.postmap is defined
+    - _table.postmap | bool
+  changed_when: false
 
 - name: Ensure postfix is started and enabled on boot
   tags:

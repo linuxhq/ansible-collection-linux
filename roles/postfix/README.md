@@ -10,13 +10,7 @@ None
 
 ## Role Variables
 
-    postfix_databases:
-      - btree
-      - cdb
-      - dbm
-      - hash
-      - fail
-      - sdbm
+    postfix_lookup_tables: []
     postfix_packages:
       - postfix
     postfix_parameters:
@@ -41,9 +35,6 @@ None
       setgid_group: postdrop
       queue_directory: /var/spool/postfix
       unknown_local_recipient_reject_code: 550
-    postfix_generic_maps: []
-    postfix_recipient_canonical_maps: []
-    postfix_sender_canonical_maps: []
 
 ## Dependencies
 
@@ -54,14 +45,19 @@ None
     - hosts: server
       roles:
         - role: linuxhq.linux.postfix
-          postfix_generic_maps:
-            - pattern: root
-              address: noreply@linuxhq.org
+          postfix_lookup_tables:
+            - name: sender_canonical
+              database: regexp
+              postmap: false
+              content: |
+                /^(.*)@(.*)\.localdomain$/ ${1}@${2}.linuxhq.net
+
           postfix_packages:
             - cyrus-sasl
             - cyrus-sasl-lib
             - cyrus-sasl-plain
             - postfix
+
           postfix_parameters:
             alias_database: hash:/etc/aliases
             alias_maps: hash:/etc/aliases
@@ -73,33 +69,16 @@ None
             mail_owner: postfix
             mailq_path: /usr/bin/mailq.postfix
             manpage_directory: /usr/share/man
-            myhostname: "{{ inventory_hostname }}"
-            mydomain: "{{ inventory_hostname }}"
-            mynetworks:
-              - 192.168.0.0/24
             newaliases_path: /usr/bin/newaliases.postfix
-            recipient_canonical_maps: regexp:/etc/postfix/recipient_canonical
-            relayhost: '[mail.linuxhq.org]:587'
+            relayhost: mta.linuxhq.net:587
             sendmail_path: /usr/sbin/sendmail.postfix
             sender_canonical_maps: regexp:/etc/postfix/sender_canonical
             setgid_group: postdrop
-            smtp_generic_maps: hash:/etc/postfix/generic
-            smtp_sasl_auth_enable: true
-            smtp_sasl_password_maps: hash:/etc/postfix/sasl_passwd
             smtp_sasl_security_options: noanonymous
-            smtp_tls_CAfile: /etc/ssl/certs/ca-bundle.crt
-            smtp_tls_security_level: encrypt
-            smtp_use_tls: true
             queue_directory: /var/spool/postfix
             unknown_local_recipient_reject_code: 550
-          postfix_sasl_password: mzh3SfKATIYP22qlRKIQnw51
-          postfix_sasl_username: noreply@linuxhq.org
-          postfix_recipient_canonical_maps:
-            - pattern: /.+/
-              address: noreply@linuxhq.org
-          postfix_sender_canonical_maps:
-            - pattern: /.+/
-              address: noreply@linuxhq.org
+
+          postfix_service_submission: true
 
 ## License
 
