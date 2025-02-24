@@ -3,6 +3,10 @@
   hosts: all
   roles:
     - role: sudo
+      tags:
+        - molecule-idempotence-notest
+
+    - role: sudo
       sudo_d:
         - file: linuxhq
           user: '%linuxhq'

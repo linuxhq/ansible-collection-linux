@@ -3,6 +3,10 @@
   hosts: all
   roles:
     - role: dnf_versionlock
+      tags:
+        - molecule-idempotence-notest
+
+    - role: dnf_versionlock
       dnf_versionlock_packages:
         - name: docker-ce
           version: '3:25.0.5-1.el9.*'

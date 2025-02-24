@@ -3,5 +3,9 @@
   hosts: all
   roles:
     - role: hostnamectl
+      tags:
+        - molecule-idempotence-notest
+
+    - role: hostnamectl
       hostnamectl_location: AWS
 ...

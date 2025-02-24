@@ -3,6 +3,10 @@
   hosts: all
   roles:
     - role: dnf_automatic
+      tags:
+        - molecule-idempotence-notest
+
+    - role: dnf_automatic
       dnf_automatic_commands_apply_updates: true
       dnf_automatic_timer: dnf-automatic-install.timer
 ...

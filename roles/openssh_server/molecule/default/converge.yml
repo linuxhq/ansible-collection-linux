@@ -3,6 +3,10 @@
   hosts: all
   roles:
     - role: openssh_server
+      tags:
+        - molecule-idempotence-notest
+
+    - role: openssh_server
       openssh_server_parameters:
         AddressFamily: inet
         AllowAgentForwarding: false

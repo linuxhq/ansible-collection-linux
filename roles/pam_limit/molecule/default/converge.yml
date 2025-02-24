@@ -3,6 +3,10 @@
   hosts: all
   roles:
     - role: pam_limit
+      tags:
+        - molecule-idempotence-notest
+
+    - role: pam_limit
       pam_limit_list:
         - domain: '*'
           limit_item: core

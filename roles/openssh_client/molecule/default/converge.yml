@@ -3,6 +3,10 @@
   hosts: all
   roles:
     - role: openssh_client
+      tags:
+        - molecule-idempotence-notest
+
+    - role: openssh_client
       openssh_client_parameters:
         AddressFamily: inet
         Ciphers: aes128-ctr,aes192-ctr,aes256-ctr

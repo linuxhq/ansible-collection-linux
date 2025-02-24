@@ -3,6 +3,10 @@
   hosts: all
   roles:
     - role: logrotate
+      tags:
+        - molecule-idempotence-notest
+
+    - role: logrotate
       logrotate_conf:
         - compress
         - create
