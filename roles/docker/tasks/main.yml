@@ -15,15 +15,15 @@
     - docker
   become: true
   community.general.dnf_config_manager:
-    name: "{{ _docker.name }}"
-    state: "{{ _docker.state }}"
+    name: "{{ _repo.name }}"
+    state: "{{ _repo.state }}"
   loop: "{{ docker_repositories }}"
   loop_control:
-    label: "{{ _docker.name | d(none) }}"
-    loop_var: _docker
+    label: "{{ _repo.name | d(none) }}"
+    loop_var: _repo
   when:
-    - _docker.name is defined
-    - _docker.state is defined
+    - _repo.name is defined
+    - _repo.state is defined
 
 - name: Ensure docker packages are present
   tags:
@@ -39,13 +39,13 @@
   become: true
   ansible.builtin.user:
     append: true
-    name: "{{ docker_user }}"
+    name: "{{ _user }}"
     groups:
       - docker
   loop: "{{ docker_users }}"
   loop_control:
-    label: "{{ docker_user }}"
-    loop_var: docker_user
+    label: "{{ _user | d(none) }}"
+    loop_var: _user
 
 - name: Ensure docker daemon configuration is managed
   tags:
@@ -59,8 +59,6 @@
     src: daemon.json.j2
   notify:
     - Reload docker
-  when:
-    - docker_daemon | length > 0
 
 - name: Ensure docker is started and enabled on boot
   tags:
