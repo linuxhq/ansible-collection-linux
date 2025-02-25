@@ -10,11 +10,11 @@ jobs:
     name: release
     runs-on: ubuntu-latest
     steps:
-        uses: actions/checkout@v3
-        uses: actions/setup-python@v4
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
         with:
           python-version: '3.11'
-        run: pip install ansible-core==2.15.0
-        run: ansible-galaxy collection build
-        run: ansible-galaxy collection publish --api-key ${{ secrets.GALAXY_API_KEY }} linuxhq-linux-*.tar.gz
+      - run: pip install ansible-core==2.15.0
+      - run: ansible-galaxy collection build
+      - run: ansible-galaxy collection publish --api-key ${{ secrets.GALAXY_API_KEY }} linuxhq-linux-*.tar.gz
 ...
