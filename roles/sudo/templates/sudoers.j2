@@ -18,13 +18,13 @@ Defaults {{ default.key }}
 {%     elif default.value is sameas false %}
 Defaults !{{ default.key }}
 {%     elif default.value is string %}
-Defaults {{ default.key }} = "{{ default.value | string }}"
+Defaults {{ default.key }} {{ default.operator | d('=') }} "{{ default.value | string }}"
 {%     elif default.value is number %}
-Defaults {{ default.key }} = "{{ default.value | int }}"
+Defaults {{ default.key }} {{ default.operator | d('=') }} "{{ default.value | int }}"
 {%     elif default.value is iterable %}
-Defaults {{ default.key }} = "{{ default.value | join(' ') }}"
+Defaults {{ default.key }} {{ default.operator | d('=') }} "{{ default.value | join(' ') }}"
 {%     else %}
-Defaults {{ default.key }} = "{{ default.value }}"
+Defaults {{ default.key }} {{ default.operator | d('=') }} "{{ default.value }}"
 {%     endif %}
 {%   endfor %}
 {% endif %}

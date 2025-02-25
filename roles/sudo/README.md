@@ -83,8 +83,8 @@ None
               value: false
             - key: env_keep
               value:
-                - HOME
                 - SSH_AUTH_SOCK
+              operator: '+='
           sudo_pam:
             - module_interface: auth
               control_flag: sufficient
