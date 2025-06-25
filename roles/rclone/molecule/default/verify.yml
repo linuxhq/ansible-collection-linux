@@ -1,0 +1,22 @@
+---
+- name: Verify
+  hosts: all
+  tasks:
+    - name: Ensure rclone mountpoint is checked
+      tags:
+        - rclone
+      become: true
+      ansible.builtin.command:
+        cmd: >
+          mountpoint /mnt/koofr
+      register: __rclone_mountpoint
+      changed_when: false
+
+    - name: Ensure rclone mountpoint is verified
+      tags:
+        - rclone
+      ansible.builtin.debug:
+        msg: "{{ __rclone_mountpoint.rc }}"
+      failed_when:
+        - __rclone_mountpoint.rc != 0
+...

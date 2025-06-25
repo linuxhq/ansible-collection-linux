@@ -1,0 +1,8 @@
+# {{ ansible_managed }}
+
+RCLONE_CONFIG=/etc/rclone/rclone.conf
+{% if rclone_sysconfig | length > 0 %}
+{%   for key, value in rclone_sysconfig.items() %}
+{{ key | upper }}={{ value }}
+{%   endfor %}
+{% endif %}

@@ -1,0 +1,113 @@
+---
+- name: Ensure rclone package dependencies are present
+  tags:
+    - rclone
+  become: true
+  ansible.builtin.dnf:
+    name:
+      - fuse3
+      - fuse3-libs
+    state: present
+    validate_certs: true
+
+- name: Ensure rclone package key is present
+  tags:
+    - rclone
+  become: true
+  ansible.builtin.rpm_key:
+    key: 'https://www.craig-wood.com/nick/pub/pgp-key.txt'
+    state: present
+    validate_certs: true
+
+- name: Ensure rclone package is present
+  tags:
+    - rclone
+  become: true
+  ansible.builtin.dnf:
+    disable_gpg_check: true
+    name: "{{ __rclone_dnf_url }}/{{ __rclone_dnf_release }}.rpm"
+    state: present
+    validate_certs: true
+  vars:
+    __rclone_dnf_release: "rclone-{{ rclone_version }}-linux-{{ rclone_arch }}"
+    __rclone_dnf_url: "https://downloads.rclone.org/{{ rclone_version }}"
+
+- name: Ensure rclone configuration path is present
+  tags:
+    - rclone
+  become: true
+  ansible.builtin.file:
+    group: root
+    mode: '0700'
+    owner: root
+    path: /etc/rclone
+    state: directory
+
+- name: Ensure rclone configuration file is present
+  tags:
+    - rclone
+  become: true
+  no_log: "{{ rclone_no_log }}"
+  ansible.builtin.template:
+    group: root
+    dest: /etc/rclone/rclone.conf
+    mode: '0600'
+    owner: root
+    src: rclone.conf.j2
+
+- name: Ensure rclone sysconfig configuration is present
+  tags:
+    - rclone
+  become: true
+  ansible.builtin.template:
+    group: root
+    dest: /etc/sysconfig/rclone
+    mode: '0600'
+    owner: root
+    src: rclone.sysconfig.j2
+
+- name: Ensure rclone systemd unit is present
+  tags:
+    - rclone
+  become: true
+  ansible.builtin.template:
+    group: root
+    dest: /usr/lib/systemd/system/{{ _mount.name }}.service
+    mode: '0644'
+    owner: root
+    src: rclone.systemd.j2
+  loop: "{{ rclone_mounts }}"
+  loop_control:
+    label: "{{ _mount.name | d(none) }}"
+    loop_var: _mount
+  when:
+    - _mount.name is defined
+    - _mount.mountpoint is defined
+    - _mount.remote is defined
+
+- name: Ensure rclone systemd unit is reloaded
+  tags:
+    - rclone
+  become: true
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  when:
+    - rclone_mounts | length > 0
+
+- name: Ensure rclone systemd unit is started and enabled on boot
+  tags:
+    - rclone
+  become: true
+  ansible.builtin.systemd_service:
+    enabled: true
+    name: "{{ _mount.name }}.service"
+    state: started
+  loop: "{{ rclone_mounts }}"
+  loop_control:
+    label: "{{ _mount.name | d(none) }}"
+    loop_var: _mount
+  when:
+    - _mount.name is defined
+    - _mount.mountpoint is defined
+    - _mount.remote is defined
+...
