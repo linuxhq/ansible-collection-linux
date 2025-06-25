@@ -1,0 +1,25 @@
+# {{ ansible_managed }}
+
+[Unit]
+Description={{ _mount.name }}
+After={{ rclone_systemd_after }}
+Before={{ rclone_systemd_before if rclone_systemd_before is not none else '' }}
+Wants={{ rclone_systemd_wants }}
+
+[Service]
+Type=notify
+EnvironmentFile=/etc/sysconfig/rclone
+ExecStartPre=/usr/bin/mkdir -p {{ _mount.mountpoint }}
+ExecStart=/usr/bin/rclone mount \
+{% if _mount.flags is defined and _mount.flags | length > 0 %}
+{%   for __flag in _mount.flags %}
+  {{ __flag }} \
+{%   endfor %}
+{% endif %}
+  {{ _mount.remote }} {{ _mount.mountpoint }}
+ExecStop=/usr/bin/fusermount3 -u {{ _mount.mountpoint }}
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=default.target

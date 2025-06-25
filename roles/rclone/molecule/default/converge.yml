@@ -1,0 +1,34 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - role: rclone
+      tags:
+        - molecule-idempotence-notest
+
+    - role: rclone
+      rclone_conf:
+        koofr:
+          password: "{{ lookup('env', 'KOOFR_PASSWORD') }}"
+          provider: koofr
+          type: koofr
+          user: "{{ lookup('env', 'KOOFR_USERNAME') }}"
+        koofr-crypt:
+          password: "{{ lookup('env', 'KOOFR_CRYPT_PASSWORD') }}"
+          password2: "{{ lookup('env', 'KOOFR_CRYPT_PASSWORD2') }}"
+          remote: koofr:/rclone
+          type: crypt
+
+      rclone_mounts:
+        - name: rclone-koofr-ro
+          remote: 'koofr-crypt:'
+          mountpoint: /mnt/koofr
+          flags:
+            - --read-only
+            - --vfs-cache-mode=full
+
+      rclone_sysconfig:
+        rclone_verbose: '1'
+
+      rclone_systemd_before: docker.service
+...
