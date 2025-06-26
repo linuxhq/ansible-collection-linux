@@ -14,6 +14,7 @@ None
     rclone_conf: {}
     rclone_mounts: []
     rclone_no_log: false
+    rclone_profile: {}
     rclone_sysconfig: {}
     rclone_systemd_after: network-online.target
     rclone_systemd_before: null
