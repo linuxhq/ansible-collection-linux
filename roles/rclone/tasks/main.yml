@@ -55,6 +55,17 @@
     owner: root
     src: rclone.conf.j2
 
+- name: Ensure rclone profile configuration is present
+  tags:
+    - rclone
+  become: true
+  ansible.builtin.template:
+    group: root
+    dest: /etc/profile.d/rclone.sh
+    mode: '0644'
+    owner: root
+    src: rclone.profile.j2
+
 - name: Ensure rclone sysconfig configuration is present
   tags:
     - rclone
