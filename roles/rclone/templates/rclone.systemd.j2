@@ -2,9 +2,8 @@
 
 [Unit]
 Description={{ _mount.name }}
-After={{ rclone_systemd_after }}
-Before={{ rclone_systemd_before if rclone_systemd_before is not none else '' }}
-Wants={{ rclone_systemd_wants }}
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=notify
