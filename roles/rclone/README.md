@@ -16,9 +16,6 @@ None
     rclone_no_log: false
     rclone_profile: {}
     rclone_sysconfig: {}
-    rclone_systemd_after: network-online.target
-    rclone_systemd_before: null
-    rclone_systemd_wants: network-online.target
     rclone_version: v1.69.3
 
 ## Dependencies
@@ -50,7 +47,6 @@ None
                 - --vfs-cache-mode=full
           rclone_sysconfig:
             rclone_verbose: '1'
-          rclone_systemd_before: docker.service
 
 ## License
 

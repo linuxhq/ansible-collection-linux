@@ -29,6 +29,4 @@
 
       rclone_sysconfig:
         rclone_verbose: '1'
-
-      rclone_systemd_before: docker.service
 ...
