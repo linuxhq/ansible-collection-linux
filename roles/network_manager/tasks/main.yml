@@ -22,6 +22,15 @@
   when:
     - network_manager_conf | length > 0
 
+- name: Ensure network manager is started and enabled on boot
+  tags:
+    - network_manager
+  become: true
+  ansible.builtin.service:
+    enabled: true
+    name: NetworkManager
+    state: started
+
 - name: Ensure network manager connections are managed
   tags:
     - network_manager
@@ -114,13 +123,4 @@
     loop_var: _connection
   when:
     - _connection.conn_name is defined
-
-- name: Ensure network manager is started and enabled on boot
-  tags:
-    - network_manager
-  become: true
-  ansible.builtin.service:
-    enabled: true
-    name: NetworkManager
-    state: started
 ...
