@@ -1,0 +1,4 @@
+---
+systemd_resolved_conf: {}
+systemd_resolved_symlink: /run/systemd/resolve/stub-resolv.conf
+...
