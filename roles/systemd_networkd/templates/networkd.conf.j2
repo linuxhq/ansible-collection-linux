@@ -1,0 +1,71 @@
+# {{ ansible_managed }}
+#
+# Entries in this file show the compile time defaults. Local configuration
+# should be created by either modifying this file, or by creating "drop-ins" in
+# the networkd.conf.d/ subdirectory. The latter is generally recommended.
+# Defaults can be restored by simply deleting this file and all drop-ins.
+#
+# See networkd.conf(5) for details.
+
+[Network]
+{% if systemd_networkd_conf.network is defined %}
+{%   for key, value in systemd_networkd_conf.network | dictsort %}
+{%     if value is not defined %}
+{{ key }}=
+{%     elif value is sameas true %}
+{{ key }}=yes
+{%     elif value is sameas false %}
+{{ key }}=no
+{%     elif value is string %}
+{{ key }}={{ value | string }}
+{%     elif value is number %}
+{{ key }}={{ value | int }}
+{%     elif value is iterable %}
+{{ key }}={{ value | join(' ') }}
+{%     else %}
+{{ key }}={{ value }}
+{%     endif %}
+{%   endfor %}
+{% endif %}
+
+[DHCPv4]
+{% if systemd_networkd_conf.dhcpv4 is defined %}
+{%   for key, value in systemd_networkd_conf.dhcpv4 | dictsort %}
+{%     if value is not defined %}
+{{ key }}=
+{%     elif value is sameas true %}
+{{ key }}=yes
+{%     elif value is sameas false %}
+{{ key }}=no
+{%     elif value is string %}
+{{ key }}={{ value | string }}
+{%     elif value is number %}
+{{ key }}={{ value | int }}
+{%     elif value is iterable %}
+{{ key }}={{ value | join(' ') }}
+{%     else %}
+{{ key }}={{ value }}
+{%     endif %}
+{%   endfor %}
+{% endif %}
+
+[DHCPv6]
+{% if systemd_networkd_conf.dhcpv6 is defined %}
+{%   for key, value in systemd_networkd_conf.dhcpv6 | dictsort %}
+{%     if value is not defined %}
+{{ key }}=
+{%     elif value is sameas true %}
+{{ key }}=yes
+{%     elif value is sameas false %}
+{{ key }}=no
+{%     elif value is string %}
+{{ key }}={{ value | string }}
+{%     elif value is number %}
+{{ key }}={{ value | int }}
+{%     elif value is iterable %}
+{{ key }}={{ value | join(' ') }}
+{%     else %}
+{{ key }}={{ value }}
+{%     endif %}
+{%   endfor %}
+{% endif %}

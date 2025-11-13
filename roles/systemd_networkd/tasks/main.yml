@@ -1,0 +1,55 @@
+---
+- name: Ensure systemd networkd package is present
+  tags:
+    - systemd_networkd
+  become: true
+  ansible.builtin.dnf:
+    name: systemd-networkd
+    state: present
+
+- name: Ensure systemd networkd configuration is managed
+  tags:
+    - systemd_networkd
+  become: true
+  ansible.builtin.template:
+    dest: /etc/systemd/networkd.conf
+    group: root
+    mode: '0644'
+    owner: root
+    src: networkd.conf.j2
+  notify:
+    - Restart systemd-networkd
+
+- name: Ensure systemd networkd interface files are managed
+  tags:
+    - systemd_networkd
+  become: true
+  ansible.builtin.template:
+    dest: "/etc/systemd/network/{{ _network.priority }}-{{ _network.name }}.network"
+    group: root
+    mode: '0644'
+    owner: root
+    src: network.j2
+  loop: "{{ systemd_networkd_files }}"
+  loop_control:
+    label: "{{ _network.name | d(none) }}"
+    loop_var: _network
+  notify:
+    - Restart systemd-networkd
+  when:
+    - _network.name is defined
+    - _network.priority is defined
+    - _network.match is defined
+    - _network.match | length > 0
+    - _network.network is defined
+    - _network.network | length > 0
+
+- name: Ensure systemd networkd is started and enabled on boot
+  tags:
+    - systemd_networkd
+  become: true
+  ansible.builtin.systemd_service:
+    enabled: true
+    name: systemd-networkd
+    state: started
+...

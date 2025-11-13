@@ -1,0 +1,39 @@
+# {{ ansible_managed }}
+
+[Match]
+{% for key, value in _network.match | dictsort %}
+{%   if value is not defined %}
+{{ key }}=
+{%   elif value is sameas true %}
+{{ key }}=yes
+{%   elif value is sameas false %}
+{{ key }}=no
+{%   elif value is string %}
+{{ key }}={{ value | string }}
+{%   elif value is number %}
+{{ key }}={{ value | int }}
+{%   elif value is iterable %}
+{{ key }}={{ value | join(' ') }}
+{%   else %}
+{{ key }}={{ value }}
+{%   endif %}
+{% endfor %}
+
+[Network]
+{% for key, value in _network.network | dictsort %}
+{%   if value is not defined %}
+{{ key }}=
+{%   elif value is sameas true %}
+{{ key }}=yes
+{%   elif value is sameas false %}
+{{ key }}=no
+{%   elif value is string %}
+{{ key }}={{ value | string }}
+{%   elif value is number %}
+{{ key }}={{ value | int }}
+{%   elif value is iterable %}
+{{ key }}={{ value | join(' ') }}
+{%   else %}
+{{ key }}={{ value }}
+{%   endif %}
+{% endfor %}
