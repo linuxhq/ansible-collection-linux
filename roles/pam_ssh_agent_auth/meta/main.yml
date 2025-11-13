@@ -4,7 +4,7 @@ galaxy_info:
   role_name: pam_ssh_agent_auth
   author: Taylor Kimball
   description: PAM module for granting permissions based on SSH agent requests
-  license: GPLv3
+  license: GPL-3.0-or-later
   min_ansible_version: 2.15.0
   namespace: linuxhq
   platforms:
