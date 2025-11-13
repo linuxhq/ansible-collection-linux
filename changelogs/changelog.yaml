@@ -8,10 +8,14 @@ releases:
         - Deprecated localectl role in favor of systemd role
         - Deprecated logind role in favor of systemd role
         - Deprecated timedatectl role in favor of systemd role
+        - Deprecated network_manager role in favor of systemd_networkd
         - Initial commit of systemd role
+        - Initial commit of systemd_networkd role
+        - Initial commit of systemd_resolved role
       minor_changes:
         - This is the beginning of the linuxhq.linux changelog
         - Removal of empty CHANGELOG.md
+        - Update galaxy dependency versions
       release_summary: >-
         This is the beginning of the linuxhq.linux changelog.  Unfortunately
         all previous release changes will need to be reviewed via git logs.
