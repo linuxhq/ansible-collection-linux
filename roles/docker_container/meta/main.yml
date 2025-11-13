@@ -6,7 +6,7 @@ galaxy_info:
   role_name: docker_container
   author: Taylor Kimball
   description: Manage docker containers
-  license: GPLv3
+  license: GPL-3.0-or-later
   min_ansible_version: 2.15.0
   namespace: linuxhq
   platforms:

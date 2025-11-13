@@ -4,7 +4,7 @@ galaxy_info:
   role_name: tcp_bbr
   author: Taylor Kimball
   description: TCP Bottleneck Bandwidth and RRT
-  license: GPLv3
+  license: GPL-3.0-or-later
   min_ansible_version: 2.15.0
   namespace: linuxhq
   platforms:

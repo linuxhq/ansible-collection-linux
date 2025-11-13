@@ -1,9 +1,12 @@
 ---
-dependencies: []
+dependencies:
+  - role: epel
+    tags: systemd_networkd
+    when: ansible_os_family == 'RedHat'
 galaxy_info:
-  role_name: systemd
+  role_name: systemd_networkd
   author: Taylor Kimball
-  description: A system and service manager for Linux
+  description: A system daemon that manages network configurations
   license: GPL-3.0-or-later
   min_ansible_version: 2.15.0
   namespace: linuxhq
@@ -15,11 +18,7 @@ galaxy_info:
       versions:
         - all
   galaxy_tags:
-    - hostnamectl
-    - journald
     - linux
-    - localectl
-    - logind
-    - timedatectl
+    - networkd
     - systemd
 ...
