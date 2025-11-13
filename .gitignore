@@ -2,6 +2,4 @@
 
 .ansible
 .DS_Store
-galaxy_cache
-tmp
 venv

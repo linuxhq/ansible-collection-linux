@@ -1,0 +1,124 @@
+---
+- name: Ensure systemd package is present
+  tags:
+    - systemd
+  become: true
+  ansible.builtin.apt:
+    name: systemd
+    state: present
+    update_cache: true
+  when:
+    - ansible_os_family == 'Debian'
+
+- name: Ensure systemd package is present
+  tags:
+    - systemd
+  become: true
+  ansible.builtin.dnf:
+    name: systemd
+    state: present
+  when:
+    - ansible_os_family == 'RedHat'
+
+- name: Ensure systemd system and user configurations are managed
+  tags:
+    - systemd
+  become: true
+  ansible.builtin.template:
+    dest: "{{ _conf.dest }}"
+    group: root
+    mode: '0644'
+    owner: root
+    src: "{{ _conf.src }}"
+  loop:
+    - { dest: /etc/systemd/system.conf, src: system.conf.j2 }
+    - { dest: /etc/systemd/user.conf, src: user.conf.j2 }
+  loop_control:
+    label: "{{ _conf.dest | d(none) }}"
+    loop_var: _conf
+  notify:
+    - Reload systemd
+
+- name: Ensure systemd journald configuration is managed
+  tags:
+    - systemd
+  become: true
+  ansible.builtin.template:
+    dest: /etc/systemd/journald.conf
+    group: root
+    mode: '0644'
+    owner: root
+    src: journald.conf.j2
+  notify:
+    - Restart systemd-journald
+
+- name: Ensure systemd journald is started and enabled on boot
+  tags:
+    - systemd
+  become: true
+  ansible.builtin.systemd_service:
+    enabled: true
+    name: systemd-journald
+    state: started
+
+- name: Ensure systemd logind configuration is managed
+  tags:
+    - systemd
+  become: true
+  ansible.builtin.template:
+    dest: /etc/systemd/logind.conf
+    group: root
+    mode: '0644'
+    owner: root
+    src: logind.conf.j2
+  notify:
+    - Restart systemd-logind
+
+- name: Ensure systemd logind is started and enabled on boot
+  tags:
+    - systemd
+  become: true
+  ansible.builtin.systemd_service:
+    enabled: true
+    name: systemd-logind
+    state: started
+
+- name: Ensure hostnamectl settings are managed
+  tags:
+    - systemd
+  become: true
+  ansible.builtin.command:
+    cmd: >
+      hostnamectl {{ _hostnamectl.0 }} {{ _hostnamectl.1 }}
+  loop: "{{ systemd_hostnamectl | dictsort }}"
+  loop_control:
+    label: "{{ _hostnamectl.0 | d(none) }}"
+    loop_var: _hostnamectl
+  changed_when: false
+
+- name: Ensure localectl settings are managed
+  tags:
+    - systemd
+  become: true
+  ansible.builtin.command:
+    cmd: >
+      localectl {{ _localectl.0 }} {{ _localectl.1 }}
+  loop: "{{ systemd_localectl | dictsort }}"
+  loop_control:
+    label: "{{ _localectl.0 | d(none) }}"
+    loop_var: _localectl
+  changed_when: false
+
+- name: Ensure timedatectl settings are managed
+  tags:
+    - systemd
+  become: true
+  ansible.builtin.command:
+    cmd: >
+      timedatectl {{ _timedatectl.0 }} {{ _timedatectl.1 }}
+  loop: "{{ systemd_timedatectl | dictsort }}"
+  loop_control:
+    label: "{{ _timedatectl.0 | d(none) }}"
+    loop_var: _timedatectl
+  changed_when: false
+...

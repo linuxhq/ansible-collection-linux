@@ -1,0 +1,21 @@
+---
+- name: Verify
+  hosts: all
+  tasks:
+    - name: Ensure systemd service facts are gathered
+      tags:
+        - systemd
+      ansible.builtin.service_facts:
+
+    - name: Ensure logind service facts are verified
+      tags:
+        - systemd
+      ansible.builtin.assert:
+        that:
+          - services['systemd-journald.service'] is defined
+          - services['systemd-journald.service'].state == 'running'
+          - services['systemd-journald.service'].status == 'static'
+          - services['systemd-logind.service'] is defined
+          - services['systemd-logind.service'].state == 'running'
+          - services['systemd-logind.service'].status == 'static'
+...
