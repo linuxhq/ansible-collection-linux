@@ -3,9 +3,21 @@
   tags:
     - systemd_resolved
   become: true
+  ansible.builtin.apt:
+    name: systemd-resolved
+    state: present
+  when:
+    - ansible_os_family == 'Debian'
+
+- name: Ensure systemd resolved package is present
+  tags:
+    - systemd_resolved
+  become: true
   ansible.builtin.dnf:
     name: systemd-resolved
     state: present
+  when:
+    - ansible_os_family == 'RedHat'
 
 - name: Ensure systemd resolved configuration is managed
   tags:

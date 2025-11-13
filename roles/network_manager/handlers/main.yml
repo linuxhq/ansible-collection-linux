@@ -1,9 +1,0 @@
----
-- name: Restart NetworkManager
-  tags:
-    - network_manager
-  become: true
-  ansible.builtin.service:
-    name: NetworkManager
-    state: restarted
-...
