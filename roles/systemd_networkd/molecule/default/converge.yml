@@ -1,0 +1,31 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - role: systemd_networkd
+      tags:
+        - molecule-idempotence-notest
+
+    - role: systemd_networkd
+      systemd_networkd_conf:
+        network:
+          ManageForeignRoutes: true
+          ManageForeignRoutingPolicyRules: true
+          RouteTable:
+          SpeedMeter: false
+          SpeedMeterIntervalSec: 10s
+        dhcpv4:
+          DUIDRawData:
+          DUIDType: vendor
+        dhcpv6:
+          DUIDRawData:
+          DUIDType: vendor
+
+      systemd_networkd_files:
+        - name: "{{ ansible_default_ipv4.interface }}"
+          priority: 80
+          match:
+            Name: "{{ ansible_default_ipv4.interface }}"
+          network:
+            DHCP: true
+...

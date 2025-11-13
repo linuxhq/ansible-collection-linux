@@ -13,11 +13,6 @@ platforms:
     cpus: 4
     memory: 4096
 
-  - name: debian12
-    box: bento/debian-12
-    cpus: 4
-    memory: 4096
-
 provisioner:
   name: ansible
   log: true
