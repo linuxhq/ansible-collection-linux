@@ -28,12 +28,12 @@ None
       roles:
         - role: linuxhq.linux.rclone
           rclone_conf:
-            koofr:
+            - name: koofr
               password: "{{ lookup('env', 'KOOFR_PASSWORD') }}"
               provider: koofr
               type: koofr
               user: "{{ lookup('env', 'KOOFR_USERNAME') }}"
-            koofr-crypt:
+            - name: koofr-crypt:
               password: "{{ lookup('env', 'KOOFR_CRYPT_PASSWORD') }}"
               password2: "{{ lookup('env', 'KOOFR_CRYPT_PASSWORD2') }}"
               remote: koofr:/rclone
@@ -44,13 +44,12 @@ None
               mountpoint: /mnt/koofr
               flags:
                 - --read-only
-                - --vfs-cache-mode=full
           rclone_sysconfig:
             rclone_verbose: '1'
 
 ## License
 
-Copyright (C) 2025 Linux HeadQuarters
+Copyright (c) Linux HeadQuarters
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
