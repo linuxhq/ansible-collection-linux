@@ -14,17 +14,13 @@
   ansible.builtin.template:
     dest: "{{ _chrony.dest }}"
     group: root
-    mode: "{{ _chrony.mode }}"
+    mode: '0644'
     owner: root
     src: "{{ _chrony.src }}"
   notify: Restart chronyd
   loop:
-    - dest: /etc/chrony.conf
-      mode: '0644'
-      src: chrony.conf.j2
-    - dest: /etc/sysconfig/chronyd
-      mode: '0644'
-      src: chronyd.sysconfig.j2
+    - { dest: /etc/chrony.conf, src: chrony.conf.j2 }
+    - { dest: /etc/sysconfig/chronyd, src: chronyd.sysconfig.j2 }
   loop_control:
     label: "{{ _chrony.dest | d(none) }}"
     loop_var: _chrony
