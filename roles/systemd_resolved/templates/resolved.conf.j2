@@ -1,0 +1,24 @@
+# {{ ansible_managed }}
+#
+# Use 'systemd-analyze cat-config systemd/resolved.conf' to display the full config.
+#
+# See resolved.conf(5) for details.
+
+[Resolve]
+{% for key, value in systemd_resolved_conf | dictsort %}
+{%   if value is not defined %}
+{{ key }}=
+{%   elif value is sameas true %}
+{{ key }}=yes
+{%   elif value is sameas false %}
+{{ key }}=no
+{%   elif value is string %}
+{{ key }}={{ value | string }}
+{%   elif value is number %}
+{{ key }}={{ value | int }}
+{%   elif value is iterable %}
+{{ key }}={{ value | join(' ') }}
+{%   else %}
+{{ key }}={{ value }}
+{%   endif %}
+{% endfor %}

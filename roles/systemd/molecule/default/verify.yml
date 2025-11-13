@@ -7,7 +7,7 @@
         - systemd
       ansible.builtin.service_facts:
 
-    - name: Ensure logind service facts are verified
+    - name: Ensure systemd service facts are verified
       tags:
         - systemd
       ansible.builtin.assert:
