@@ -1,6 +1,12 @@
 ---
 ancestor: null
 releases:
+  2.1.0:
+    changes:
+      minor_changes:
+        - Ensure galaxy dependencies are less strict
+      release_summary: >-
+        Ensure galaxy dependencies are less strict
   2.0.9:
     changes:
       breaking_changes:

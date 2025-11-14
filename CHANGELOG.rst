@@ -4,6 +4,19 @@ linuxhq.linux Release Notes
 
 .. contents:: Topics
 
+v2.1.0
+======
+
+Release Summary
+---------------
+
+Ensure galaxy dependencies are less strict
+
+Minor Changes
+-------------
+
+- Ensure galaxy dependencies are less strict
+
 v2.0.9
 ======
 
