@@ -10,14 +10,15 @@ v2.0.9
 Release Summary
 ---------------
 
-This is the beginning of the linuxhq.linux changelog.  Unfortunately all previous release changes will need to be reviewed via git logs.
+This is the beginning of the linuxhq.linux collection changelog.
 
 Minor Changes
 -------------
 
-- Removal of empty CHANGELOG.md
-- This is the beginning of the linuxhq.linux changelog
+- Added antsibull-changelog support
+- Update cloudflared systemd unit (network-online.target)
 - Update galaxy dependency versions
+- Update rclone role to use epel release
 
 Breaking Changes / Porting Guide
 --------------------------------
@@ -30,3 +31,4 @@ Breaking Changes / Porting Guide
 - Initial commit of systemd role
 - Initial commit of systemd_networkd role
 - Initial commit of systemd_resolved role
+- Update rclone_conf default from dict->list

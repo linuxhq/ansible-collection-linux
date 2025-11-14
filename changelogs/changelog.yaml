@@ -12,12 +12,13 @@ releases:
         - Initial commit of systemd role
         - Initial commit of systemd_networkd role
         - Initial commit of systemd_resolved role
+        - Update rclone_conf default from dict->list
       minor_changes:
-        - This is the beginning of the linuxhq.linux changelog
-        - Removal of empty CHANGELOG.md
+        - Added antsibull-changelog support
+        - Update cloudflared systemd unit (network-online.target)
         - Update galaxy dependency versions
+        - Update rclone role to use epel release
       release_summary: >-
-        This is the beginning of the linuxhq.linux changelog.  Unfortunately
-        all previous release changes will need to be reviewed via git logs.
+        This is the beginning of the linuxhq.linux collection changelog.
     release_date: '2025-11-12'
 ...
