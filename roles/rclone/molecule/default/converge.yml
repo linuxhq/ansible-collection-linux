@@ -8,15 +8,16 @@
 
     - role: rclone
       rclone_conf:
-        koofr:
+        - name: koofr
           password: "{{ lookup('env', 'KOOFR_PASSWORD') }}"
           provider: koofr
           type: koofr
           user: "{{ lookup('env', 'KOOFR_USERNAME') }}"
-        koofr-crypt:
+
+        - name: koofr-crypt
           password: "{{ lookup('env', 'KOOFR_CRYPT_PASSWORD') }}"
           password2: "{{ lookup('env', 'KOOFR_CRYPT_PASSWORD2') }}"
-          remote: koofr:/rclone
+          remote: koofr:/Encrypted
           type: crypt
 
       rclone_mounts:
@@ -25,8 +26,10 @@
           mountpoint: /mnt/koofr
           flags:
             - --read-only
-            - --vfs-cache-mode=full
+
+      rclone_profile:
+        rclone_verbose: 1
 
       rclone_sysconfig:
-        rclone_verbose: '1'
+        rclone_allow_other: true
 ...

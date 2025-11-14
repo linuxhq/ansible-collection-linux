@@ -1,5 +1,8 @@
 ---
-dependencies: []
+dependencies:
+  - role: epel
+    tags: rclone
+    when: ansible_os_family == 'RedHat'
 galaxy_info:
   role_name: rclone
   author: Taylor Kimball
@@ -13,7 +16,6 @@ galaxy_info:
         - '9'
   galaxy_tags:
     - cloud
-    - macos
     - rclone
     - storage
 ...

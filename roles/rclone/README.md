@@ -10,17 +10,15 @@ None
 
 ## Role Variables
 
-    rclone_arch: amd64
-    rclone_conf: {}
+    rclone_conf: []
     rclone_mounts: []
     rclone_no_log: false
     rclone_profile: {}
     rclone_sysconfig: {}
-    rclone_version: v1.69.3
 
 ## Dependencies
 
-None
+* [linuxhq.linux.epel](https://github.com/linuxhq/ansible-collection-linux/tree/main/roles/epel)
 
 ## Example Playbook
 
@@ -33,19 +31,25 @@ None
               provider: koofr
               type: koofr
               user: "{{ lookup('env', 'KOOFR_USERNAME') }}"
-            - name: koofr-crypt:
+
+            - name: koofr-crypt
               password: "{{ lookup('env', 'KOOFR_CRYPT_PASSWORD') }}"
               password2: "{{ lookup('env', 'KOOFR_CRYPT_PASSWORD2') }}"
               remote: koofr:/rclone
               type: crypt
+
           rclone_mounts:
             - name: rclone-koofr-ro
               remote: 'koofr-crypt:'
               mountpoint: /mnt/koofr
               flags:
                 - --read-only
+
+          rclone_profile:
+            rclone_verbose: 1
+
           rclone_sysconfig:
-            rclone_verbose: '1'
+            rclone_allow_other: true
 
 ## License
 

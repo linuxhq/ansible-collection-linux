@@ -1,17 +1,17 @@
 # {{ ansible_managed }}
 
-{% if rclone_profile | length > 0 %}
-{%   for key, value in rclone_profile.items() %}
-{%     if value is sameas true %}
+export RCLONE_CONFIG=/etc/rclone/rclone.conf
+
+{% for key, value in rclone_profile.items() %}
+{%   if value is sameas true %}
 export {{ key | upper }}=true
-{%     elif value is sameas false %}
+{%   elif value is sameas false %}
 export {{ key | upper }}=false
-{%     elif value is string %}
+{%   elif value is string %}
 export {{ key | upper }}={{ value | string }}
-{%     elif value is number %}
+{%   elif value is number %}
 export {{ key | upper }}={{ value | int }}
-{%     else %}
+{%   else %}
 export {{ key | upper }}={{ value }}
-{%     endif %}
-{%   endfor %}
-{% endif %}
+{%   endif %}
+{% endfor %}
