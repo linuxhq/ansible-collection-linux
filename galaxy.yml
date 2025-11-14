@@ -3,9 +3,9 @@ authors:
   - Taylor Kimball (https://github.com/tkimball83)
 description: A collection of linux roles
 dependencies:
-  ansible.posix: 2.1.0
-  community.docker: 5.0.1
-  community.general: 12.0.1
+  ansible.posix: '>=2.1.0'
+  community.docker: '>=5.0.0'
+  community.general: '>=12.0.0'
 documentation: https://github.com/linuxhq/ansible-collection-linux/blob/main/README.md
 homepage: https://www.linuxhq.org
 issues: https://github.com/linuxhq/ansible-collection-linux/issues
@@ -19,5 +19,5 @@ tags:
   - cloud
   - infrastructure
   - linux
-version: 2.0.9
+version: 2.1.0
 ...
