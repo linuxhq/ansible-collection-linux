@@ -7,8 +7,10 @@
 {{ key }} = true
 {%     elif value is sameas false %}
 {{ key }} = false
+{%     elif value is string %}
+{{ key }} = {{ value | string }}
 {%     elif value is number %}
-{{ key }} = {{ value }}
+{{ key }} = {{ value | int }}
 {%     else %}
 {{ key }} = {{ value }}
 {%     endif %}
