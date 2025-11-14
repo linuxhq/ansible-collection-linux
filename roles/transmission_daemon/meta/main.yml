@@ -7,7 +7,7 @@ galaxy_info:
   role_name: transmission_daemon
   author: Taylor Kimball
   description: A fast, easy, and free bittorrent client
-  license: GPLv3
+  license: GPL-3.0-or-later
   min_ansible_version: 2.15.0
   namespace: linuxhq
   platforms:

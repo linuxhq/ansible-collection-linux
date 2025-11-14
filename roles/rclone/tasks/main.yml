@@ -1,5 +1,13 @@
 ---
-- name: Ensure rclone package dependencies are present
+- name: Ensure rclone package is present
+  tags:
+    - rclone
+  become: true
+  ansible.builtin.dnf:
+    name: rclone
+    state: present
+
+- name: Ensure rclone mount dependency packages are present
   tags:
     - rclone
   become: true
@@ -9,28 +17,6 @@
       - fuse3-libs
     state: present
     validate_certs: true
-
-- name: Ensure rclone package key is present
-  tags:
-    - rclone
-  become: true
-  ansible.builtin.rpm_key:
-    key: 'https://www.craig-wood.com/nick/pub/pgp-key.txt'
-    state: present
-    validate_certs: true
-
-- name: Ensure rclone package is present
-  tags:
-    - rclone
-  become: true
-  ansible.builtin.dnf:
-    disable_gpg_check: true
-    name: "{{ __rclone_dnf_url }}/{{ __rclone_dnf_release }}.rpm"
-    state: present
-    validate_certs: true
-  vars:
-    __rclone_dnf_release: "rclone-{{ rclone_version }}-linux-{{ rclone_arch }}"
-    __rclone_dnf_url: "https://downloads.rclone.org/{{ rclone_version }}"
 
 - name: Ensure rclone configuration path is present
   tags:
@@ -43,7 +29,7 @@
     path: /etc/rclone
     state: directory
 
-- name: Ensure rclone configuration file is present
+- name: Ensure rclone configuration file is managed
   tags:
     - rclone
   become: true
@@ -55,7 +41,7 @@
     owner: root
     src: rclone.conf.j2
 
-- name: Ensure rclone profile configuration is present
+- name: Ensure rclone profile configuration is managed
   tags:
     - rclone
   become: true
@@ -66,7 +52,7 @@
     owner: root
     src: rclone.profile.j2
 
-- name: Ensure rclone sysconfig configuration is present
+- name: Ensure rclone sysconfig configuration is managed
   tags:
     - rclone
   become: true
@@ -77,7 +63,7 @@
     owner: root
     src: rclone.sysconfig.j2
 
-- name: Ensure rclone systemd unit is present
+- name: Ensure rclone systemd unit is managed
   tags:
     - rclone
   become: true
@@ -105,7 +91,7 @@
   when:
     - rclone_mounts | length > 0
 
-- name: Ensure rclone systemd unit is started and enabled on boot
+- name: Ensure rclone systemd units are started and enabled on boot
   tags:
     - rclone
   become: true

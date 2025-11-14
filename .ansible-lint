@@ -1,6 +1,5 @@
 ---
 exclude_paths:
-  - .ansible
   - venv
 offline: false
 ...

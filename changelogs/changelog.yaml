@@ -1,0 +1,24 @@
+---
+ancestor: null
+releases:
+  2.0.9:
+    changes:
+      breaking_changes:
+        - Deprecated hostnamectl role in favor of systemd role
+        - Deprecated localectl role in favor of systemd role
+        - Deprecated logind role in favor of systemd role
+        - Deprecated timedatectl role in favor of systemd role
+        - Deprecated network_manager role in favor of systemd_networkd
+        - Update rclone_conf default from dict->list
+      minor_changes:
+        - Added antsibull-changelog support
+        - Initial commit of systemd role
+        - Initial commit of systemd_networkd role
+        - Initial commit of systemd_resolved role
+        - Update cloudflared systemd unit (network-online.target)
+        - Update galaxy dependency versions
+        - Update rclone role to use epel release
+      release_summary: >-
+        This is the beginning of the linuxhq.linux collection changelog.
+    release_date: '2025-11-12'
+...
