@@ -16,6 +16,9 @@ Minor Changes
 -------------
 
 - Added antsibull-changelog support
+- Initial commit of systemd role
+- Initial commit of systemd_networkd role
+- Initial commit of systemd_resolved role
 - Update cloudflared systemd unit (network-online.target)
 - Update galaxy dependency versions
 - Update rclone role to use epel release
@@ -28,7 +31,4 @@ Breaking Changes / Porting Guide
 - Deprecated logind role in favor of systemd role
 - Deprecated network_manager role in favor of systemd_networkd
 - Deprecated timedatectl role in favor of systemd role
-- Initial commit of systemd role
-- Initial commit of systemd_networkd role
-- Initial commit of systemd_resolved role
 - Update rclone_conf default from dict->list
