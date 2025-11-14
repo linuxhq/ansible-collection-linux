@@ -1,0 +1,27 @@
+# {{ ansible_managed }}
+#
+# Entries in this file show the compile time defaults. Local configuration
+# should be created by either modifying this file, or by creating "drop-ins" in
+# the user.conf.d/ subdirectory. The latter is generally recommended.
+# Defaults can be restored by simply deleting this file and all drop-ins.
+#
+# See systemd-user.conf(5) for details.
+
+[Manager]
+{% for key, value in systemd_user | dictsort %}
+{%   if value is not defined %}
+{{ key }}=
+{%   elif value is sameas true %}
+{{ key }}=yes
+{%   elif value is sameas false %}
+{{ key }}=no
+{%   elif value is string %}
+{{ key }}={{ value | string }}
+{%   elif value is number %}
+{{ key }}={{ value | int }}
+{%   elif value is iterable %}
+{{ key }}={{ value | join(' ') }}
+{%   else %}
+{{ key }}={{ value }}
+{%   endif %}
+{% endfor %}

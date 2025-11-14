@@ -10,11 +10,15 @@ driver:
 platforms:
   - name: almalinux9
     box: bento/almalinux-9
+    cpus: 4
+    memory: 4096
     instance_raw_config_args:
       - 'vm.disk :disk, name: "parted", size: "5GB"'
 
   - name: debian12
     box: bento/debian-12
+    cpus: 4
+    memory: 4096
     instance_raw_config_args:
       - 'vm.disk :disk, name: "parted", size: "5GB"'
 

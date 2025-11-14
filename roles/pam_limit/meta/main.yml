@@ -4,7 +4,7 @@ galaxy_info:
   role_name: pam_limit
   author: Taylor Kimball
   description: PAM module to limit resources
-  license: GPLv3
+  license: GPL-3.0-or-later
   min_ansible_version: 2.15.0
   namespace: linuxhq
   platforms:

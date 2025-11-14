@@ -1,0 +1,53 @@
+---
+- name: Ensure systemd resolved package is present
+  tags:
+    - systemd_resolved
+  become: true
+  ansible.builtin.apt:
+    name: systemd-resolved
+    state: present
+  when:
+    - ansible_os_family == 'Debian'
+
+- name: Ensure systemd resolved package is present
+  tags:
+    - systemd_resolved
+  become: true
+  ansible.builtin.dnf:
+    name: systemd-resolved
+    state: present
+  when:
+    - ansible_os_family == 'RedHat'
+
+- name: Ensure systemd resolved configuration is managed
+  tags:
+    - systemd_resolved
+  become: true
+  ansible.builtin.template:
+    dest: /etc/systemd/resolved.conf
+    group: root
+    mode: '0644'
+    owner: root
+    src: resolved.conf.j2
+  notify:
+    - Restart systemd-resolved
+
+- name: Ensure systemd resolved is started and enabled on boot
+  tags:
+    - systemd_resolved
+  become: true
+  ansible.builtin.systemd_service:
+    enabled: true
+    name: systemd-resolved
+    state: started
+
+- name: Ensure systemd resolved symlink is managed
+  tags:
+    - systemd_resolved
+  become: true
+  ansible.builtin.file:
+    dest: /etc/resolv.conf
+    force: true
+    src: "{{ systemd_resolved_symlink }}"
+    state: link
+...

@@ -1,0 +1,18 @@
+---
+- name: Verify
+  hosts: all
+  tasks:
+    - name: Ensure systemd service facts are gathered
+      tags:
+        - systemd_networkd
+      ansible.builtin.service_facts:
+
+    - name: Ensure systemd service facts are verified
+      tags:
+        - systemd_networkd
+      ansible.builtin.assert:
+        that:
+          - services['systemd-networkd.service'] is defined
+          - services['systemd-networkd.service'].state == 'running'
+          - services['systemd-networkd.service'].status == 'enabled'
+...

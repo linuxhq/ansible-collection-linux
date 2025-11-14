@@ -1,0 +1,7 @@
+---
+systemd_resolved_conf:
+  DNS:
+    - 8.8.8.8
+    - 8.8.4.4
+systemd_resolved_symlink: /run/systemd/resolve/stub-resolv.conf
+...
