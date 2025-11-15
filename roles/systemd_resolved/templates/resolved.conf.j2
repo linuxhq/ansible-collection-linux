@@ -22,7 +22,9 @@
 {%   elif value is number %}
 {{ key }}={{ value | int }}
 {%   elif value is iterable %}
-{{ key }}={{ value | join(' ') }}
+{%     for v in value %}
+{{ key }}={{ v }}
+{%     endfor %}
 {%   else %}
 {{ key }}={{ value }}
 {%   endif %}

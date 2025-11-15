@@ -4,6 +4,19 @@ linuxhq.linux Release Notes
 
 .. contents:: Topics
 
+v2.1.1
+======
+
+Release Summary
+---------------
+
+Updates systemd_resolved configuration template to correctly handle iterable values
+
+Breaking Changes / Porting Guide
+--------------------------------
+
+- Iterable values in systemd_resolved config are now handled differently
+
 v2.1.0
 ======
 
