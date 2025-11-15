@@ -1,6 +1,13 @@
 ---
 ancestor: null
 releases:
+  2.1.1:
+    changes:
+      breaking_changes:
+        - Iterable values in systemd_resolved config are now handled differently
+      release_summary: >-
+        Updates systemd_resolved configuration template to correctly
+        handle iterable values
   2.1.0:
     changes:
       minor_changes:
