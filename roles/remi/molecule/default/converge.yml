@@ -1,0 +1,10 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - remi
+
+    - role: remi
+      remi_packages:
+        - '@php:remi-8.5'
+...

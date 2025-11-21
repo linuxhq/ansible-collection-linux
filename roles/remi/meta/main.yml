@@ -1,0 +1,19 @@
+---
+dependencies:
+  - role: epel
+    tags: remi
+galaxy_info:
+  role_name: remi
+  author: Taylor Kimball
+  description: Remi's RPM repository
+  license: GPL-3.0-or-later
+  min_ansible_version: 2.15.0
+  namespace: linuxhq
+  platforms:
+    - name: EL
+      versions:
+        - '9'
+        - '10'
+  galaxy_tags:
+    - remi
+...

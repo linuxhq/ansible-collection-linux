@@ -4,6 +4,19 @@ linuxhq.linux Release Notes
 
 .. contents:: Topics
 
+v2.1.2
+======
+
+Release Summary
+---------------
+
+Addition of remis rpm repository role
+
+Minor Changes
+-------------
+
+- Initial commit of remi role
+
 v2.1.1
 ======
 
