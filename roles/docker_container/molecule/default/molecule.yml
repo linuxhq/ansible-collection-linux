@@ -9,7 +9,8 @@ driver:
 
 platforms:
   - name: almalinux9
-    box: bento/almalinux-9
+    box: bento/almalinux-9.6
+    box_architecture: amd64
     cpus: 4
     memory: 4096
 
