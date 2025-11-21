@@ -1,0 +1,22 @@
+---
+- name: Verify
+  hosts: all
+  tasks:
+    - name: Ensure remi package facts are gathered
+      tags:
+        - remi
+      ansible.builtin.package_facts:
+        manager: rpm
+        strategy: first
+
+    - name: Ensure remi package facts are verified
+      tags:
+        - remi
+      ansible.builtin.assert:
+        that:
+          - packages['php-cli'].0.version is match('8.5')
+          - packages['php-common'].0.version is match('8.5')
+          - packages['php-fpm'].0.version is match('8.5')
+          - packages['php-mbstring'].0.version is match('8.5')
+          - packages['php-xml'].0.version is match('8.5')
+...
