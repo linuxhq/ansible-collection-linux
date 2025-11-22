@@ -10,7 +10,7 @@ driver:
 platforms:
   - name: almalinux9
     box: bento/almalinux-9.6
-    box_architecture: amd64
+    box_architecture: arm64
     cpus: 4
     memory: 4096
     instance_raw_config_args:
@@ -18,7 +18,7 @@ platforms:
 
   - name: debian12
     box: bento/debian-12.12
-    box_architecture: amd64
+    box_architecture: arm64
     cpus: 4
     memory: 4096
     instance_raw_config_args:

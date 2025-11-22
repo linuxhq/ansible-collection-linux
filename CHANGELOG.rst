@@ -4,6 +4,20 @@ linuxhq.linux Release Notes
 
 .. contents:: Topics
 
+v2.1.3
+======
+
+Release Summary
+---------------
+
+A set of minor fixes for the epel and remi roles. Update galaxy requirements.yml versions.
+
+Minor Changes
+-------------
+
+- epel - Fix conditional around ansible_distribution_major_version
+- remi - Fix remi-release installation, removal of rpm keys from defaults
+
 v2.1.2
 ======
 
