@@ -1,16 +1,5 @@
 ---
 remi_baseurl: 'https://rpms.remirepo.net'
-remi_gpg_keys:
-  - "{{ remi_baseurl }}/RPM-GPG-KEY-remi"
-  - "{{ remi_baseurl }}/RPM-GPG-KEY-remi2017"
-  - "{{ remi_baseurl }}/RPM-GPG-KEY-remi2018"
-  - "{{ remi_baseurl }}/RPM-GPG-KEY-remi2019"
-  - "{{ remi_baseurl }}/RPM-GPG-KEY-remi2020"
-  - "{{ remi_baseurl }}/RPM-GPG-KEY-remi2021"
-  - "{{ remi_baseurl }}/RPM-GPG-KEY-remi2022"
-  - "{{ remi_baseurl }}/RPM-GPG-KEY-remi2023"
-  - "{{ remi_baseurl }}/RPM-GPG-KEY-remi2024"
-  - "{{ remi_baseurl }}/RPM-GPG-KEY-remi2025"
 remi_packages: []
 remi_release: "remi-release-{{ ansible_distribution_major_version }}.rpm"
 remi_repositories:

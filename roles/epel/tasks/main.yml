@@ -15,7 +15,7 @@
     name: powertools
     state: enabled
   when:
-    - ansible_distribution_major_version == '8'
+    - ansible_distribution_major_version | int == 8
 
 - name: Ensure epel repository dependencies are enabled
   tags:
@@ -25,7 +25,7 @@
     name: crb
     state: enabled
   when:
-    - ansible_distribution_major_version >= '9'
+    - ansible_distribution_major_version | int >= 9
 
 - name: Ensure epel repositories are managed
   tags:

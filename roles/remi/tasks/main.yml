@@ -1,4 +1,13 @@
 ---
+- name: Ensure remi repository package is present
+  tags:
+    - remi
+  become: true
+  ansible.builtin.dnf:
+    name: "{{ remi_baseurl }}/enterprise/{{ remi_release }}"
+    disable_gpg_check: true
+    state: present
+
 - name: Ensure remi repository gpg keys are present
   tags:
     - remi
@@ -6,18 +15,11 @@
   ansible.builtin.rpm_key:
     key: "{{ _key }}"
     state: present
-  loop: "{{ remi_gpg_keys }}"
+  loop:
+    - "/etc/pki/rpm-gpg/RPM-GPG-KEY-remi{{ ansible_date_time.year }}"
   loop_control:
     label: "{{ _key | d(none) }}"
     loop_var: _key
-
-- name: Ensure remi repository package is present
-  tags:
-    - remi
-  become: true
-  ansible.builtin.dnf:
-    name: "{{ remi_baseurl }}/enterprise/{{ remi_release }}"
-    state: present
 
 - name: Ensure remi repositories are managed
   tags:
