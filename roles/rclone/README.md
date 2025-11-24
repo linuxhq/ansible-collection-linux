@@ -12,6 +12,7 @@ None
 
     rclone_config: []
     rclone_config_pass: null
+    rclone_config_path: /etc/rclone/rclone.conf
     rclone_mounts: []
     rclone_no_log: false
     rclone_profile: {}
