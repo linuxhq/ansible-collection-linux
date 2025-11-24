@@ -14,6 +14,12 @@ platforms:
     cpus: 4
     memory: 4096
 
+  - name: almalinux10
+    box: bento/almalinux-10.0
+    box_architecture: arm64
+    cpus: 4
+    memory: 4096
+
 provisioner:
   name: ansible
   log: true

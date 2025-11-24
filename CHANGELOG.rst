@@ -4,6 +4,24 @@ linuxhq.linux Release Notes
 
 .. contents:: Topics
 
+v2.1.4
+======
+
+Release Summary
+---------------
+
+A set of breaking and minor changes to the rclone role
+
+Minor Changes
+-------------
+
+- rclone - Added support for encrypting rclone configuration file
+
+Breaking Changes / Porting Guide
+--------------------------------
+
+- rclone - Renamed rclone_conf to rclone_config to align with other defaults
+
 v2.1.3
 ======
 
