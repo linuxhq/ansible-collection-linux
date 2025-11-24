@@ -1,8 +1,6 @@
 # {{ ansible_managed }}
 
-RCLONE_CONFIG=/etc/rclone/rclone.conf
-
-{% for key, value in rclone_sysconfig.items() %}
+{% for key, value in __rclone_sysconfig | dictsort %}
 {%   if value is sameas true %}
 {{ key | upper }}=true
 {%   elif value is sameas false %}

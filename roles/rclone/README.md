@@ -10,7 +10,8 @@ None
 
 ## Role Variables
 
-    rclone_conf: []
+    rclone_config: []
+    rclone_config_pass: null
     rclone_mounts: []
     rclone_no_log: false
     rclone_profile: {}
@@ -25,31 +26,29 @@ None
     - hosts: server
       roles:
         - role: linuxhq.linux.rclone
-          rclone_conf:
+          rclone_config:
             - name: koofr
               password: "{{ lookup('env', 'KOOFR_PASSWORD') }}"
               provider: koofr
               type: koofr
               user: "{{ lookup('env', 'KOOFR_USERNAME') }}"
 
-            - name: koofr-crypt
-              password: "{{ lookup('env', 'KOOFR_CRYPT_PASSWORD') }}"
-              password2: "{{ lookup('env', 'KOOFR_CRYPT_PASSWORD2') }}"
-              remote: koofr:/rclone
-              type: crypt
+          rclone_config_pass: VhpgjeaYPbXzrAx9ogXE3Txp
 
           rclone_mounts:
-            - name: rclone-koofr-ro
-              remote: 'koofr-crypt:'
+            - name: rclone-koofr
+              remote: 'koofr:'
               mountpoint: /mnt/koofr
               flags:
                 - --read-only
 
           rclone_profile:
+            rclone_progress: true
             rclone_verbose: 1
 
           rclone_sysconfig:
             rclone_allow_other: true
+            rclone_read_only: true
 
 ## License
 

@@ -1,6 +1,6 @@
 # {{ ansible_managed }}
 
-{% for remote in rclone_conf %}
+{% for remote in rclone_config %}
 [{{ remote.name }}]
 {%   for key, value in remote | dictsort if key != 'name' %}
 {%     if value is sameas true %}

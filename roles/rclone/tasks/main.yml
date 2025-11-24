@@ -1,13 +1,21 @@
 ---
-- name: Ensure rclone package is present
+- name: Ensure rclone facts are generated
   tags:
     - rclone
-  become: true
-  ansible.builtin.dnf:
-    name: rclone
-    state: present
+  ansible.builtin.set_fact:
+    __rclone_profile:
+      "{{ rclone_profile |
+          combine({
+            'rclone_config': rclone_config_path
+          }) }}"
+    __rclone_sysconfig:
+      "{{ rclone_sysconfig |
+          combine({
+            'rclone_config': rclone_config_path,
+            'rclone_config_pass': rclone_config_pass
+          }) }}"
 
-- name: Ensure rclone mount dependency packages are present
+- name: Ensure rclone packages are present
   tags:
     - rclone
   become: true
@@ -15,6 +23,7 @@
     name:
       - fuse3
       - fuse3-libs
+      - rclone
     state: present
     validate_certs: true
 
@@ -26,8 +35,39 @@
     group: root
     mode: '0700'
     owner: root
-    path: /etc/rclone
+    path: "{{ rclone_config_path | dirname }}"
     state: directory
+
+- name: Ensure rclone encryption configuration is checked
+  tags:
+    - rclone
+  become: true
+  ansible.builtin.command:
+    cmd: >
+      rclone config encryption check
+        --config {{ rclone_config_path }}
+        --password-command '/bin/echo {{ rclone_config_pass }}'
+  register: __rclone_encryption_check
+  changed_when: false
+  failed_when: false
+  when:
+    - rclone_config | length > 0
+    - rclone_config_pass is not none
+
+- name: Ensure rclone encryption configuration is removed
+  tags:
+    - rclone
+  become: true
+  ansible.builtin.command:
+    cmd: >
+      rclone config encryption remove
+        --config {{ rclone_config_path }}
+        --password-command '/bin/echo {{ rclone_config_pass }}'
+  changed_when: false
+  when:
+    - rclone_config | length > 0
+    - rclone_config_pass is not none
+    - __rclone_encryption_check.rc == 0
 
 - name: Ensure rclone configuration file is managed
   tags:
@@ -36,10 +76,24 @@
   no_log: "{{ rclone_no_log }}"
   ansible.builtin.template:
     group: root
-    dest: /etc/rclone/rclone.conf
+    dest: "{{ rclone_config_path }}"
     mode: '0600'
     owner: root
     src: rclone.conf.j2
+
+- name: Ensure rclone encryption configuration is set
+  tags:
+    - rclone
+  become: true
+  ansible.builtin.command:
+    cmd: >
+      rclone config encryption set
+        --config {{ rclone_config_path }}
+        --password-command '/bin/echo {{ rclone_config_pass }}'
+  changed_when: false
+  when:
+    - rclone_config | length > 0
+    - rclone_config_pass is not none
 
 - name: Ensure rclone profile configuration is managed
   tags:
