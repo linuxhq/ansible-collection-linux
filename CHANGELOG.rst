@@ -15,12 +15,12 @@ A set of breaking and minor changes to the rclone role
 Minor Changes
 -------------
 
-- rclone - Added support for encrypting rclone configuration file
+- rclone - added support for encrypting rclone configuration file
 
 Breaking Changes / Porting Guide
 --------------------------------
 
-- rclone - Renamed rclone_conf to rclone_config to align with other defaults
+- rclone - renamed rclone_conf to rclone_config to align with other defaults
 
 v2.1.3
 ======
@@ -33,8 +33,8 @@ A set of minor fixes for the epel and remi roles. Update galaxy requirements.yml
 Minor Changes
 -------------
 
-- epel - Fix conditional around ansible_distribution_major_version
-- remi - Fix remi-release installation, removal of rpm keys from defaults
+- epel - fix conditional around ansible_distribution_major_version
+- remi - fix remi-release installation, removal of rpm keys from defaults
 
 v2.1.2
 ======
@@ -47,7 +47,7 @@ Addition of remis rpm repository role
 Minor Changes
 -------------
 
-- Initial commit of remi role
+- remi - initial commit
 
 v2.1.1
 ======
@@ -60,7 +60,7 @@ Updates systemd_resolved configuration template to correctly handle iterable val
 Breaking Changes / Porting Guide
 --------------------------------
 
-- Iterable values in systemd_resolved config are now handled differently
+- systemd_resolved - iterable values are now handled differently
 
 v2.1.0
 ======
@@ -73,7 +73,7 @@ Ensure galaxy dependencies are less strict
 Minor Changes
 -------------
 
-- Ensure galaxy dependencies are less strict
+- galaxy - ensure dependencies are less strict
 
 v2.0.9
 ======
@@ -86,20 +86,20 @@ This is the beginning of the linuxhq.linux collection changelog.
 Minor Changes
 -------------
 
-- Added antsibull-changelog support
-- Initial commit of systemd role
-- Initial commit of systemd_networkd role
-- Initial commit of systemd_resolved role
-- Update cloudflared systemd unit (network-online.target)
-- Update galaxy dependency versions
-- Update rclone role to use epel release
+- changelog - addition of antsibull-changelog
+- cloudflared - update systemd unit (network-online.target)
+- galaxy - update dependency versions
+- rclone - use epel package
+- systemd - initial commit
+- systemd_networkd - initial commit
+- systemd_resolved - initial commit
 
 Breaking Changes / Porting Guide
 --------------------------------
 
-- Deprecated hostnamectl role in favor of systemd role
-- Deprecated localectl role in favor of systemd role
-- Deprecated logind role in favor of systemd role
-- Deprecated network_manager role in favor of systemd_networkd
-- Deprecated timedatectl role in favor of systemd role
-- Update rclone_conf default from dict->list
+- hostnamectl - deprecated
+- localectl - deprecated
+- logind - deprecated
+- network_manager - deprecated
+- rclone - update rclone_conf from dict->list
+- timedatectl - deprecated
