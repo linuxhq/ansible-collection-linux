@@ -1,0 +1,9 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - cloudflare_warp
+
+    - role: cloudflare_warp
+      cloudflare_warp_token: "{{ lookup('env', 'CLOUDFLARE_WARP_TOKEN') }}"
+...

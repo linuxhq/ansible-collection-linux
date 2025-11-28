@@ -1,6 +1,12 @@
 ---
 ancestor: null
 releases:
+  2.1.5:
+    changes:
+      minor_changes:
+        - cloudflare_warp - initial commit
+      release_summary:
+        This release includes a new role - cloudflare_warp
   2.1.4:
     changes:
       breaking_changes:
@@ -55,5 +61,4 @@ releases:
         - systemd_resolved - initial commit
       release_summary: >-
         This is the beginning of the linuxhq.linux collection changelog.
-    release_date: '2025-11-12'
 ...
