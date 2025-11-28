@@ -1,0 +1,18 @@
+---
+- name: Verify
+  hosts: all
+  tasks:
+    - name: Ensure cloudflare warp service info is gathered
+      tags:
+        - cloudflare_warp
+      ansible.builtin.service_facts:
+
+    - name: Ensure cloudflare warp service info is verified
+      tags:
+        - cloudflare_warp
+      ansible.builtin.assert:
+        that:
+          - services['warp-svc.service'] is defined
+          - services['warp-svc.service'].state  == 'running'
+          - services['warp-svc.service'].status == 'enabled'
+...

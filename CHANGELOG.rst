@@ -4,6 +4,19 @@ linuxhq.linux Release Notes
 
 .. contents:: Topics
 
+v2.1.5
+======
+
+Release Summary
+---------------
+
+This release includes a new role - cloudflare_warp
+
+Minor Changes
+-------------
+
+- cloudflare_warp - initial commit
+
 v2.1.4
 ======
 

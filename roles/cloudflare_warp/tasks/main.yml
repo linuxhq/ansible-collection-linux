@@ -1,0 +1,73 @@
+---
+- name: Ensure cloudflare warp repository file is present
+  tags:
+    - cloudflare_warp
+  become: true
+  ansible.builtin.yum_repository:
+    baseurl: https://pkg.cloudflareclient.com/rpm
+    description: cloudflare-warp-stable
+    enabled: true
+    gpgcheck: true
+    gpgkey: https://pkg.cloudflareclient.com/pubkey.gpg
+    file: cloudflare-warp
+    name: cloudflare-warp-stable
+
+- name: Ensure cloudflare warp repository key is present
+  tags:
+    - cloudflare_warp
+  become: true
+  ansible.builtin.rpm_key:
+    key: https://pkg.cloudflareclient.com/pubkey.gpg
+    state: present
+    validate_certs: true
+
+- name: Ensure cloudflare warp packages are present
+  tags:
+    - cloudflare_warp
+  become: true
+  ansible.builtin.dnf:
+    name: cloudflare-warp
+    state: present
+
+- name: Ensure cloudflare warp is started and enabled on boot
+  tags:
+    - cloudflare_warp
+  become: true
+  ansible.builtin.service:
+    enabled: true
+    name: warp-svc.service
+    state: started
+
+- name: Ensure cloudflare warp status is gathered
+  tags:
+    - cloudflare_warp
+  ansible.builtin.command:
+    cmd: >
+      /usr/bin/warp-cli --accept-tos status
+  register: __cloudflare_warp_status
+  changed_when: false
+
+- name: Ensure cloudflare warp connector token is set
+  tags:
+    - cloudflare_warp
+  become: true
+  ansible.builtin.command:
+    cmd: >
+      /usr/bin/warp-cli --accept-tos connector new {{ cloudflare_warp_token }}
+  changed_when: true
+  when:
+    - cloudflare_warp_token is not none
+    - __cloudflare_warp_status.stdout
+        is not search('connected', ignorecase=true)
+
+- name: Ensure cloudflare warp connector is connected
+  tags:
+    - cloudflare_warp
+  become: true
+  ansible.builtin.command:
+    cmd: >
+      /usr/bin/warp-cli --accept-tos connect
+  changed_when: true
+  when:
+    - cloudflare_warp_token is not none
+...
