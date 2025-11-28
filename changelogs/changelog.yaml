@@ -1,6 +1,12 @@
 ---
 ancestor: null
 releases:
+  2.1.6:
+    changes:
+      minor_changes:
+        - rclone - only populate rclone_config_pass is mounts are defined
+      release_summary:
+        This release includes a minor change to rclone role config pass population
   2.1.5:
     changes:
       minor_changes:

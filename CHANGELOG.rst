@@ -4,6 +4,19 @@ linuxhq.linux Release Notes
 
 .. contents:: Topics
 
+v2.1.6
+======
+
+Release Summary
+---------------
+
+This release includes a minor change to rclone role config pass population
+
+Minor Changes
+-------------
+
+- rclone - only populate rclone_config_pass is mounts are defined
+
 v2.1.5
 ======
 
