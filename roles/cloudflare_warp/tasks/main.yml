@@ -47,6 +47,13 @@
   register: __cloudflare_warp_status
   changed_when: false
 
+- name: Ensure cloudflare warp status fact is generated
+  tags:
+    - cloudflare_warp
+  ansible.builtin.set_fact:
+    __cloudflare_warp_connected:
+      "{{ 'Connected' in __cloudflare_warp_status.stdout }}"
+
 - name: Ensure cloudflare warp connector token is set
   tags:
     - cloudflare_warp
@@ -57,8 +64,7 @@
   changed_when: true
   when:
     - cloudflare_warp_token is not none
-    - __cloudflare_warp_status.stdout
-        is not search('connected', ignorecase=true)
+    - not __cloudflare_warp_connected | bool
 
 - name: Ensure cloudflare warp connector is connected
   tags:
@@ -70,4 +76,5 @@
   changed_when: true
   when:
     - cloudflare_warp_token is not none
+    - not __cloudflare_warp_connected | bool
 ...
