@@ -77,4 +77,23 @@
   when:
     - cloudflare_warp_token is not none
     - not __cloudflare_warp_connected | bool
+
+- name: Ensure cloudflare warp scripts are managed
+  tags:
+    - cloudflare_warp
+  become: true
+  ansible.builtin.template:
+    dest: "{{ _script.path }}/{{ _script.name }}"
+    group: root
+    mode: '0700'
+    owner: root
+    src: script.j2
+  loop: "{{ cloudflare_warp_scripts }}"
+  loop_control:
+    label: "{{ _script.name | d(none) }}"
+    loop_var: _script
+  when:
+    - _script.base64 is defined
+    - _script.name is defined
+    - _script.path is defined
 ...

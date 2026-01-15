@@ -10,6 +10,7 @@ None
 
 ## Role Variables
 
+    cloudflare_warp_scripts: []
     cloudflare_warp_token: null
 
 ## Dependencies
