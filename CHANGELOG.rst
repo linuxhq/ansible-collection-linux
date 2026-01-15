@@ -4,6 +4,19 @@ linuxhq.linux Release Notes
 
 .. contents:: Topics
 
+v2.1.8
+======
+
+Release Summary
+---------------
+
+This release adds support for overlaying custom scripts alongside cloudflare warp
+
+Minor Changes
+-------------
+
+- cloudflare_warp - add support for overlaying custom scripts
+
 v2.1.7
 ======
 

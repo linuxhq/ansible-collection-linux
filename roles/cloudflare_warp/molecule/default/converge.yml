@@ -6,4 +6,25 @@
 
     - role: cloudflare_warp
       cloudflare_warp_token: "{{ lookup('env', 'CLOUDFLARE_WARP_TOKEN') }}"
+      cloudflare_warp_scripts:
+        - name: cloudflare_warp_sshd.sh
+          path: /etc/cron.hourly
+          base64: |
+            IyEvdXNyL2Jpbi9lbnYgYmFzaAoKc3NoZF93YXJwX2Rpcj0iL2V0Yy9zc2gvc3NoZF9jb25maWcu
+            ZCIKc3NoZF93YXJwX2hvc3Q9IndhcnAuJChob3N0bmFtZSkiCnNzaGRfd2FycF9pbnRlcmZhY2U9
+            IkNsb3VkZmxhcmVXQVJQIgpzc2hkX3dhcnBfbmFtZT0iOTktY2xvdWRmbGFyZS5jb25mIgoKaWYg
+            WyAiJHtFVUlEfSIgLW5lIDAgXTsgdGhlbgogIGVjaG8gIkVSUk9SOiBUaGlzIHNjcmlwdCBtdXN0
+            IGJlIHJ1biBhcyByb290LCBleGl0aW5nLiIKICBleGl0IDEKZmkKCmlmICEgdHlwZSAtUCBkaWcg
+            Jj4vZGV2L251bGw7IHRoZW4KICBlY2hvICJFUlJPUjogVGhlIGRpZyBiaW5hcnkgaXMgbm90IGF2
+            YWlsYWJsZSwgZXhpdGluZy4iCiAgZXhpdCAxCmZpCgpzc2hkX3dhcnBfc3lzZnM9Ii9zeXMvY2xh
+            c3MvbmV0LyR7c3NoZF93YXJwX2ludGVyZmFjZX0iCnNzaGRfd2FycF9pcGFkZHI9IiQoZGlnICtz
+            aG9ydCAiJHtzc2hkX3dhcnBfaG9zdH0iKSIKc3NoZF93YXJwX2NvbmZpZz0iJHtzc2hkX3dhcnBf
+            ZGlyfS8ke3NzaGRfd2FycF9uYW1lfSIKCmlmIFsgISAtZSAiJHtzc2hkX3dhcnBfc3lzZnN9IiBd
+            IHx8IFsgISAtbiAiJHtzc2hkX3dhcnBfaXBhZGRyfSIgXTsgdGhlbgogIHJtIC1mICIke3NzaGRf
+            d2FycF9jb25maWd9IgogIHN5c3RlbWN0bCByZXN0YXJ0IHNzaGQuc2VydmljZQogIGV4aXQgMQpm
+            aQoKbWtkaXIgLXAgIiR7c3NoZF93YXJwX2Rpcn0iCmNobW9kIDc1NSAiJHtzc2hkX3dhcnBfZGly
+            fSIKCnRvdWNoICIke3NzaGRfd2FycF9jb25maWd9IgpjaG1vZCA2MDAgIiR7c3NoZF93YXJwX2Nv
+            bmZpZ30iCgpjYXQgPDxFT0YgPiIke3NzaGRfd2FycF9jb25maWd9IgojICR7c3NoZF93YXJwX25h
+            bWV9CgpMaXN0ZW5BZGRyZXNzICR7c3NoZF93YXJwX2lwYWRkcn0KRU9GCgpzeXN0ZW1jdGwgcmVz
+            dGFydCBzc2hkLnNlcnZpY2UKZXhpdCAwCg==
 ...
