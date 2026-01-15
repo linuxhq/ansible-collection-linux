@@ -4,6 +4,19 @@ linuxhq.linux Release Notes
 
 .. contents:: Topics
 
+v2.1.7
+======
+
+Release Summary
+---------------
+
+This release adds support for defining include files in openssh server configuration file
+
+Minor Changes
+-------------
+
+- openssh_server - add support for defining include files in sshd_config
+
 v2.1.6
 ======
 

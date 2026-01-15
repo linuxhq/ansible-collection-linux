@@ -7,6 +7,8 @@
         - molecule-idempotence-notest
 
     - role: openssh_server
+      openssh_server_include:
+        - /etc/ssh/sshd_config.d/99-cloudflare.conf
       openssh_server_parameters:
         AddressFamily: inet
         AllowAgentForwarding: false
