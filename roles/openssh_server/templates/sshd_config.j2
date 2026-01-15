@@ -17,3 +17,9 @@
 {{ key }} {{ value }}
 {%   endif %}
 {% endfor %}
+{% if openssh_server_include | length > 0 %}
+
+{%   for include in openssh_server_include %}
+Include {{ include }}
+{%   endfor %}
+{% endif %}

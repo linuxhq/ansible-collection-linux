@@ -1,6 +1,12 @@
 ---
 ancestor: null
 releases:
+  2.1.7:
+    changes:
+      minor_changes:
+        - openssh_server - add support for defining include files in sshd_config
+      release_summary:
+        This release adds support for defining include files in openssh server configuration file
   2.1.6:
     changes:
       minor_changes:

@@ -10,6 +10,7 @@ None
 
 ## Role Variables
 
+    openssh_server_include: []
     openssh_server_parameters:
       AcceptEnv:
         - LANG LC_CTYPE LC_NUMERIC LC_TIME LC_COLLATE LC_MONETARY LC_MESSAGES
@@ -41,6 +42,8 @@ None
     - hosts: server
       roles:
         - role: linuxhq.linux.openssh_server
+          openssh_server_include:
+            - /etc/ssh/sshd_config.d/99-cloudflare.conf
           openssh_server_parameters:
             AddressFamily: inet
             AllowAgentForwarding: false
