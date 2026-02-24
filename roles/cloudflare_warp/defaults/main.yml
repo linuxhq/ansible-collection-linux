@@ -1,5 +1,6 @@
 ---
 cloudflare_warp_no_color: false
+cloudflare_warp_log_level_max: info
 cloudflare_warp_scripts: []
 cloudflare_warp_token: null
 ...

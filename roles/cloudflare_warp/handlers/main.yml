@@ -1,0 +1,9 @@
+---
+- name: Restart warp-svc
+  tags:
+    - cloudflare_warp
+  become: true
+  ansible.builtin.systemd_service:
+    name: warp-svc.service
+    state: restarted
+...

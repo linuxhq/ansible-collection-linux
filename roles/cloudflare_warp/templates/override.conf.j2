@@ -1,0 +1,5 @@
+# {{ ansible_managed }}
+
+[Service]
+Environment="NO_COLOR={{ '1' if cloudflare_warp_no_color | bool else '0' }}"
+LogLevelMax={{ cloudflare_warp_log_level_max }}
