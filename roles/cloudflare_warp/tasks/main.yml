@@ -29,6 +29,32 @@
     name: cloudflare-warp
     state: present
 
+- name: Ensure cloudflare systemd service is patched
+  tags:
+    - cloudflare_warp
+  become: true
+  ansible.builtin.lineinfile:
+    insertbefore: '^ExecStart'
+    line: 'Environment="NO_COLOR=1"'
+    path: "{{ _systemd_service }}"
+  loop:
+    - /etc/systemd/system/warp-svc.service
+    - /usr/lib/systemd/user/warp-desktop-svc.service
+  loop_control:
+    label: "{{ _systemd_service | d(none) }}"
+    loop_var: _systemd_service
+  when:
+    - cloudflare_warp_no_color | bool
+
+- name: Ensure cloudflared systemd service is reloaded
+  tags:
+    - cloudflare_warp
+  become: true
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  when:
+    - cloudflare_warp_no_color | bool
+
 - name: Ensure cloudflare warp is started and enabled on boot
   tags:
     - cloudflare_warp

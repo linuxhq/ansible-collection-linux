@@ -1,6 +1,13 @@
 ---
 ancestor: null
 releases:
+  2.2.0:
+    changes:
+      minor_changes:
+        - cloudflare_warp - add option to toggle no color environment variable
+      release_summary:
+        This release provides a toggle for a cloudflare warp systemd addition
+        by defining NO_COLOR=1 in the service files.
   2.1.9:
     changes:
       breaking_changes:

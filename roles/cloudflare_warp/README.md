@@ -10,6 +10,7 @@ None
 
 ## Role Variables
 
+    cloudflare_warp_no_color: false
     cloudflare_warp_scripts: []
     cloudflare_warp_token: null
 
@@ -22,6 +23,7 @@ None
     - hosts: server
       roles:
         - role: linuxhq.linux.cloudflare_warp
+          cloudflare_warp_no_color: true
           cloudflare_warp_token: "{{ lookup('env', 'CLOUDFLARE_WARP_TOKEN') }}"
 
 ## License

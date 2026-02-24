@@ -4,6 +4,19 @@ linuxhq.linux Release Notes
 
 .. contents:: Topics
 
+v2.2.0
+======
+
+Release Summary
+---------------
+
+This release provides a toggle for a cloudflare warp systemd addition by defining NO_COLOR=1 in the service files.
+
+Minor Changes
+-------------
+
+- cloudflare_warp - add option to toggle no color environment variable
+
 v2.1.9
 ======
 
