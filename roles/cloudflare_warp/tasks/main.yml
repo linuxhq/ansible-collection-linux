@@ -29,37 +29,41 @@
     name: cloudflare-warp
     state: present
 
-- name: Ensure cloudflare systemd service is patched
+- name: Ensure cloudflare warp systemd override directory is managed
   tags:
     - cloudflare_warp
   become: true
-  ansible.builtin.lineinfile:
-    insertbefore: '^ExecStart'
-    line: 'Environment="NO_COLOR=1"'
-    path: "{{ _systemd_service }}"
-  loop:
-    - /etc/systemd/system/warp-svc.service
-    - /usr/lib/systemd/user/warp-desktop-svc.service
-  loop_control:
-    label: "{{ _systemd_service | d(none) }}"
-    loop_var: _systemd_service
-  when:
-    - cloudflare_warp_no_color | bool
+  ansible.builtin.file:
+    group: root
+    mode: '0755'
+    owner: root
+    path: /etc/systemd/system/warp-svc.service.d
+    state: directory
 
-- name: Ensure cloudflared systemd service is reloaded
+- name: Ensure cloudflare warp systemd override is managed
+  tags:
+    - cloudflare_warp
+  become: true
+  ansible.builtin.template:
+    dest: /etc/systemd/system/warp-svc.service.d/override.conf
+    group: root
+    mode: '0644'
+    owner: root
+    src: override.conf.j2
+  notify: Restart warp-svc
+
+- name: Ensure cloudflare warp systemd service is reloaded
   tags:
     - cloudflare_warp
   become: true
   ansible.builtin.systemd_service:
     daemon_reload: true
-  when:
-    - cloudflare_warp_no_color | bool
 
 - name: Ensure cloudflare warp is started and enabled on boot
   tags:
     - cloudflare_warp
   become: true
-  ansible.builtin.service:
+  ansible.builtin.systemd_service:
     enabled: true
     name: warp-svc.service
     state: started

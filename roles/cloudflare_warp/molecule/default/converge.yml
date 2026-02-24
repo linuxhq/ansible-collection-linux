@@ -5,6 +5,8 @@
     - cloudflare_warp
 
     - role: cloudflare_warp
+      cloudflare_warp_no_color: true
+      cloudflare_warp_log_level_max: warning
       cloudflare_warp_token: "{{ lookup('env', 'CLOUDFLARE_WARP_TOKEN') }}"
       cloudflare_warp_scripts:
         - name: cloudflare_warp_sshd.sh

@@ -4,6 +4,20 @@ linuxhq.linux Release Notes
 
 .. contents:: Topics
 
+v2.2.1
+======
+
+Release Summary
+---------------
+
+Update cloudflare_warp role to support modification of log level at the systemd service level
+
+Minor Changes
+-------------
+
+- cloudflare_warp - add support for changing log level
+- cloudflare_warp - use systemd override instead of lineinfile
+
 v2.2.0
 ======
 
