@@ -29,22 +29,12 @@ None
         - role: linuxhq.linux.cloudflared
           cloudflared_tunnels:
             - name: linuxhq.net
-              account_tag: 68b329da9893e34099c7d8ad5cb9c940
-              id: ac5a6018-3af1-11ee-be56-0242ac120002
-              ingress:
-                - hostname: linuxhq.net
-                  service: ssh://localhost:22
-                - service: http_status:404
-              secret: bUZVQVZ0UnNBcWtUUGV4M0N2WHpMUHpleVdxZ3RWZlQ3VldqeHFoN0plUHdqTkpGSnR0N1hxZm5IM0E3RXZDeg==
+              token: >
+                eyJhIjoiMzFhMTQ2NDRmZmI0NjJlODg3NDEyYWVhZDRjNWM0NmUiLCJ0IjoiMTBjNDE5YzUtZWU1NS00ZTA1LTk0MDUtYzMzYjY4NDgwNmY1IiwicyI6IldyeGFBb1Vzc014OXVQM3hYSHF0b2tKYlZSeWloWGJIM3VLRW9WYm9KcGVFVld2Zkt2d2JMaFRUS3BSZWNSckVrNGZwWGthRUh5Zm5lOUxWZWJNVG00PT0ifQ==
 
             - name: linuxhq.org
-              account_tag: 68b329da9893e34099c7d8ad5cb9c940
-              id: dd261e95-29a7-4653-93f4-3222b852cd8b
-              ingress:
-                - hostname: linuxhq.net
-                  service: ssh://localhost:22
-                - service: http_status:404
-              secret: zUZVQVX0UnNBcWtURGV4M0N2WHpMUHpleVdxZ3RWZlC3VldqeHFoN0plUHdqTkpGSnRaN1hxZm5IM0E3RXZDegF2
+              token: >
+                eyJhIjoiNGZjY2ZiZGY0Y2VmYTM5MjE2ZTM1NGM4NTgxN2U0YTciLCJ0IjoiZDVhNzI4Y2QtODg0Mi00ZDE5LWI3OGEtYjE0ZDMwYjljMmVhIiwicyI6ImVBS29IS3pOTG1pZXdtdEV2YXRYb0Vjc3VGS3M3OWt6ajRQTEtITWpGTXV5VVBQclBOSmdKc1BGcWg5VGlwaXJhaUtueUxNdlB6b2d1bUprcEFhYWNhPT0ifQ==
 
 ## License
 
