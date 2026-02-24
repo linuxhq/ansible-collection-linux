@@ -10,7 +10,11 @@ driver:
 platforms:
   - name: almalinux9
     box: bento/almalinux-9.6
-    box_architecture: arm64
+    cpus: 4
+    memory: 4096
+
+  - name: almalinux10
+    box: bento/almalinux-10.0
     cpus: 4
     memory: 4096
 
@@ -19,6 +23,17 @@ provisioner:
   log: true
   options:
     diff: true
+  inventory:
+    group_vars:
+      all:
+        cloudflared_tunnels:
+          - name: linuxhq.net
+            token: >
+              eyJhIjoiMzFhMTQ2NDRmZmI0NjJlODg3NDEyYWVhZDRjNWM0NmUiLCJ0IjoiMTBjNDE5YzUtZWU1NS00ZTA1LTk0MDUtYzMzYjY4NDgwNmY1IiwicyI6IldyeGFBb1Vzc014OXVQM3hYSHF0b2tKYlZSeWloWGJIM3VLRW9WYm9KcGVFVld2Zkt2d2JMaFRUS3BSZWNSckVrNGZwWGthRUh5Zm5lOUxWZWJNVG00PT0ifQ==
+
+          - name: linuxhq.org
+            token: >
+              eyJhIjoiNGZjY2ZiZGY0Y2VmYTM5MjE2ZTM1NGM4NTgxN2U0YTciLCJ0IjoiZDVhNzI4Y2QtODg0Mi00ZDE5LWI3OGEtYjE0ZDMwYjljMmVhIiwicyI6ImVBS29IS3pOTG1pZXdtdEV2YXRYb0Vjc3VGS3M3OWt6ajRQTEtITWpGTXV5VVBQclBOSmdKc1BGcWg5VGlwaXJhaUtueUxNdlB6b2d1bUprcEFhYWNhPT0ifQ==
 
 verifier:
   name: ansible

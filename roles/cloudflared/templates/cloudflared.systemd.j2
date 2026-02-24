@@ -7,7 +7,7 @@ Wants=network-online.target
 
 [Service]
 Type=notify
-ExecStart=/usr/bin/cloudflared --config /etc/cloudflared/%i.yaml --no-autoupdate {{ cloudflared_command }}
+ExecStart=/usr/bin/cloudflared --no-autoupdate {{ cloudflared_command }} --token-file /etc/cloudflared/%i.token
 Group={{ cloudflared_group }}
 Restart=always
 RestartSec=5s

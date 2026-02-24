@@ -4,6 +4,19 @@ linuxhq.linux Release Notes
 
 .. contents:: Topics
 
+v2.1.9
+======
+
+Release Summary
+---------------
+
+This release changes cloudflared role behavior migrating from locally configured tunnels to cloudflare managed tunnels, therefore only overlaying a tunnel token.
+
+Breaking Changes / Porting Guide
+--------------------------------
+
+- cloudflared - use managed tunnels and only overlay a single token
+
 v2.1.8
 ======
 

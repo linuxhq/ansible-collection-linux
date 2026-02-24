@@ -1,6 +1,14 @@
 ---
 ancestor: null
 releases:
+  2.1.9:
+    changes:
+      breaking_changes:
+        - cloudflared - use managed tunnels and only overlay a single token
+      release_summary:
+        This release changes cloudflared role behavior migrating from locally
+        configured tunnels to cloudflare managed tunnels, therefore only
+        overlaying a tunnel token.
   2.1.8:
     changes:
       minor_changes:
