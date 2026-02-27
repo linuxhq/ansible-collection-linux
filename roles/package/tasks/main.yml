@@ -44,7 +44,7 @@
     update_cache_retry_max_delay: "{{ package_apt_update_cache_retry_max_delay }}"
   when:
     - __package_list_present | length > 0
-    - ansible_os_family == 'Debian'
+    - ansible_facts.os_family == 'Debian'
 
 - name: Ensure packages are present
   tags:
@@ -72,7 +72,7 @@
     validate_certs: "{{ package_dnf_validate_certs }}"
   when:
     - __package_list_present | length > 0
-    - ansible_os_family == 'RedHat'
+    - ansible_facts.os_family == 'RedHat'
 
 - name: Ensure packages are absent
   tags:
@@ -89,7 +89,7 @@
     state: absent
   when:
     - __package_list_absent | length > 0
-    - ansible_os_family == 'Debian'
+    - ansible_facts.os_family == 'Debian'
 
 - name: Ensure packages are absent
   tags:
@@ -104,5 +104,5 @@
     validate_certs: "{{ package_dnf_validate_certs }}"
   when:
     - __package_list_absent | length > 0
-    - ansible_os_family == 'RedHat'
+    - ansible_facts.os_family == 'RedHat'
 ...

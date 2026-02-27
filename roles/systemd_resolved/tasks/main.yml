@@ -7,7 +7,7 @@
     name: systemd-resolved
     state: present
   when:
-    - ansible_os_family == 'Debian'
+    - ansible_facts.os_family == 'Debian'
 
 - name: Ensure systemd resolved package is present
   tags:
@@ -17,7 +17,7 @@
     name: systemd-resolved
     state: present
   when:
-    - ansible_os_family == 'RedHat'
+    - ansible_facts.os_family == 'RedHat'
 
 - name: Ensure systemd resolved configuration is managed
   tags:

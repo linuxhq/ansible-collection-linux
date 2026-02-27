@@ -8,7 +8,7 @@
     state: present
     update_cache: true
   when:
-    - ansible_os_family == 'Debian'
+    - ansible_facts.os_family == 'Debian'
 
 - name: Ensure systemd package is present
   tags:
@@ -18,13 +18,13 @@
     name: systemd
     state: present
   when:
-    - ansible_os_family == 'RedHat'
+    - ansible_facts.os_family == 'RedHat'
 
 - name: Ensure rc.local os specific vars are present
   tags:
     - rc_local
   ansible.builtin.include_vars:
-    file: "{{ ansible_os_family }}.yml"
+    file: "{{ ansible_facts.os_family }}.yml"
 
 - name: Ensure rc.local template is present
   tags:

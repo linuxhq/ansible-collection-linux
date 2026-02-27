@@ -7,7 +7,7 @@
         - mount
       ansible.builtin.assert:
         that:
-          - ansible_mounts |
+          - ansible_facts.mounts |
             selectattr('device', 'eq', '/dev/sdb1') |
             map(attribute='mount') |
             first == '/srv'

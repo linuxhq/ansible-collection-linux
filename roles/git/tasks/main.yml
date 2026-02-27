@@ -8,7 +8,7 @@
     state: present
     update_cache: true
   when:
-    - ansible_os_family == 'Debian'
+    - ansible_facts.os_family == 'Debian'
 
 - name: Ensure git packages are present
   tags:
@@ -18,7 +18,7 @@
     name: "{{ git_packages }}"
     state: present
   when:
-    - ansible_os_family == 'RedHat'
+    - ansible_facts.os_family == 'RedHat'
 
 - name: Ensure git repositories are present
   tags:

@@ -37,10 +37,10 @@ None
               DUIDType: vendor
 
           systemd_networkd_files:
-            - name: "{{ ansible_default_ipv4.interface }}"
+            - name: "{{ ansible_facts.default_ipv4.interface }}"
               priority: 80
               match:
-                Name: "{{ ansible_default_ipv4.interface }}"
+                Name: "{{ ansible_facts.default_ipv4.interface }}"
               network:
                 DHCP: true
 
