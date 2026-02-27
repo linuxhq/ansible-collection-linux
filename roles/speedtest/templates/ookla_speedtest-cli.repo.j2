@@ -1,6 +1,6 @@
 [ookla_speedtest-cli]
 name=ookla_speedtest-cli
-baseurl=https://packagecloud.io/ookla/speedtest-cli/el/{{ ansible_distribution_major_version }}/$basearch
+baseurl=https://packagecloud.io/ookla/speedtest-cli/el/{{ ansible_facts.distribution_major_version }}/$basearch
 repo_gpgcheck=0
 gpgcheck=0
 enabled=1
@@ -11,7 +11,7 @@ metadata_expire=300
 
 [ookla_speedtest-cli-source]
 name=ookla_speedtest-cli-source
-baseurl=https://packagecloud.io/ookla/speedtest-cli/el/{{ ansible_distribution_major_version }}/SRPMS
+baseurl=https://packagecloud.io/ookla/speedtest-cli/el/{{ ansible_facts.distribution_major_version }}/SRPMS
 repo_gpgcheck=0
 gpgcheck=0
 enabled=0

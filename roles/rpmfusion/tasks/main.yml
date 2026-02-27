@@ -11,9 +11,9 @@
     state: present
   vars:
     __rpmfusion_rpm_free:
-      "{{ __rpmfusion_url_free }}/rpmfusion-free-release-{{ ansible_distribution_major_version }}.noarch.rpm"
+      "{{ __rpmfusion_url_free }}/rpmfusion-free-release-{{ ansible_facts.distribution_major_version }}.noarch.rpm"
     __rpmfusion_rpm_nonfree:
-      "{{ __rpmfusion_url_nonfree }}/rpmfusion-nonfree-release-{{ ansible_distribution_major_version }}.noarch.rpm"
+      "{{ __rpmfusion_url_nonfree }}/rpmfusion-nonfree-release-{{ ansible_facts.distribution_major_version }}.noarch.rpm"
     __rpmfusion_url_free:
       "https://mirrors.rpmfusion.org/free/el"
     __rpmfusion_url_nonfree:
@@ -27,7 +27,7 @@
     name: powertools
     state: enabled
   when:
-    - ansible_distribution_major_version == '8'
+    - ansible_facts.distribution_major_version == '8'
 
 - name: Ensure rpmfusion repository dependencies are enabled
   tags:
@@ -37,7 +37,7 @@
     name: crb
     state: enabled
   when:
-    - ansible_distribution_major_version >= '9'
+    - ansible_facts.distribution_major_version >= '9'
 
 - name: Ensure rpmfusion repositories are managed
   tags:
@@ -62,8 +62,8 @@
     key: "/etc/pki/rpm-gpg/RPM-GPG-KEY-rpmfusion-{{ _key }}"
     state: present
   loop:
-    - "free-el-{{ ansible_distribution_major_version }}"
-    - "nonfree-el-{{ ansible_distribution_major_version }}"
+    - "free-el-{{ ansible_facts.distribution_major_version }}"
+    - "nonfree-el-{{ ansible_facts.distribution_major_version }}"
   loop_control:
     label: "{{ _key }}"
     loop_var: _key

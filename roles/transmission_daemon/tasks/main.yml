@@ -8,7 +8,7 @@
     state: present
     update_cache: true
   when:
-    - ansible_os_family == 'Debian'
+    - ansible_facts.os_family == 'Debian'
 
 - name: Ensure transmission-daemon package is present
   tags:
@@ -19,13 +19,13 @@
     name: transmission-daemon
     state: present
   when:
-    - ansible_os_family == 'RedHat'
+    - ansible_facts.os_family == 'RedHat'
 
 - name: Ensure transmission-daemon os specific vars are included
   tags:
     - transmission_daemon
   ansible.builtin.include_vars:
-    file: "{{ ansible_os_family }}.yml"
+    file: "{{ ansible_facts.os_family }}.yml"
 
 - name: Ensure transmission-daemon configuration directories are present
   tags:
@@ -45,7 +45,7 @@
     label: "{{ _path }}"
     loop_var: _path
   when:
-    - ansible_os_family == 'RedHat'
+    - ansible_facts.os_family == 'RedHat'
 
 - name: Ensure transmission-daemon download directories are present
   tags:

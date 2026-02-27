@@ -16,7 +16,7 @@
     key: "{{ _key }}"
     state: present
   loop:
-    - "/etc/pki/rpm-gpg/RPM-GPG-KEY-remi{{ ansible_date_time.year }}"
+    - "/etc/pki/rpm-gpg/RPM-GPG-KEY-remi{{ ansible_facts.date_time.year }}"
   loop_control:
     label: "{{ _key | d(none) }}"
     loop_var: _key

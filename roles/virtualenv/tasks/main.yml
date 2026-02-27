@@ -8,7 +8,7 @@
     state: present
     update_cache: true
   when:
-    - ansible_os_family == 'Debian'
+    - ansible_facts.os_family == 'Debian'
 
 - name: Ensure virtual environment packages are present
   tags:
@@ -18,7 +18,7 @@
     name: python3
     state: present
   when:
-    - ansible_os_family == 'RedHat'
+    - ansible_facts.os_family == 'RedHat'
 
 - name: Ensure virtual environments are present
   tags:

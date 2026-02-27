@@ -17,7 +17,7 @@
           - '"apache2" in packages.keys()'
           - '"tuned" not in packages.keys()'
       when:
-        - ansible_os_family == 'Debian'
+        - ansible_facts.os_family == 'Debian'
 
     - name: Ensure package list is verified
       tags:
@@ -27,5 +27,5 @@
           - '"httpd" in packages.keys()'
           - '"tuned" not in packages.keys()'
       when:
-        - ansible_os_family == 'RedHat'
+        - ansible_facts.os_family == 'RedHat'
 ...

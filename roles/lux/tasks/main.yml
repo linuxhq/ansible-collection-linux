@@ -9,9 +9,9 @@
     state: present
   vars:
     __lux_package:
-      "lux-release-{{ ansible_distribution_major_version }}-1.noarch.rpm"
+      "lux-release-{{ ansible_facts.distribution_major_version }}-1.noarch.rpm"
     __lux_uri:
-      "/CentOS/{{ ansible_distribution_major_version }}/noarch"
+      "/CentOS/{{ ansible_facts.distribution_major_version }}/noarch"
     __lux_url:
       "http://repo.iotti.biz"
 

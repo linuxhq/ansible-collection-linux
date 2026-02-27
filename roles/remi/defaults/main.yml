@@ -1,7 +1,7 @@
 ---
 remi_baseurl: 'https://rpms.remirepo.net'
 remi_packages: []
-remi_release: "remi-release-{{ ansible_distribution_major_version }}.rpm"
+remi_release: "remi-release-{{ ansible_facts.distribution_major_version }}.rpm"
 remi_repositories:
   - name: remi-modular
     state: enabled

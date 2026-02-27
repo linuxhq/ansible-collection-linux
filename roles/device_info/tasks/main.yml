@@ -11,7 +11,7 @@
     - device_info
   ansible.builtin.set_fact:
     _device_info_list:
-      "{{ (ansible_devices |
+      "{{ (ansible_facts.devices |
           dict2items |
           json_query('[].{
             device: key,
