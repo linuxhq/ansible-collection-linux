@@ -4,6 +4,32 @@ linuxhq.linux Release Notes
 
 .. contents:: Topics
 
+v2.2.3
+======
+
+Release Summary
+---------------
+
+Update pre-commit configs and fix linting issues
+
+Minor Changes
+-------------
+
+- Update pre-commit configs and fix linting issues
+
+v2.2.2
+======
+
+Release Summary
+---------------
+
+Loosen ansible.posix dependency versioning
+
+Minor Changes
+-------------
+
+- Loosen ansible.posix dependency versioning
+
 v2.2.1
 ======
 
