@@ -25,7 +25,7 @@
     label: "{{ _protected.name | d(none) }}"
     loop_var: _protected
   when:
-    - _protected.name
+    - _protected.name is defined
     - _protected.packages is defined
     - _protected.packages | length > 0
 ...
