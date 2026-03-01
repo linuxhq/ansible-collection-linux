@@ -7,12 +7,12 @@
         - snoopy
       ansible.builtin.slurp:
         src: /etc/ld.so.preload
-      register: _ld_so_preload
+      register: __snoopy_ld_so_preload
 
     - name: Ensure ld.so.preload is verified
       tags:
         - snoopy
       ansible.builtin.assert:
         that:
-          - "'snoopy' in _ld_so_preload['content'] | b64decode"
+          - "'snoopy' in __snoopy_ld_so_preload['content'] | b64decode"
 ...

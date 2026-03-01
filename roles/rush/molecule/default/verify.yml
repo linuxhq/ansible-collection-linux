@@ -7,12 +7,12 @@
         - rush
       ansible.builtin.stat:
         path: /usr/sbin/rush
-      register: _stat
+      register: __rush_stat
 
     - name: Ensure rush stat information is verified
       tags:
         - rush
       ansible.builtin.assert:
         that:
-          - _stat.stat.exists | bool
+          - __rush_stat.stat.exists | bool
 ...

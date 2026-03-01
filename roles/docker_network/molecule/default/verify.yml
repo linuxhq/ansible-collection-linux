@@ -7,13 +7,13 @@
         - docker_network
       community.docker.docker_network_info:
         name: linuxhq
-      register: __docker_newtork_info
+      register: __docker_network_info
 
     - name: Ensure docker network information is verified
       tags:
         - docker_network
       ansible.builtin.assert:
         that:
-          - __docker_newtork_info.network.Name == 'linuxhq'
-          - __docker_newtork_info.network.IPAM.Config[0].Subnet == '192.168.0.0/24'
+          - __docker_network_info.network.Name == 'linuxhq'
+          - __docker_network_info.network.IPAM.Config[0].Subnet == '192.168.0.0/24'
 ...
