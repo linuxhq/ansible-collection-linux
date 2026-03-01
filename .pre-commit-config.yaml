@@ -8,6 +8,7 @@ repos:
     hooks:
       - id: ansible-lint
         files: \.(yaml|yml)$
+        language_version: python3.12
         verbose: true
 
   - repo: https://github.com/adrienverge/yamllint.git
@@ -15,6 +16,7 @@ repos:
     hooks:
       - id: yamllint
         files: \.(yaml|yml)$
+        language_version: python3.12
         types: [file, yaml]
         entry: yamllint --strict
 ...
