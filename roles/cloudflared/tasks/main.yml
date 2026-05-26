@@ -86,7 +86,9 @@
     state: started
   loop:
     "{{ cloudflared_tunnels |
-        map(attribute='name', default=[]) }} "
+        selectattr('name', 'defined') |
+        map(attribute='name') |
+        list }}"
   loop_control:
     label: "{{ _service | d(none) }}"
     loop_var: _service

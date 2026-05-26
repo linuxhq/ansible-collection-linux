@@ -1,6 +1,20 @@
 ---
 ancestor: null
 releases:
+  2.2.5:
+    changes:
+      minor_changes:
+        - cloudflared_tunnel - fixes loop / mapping issue
+      release_summary:
+        Fixes cloudflared_tunnel service loop issue
+  2.2.4:
+    changes:
+      minor_changes:
+        - needs_restarting - fixes stderr crontab output redirection
+        - ansible-lint - ignore molecule tests
+        - pre-commit - multiple updates
+      release_summary:
+        Fixes needs_restarting crontab stderr redirection
   2.2.3:
     changes:
       minor_changes:

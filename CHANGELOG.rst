@@ -4,6 +4,34 @@ linuxhq.linux Release Notes
 
 .. contents:: Topics
 
+v2.2.5
+======
+
+Release Summary
+---------------
+
+Fixes cloudflared_tunnel service loop issue
+
+Minor Changes
+-------------
+
+- cloudflared_tunnel - fixes loop / mapping issue
+
+v2.2.4
+======
+
+Release Summary
+---------------
+
+Fixes needs_restarting crontab stderr redirection
+
+Minor Changes
+-------------
+
+- ansible-lint - ignore molecule tests
+- needs_restarting - fixes stderr crontab output redirection
+- pre-commit - multiple updates
+
 v2.2.3
 ======
 
