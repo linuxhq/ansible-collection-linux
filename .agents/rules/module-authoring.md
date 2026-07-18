@@ -52,8 +52,7 @@ When starting a new module, copy the structure of an existing pair.
 
 ### Types
 
-- Accept parameters and return data in snake_case; convert input parameters to boto3 shapes
-  with the existing helpers.
+- Accept parameters and return data in snake_case.
 
 ### Validation
 
