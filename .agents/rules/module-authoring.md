@@ -74,7 +74,5 @@ When starting a new module, copy the structure of an existing pair.
 
 ### Info lookups
 
-- Only offer a singular lookup (`name`, `id`, `arn`) when the API itself accepts one — don't
-  emulate it with plural parameters.
 - If the singular lookup and the list/filter options drive different API calls, make the two
   modes mutually exclusive.

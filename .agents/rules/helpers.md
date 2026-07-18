@@ -3,7 +3,6 @@
 Prefer these `module_utils` helpers over hand-rolled logic — reimplementing one fails review and
 sanity. They cover:
 
-- ARNs
 - case conversion
 - filters
 - pagination
