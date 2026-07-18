@@ -1,6 +1,44 @@
 ---
 authors:
   - Taylor Kimball (https://github.com/tkimball83)
+build_ignore:
+  - .agents
+  - .agents/**
+  - .ansible
+  - .ansible/**
+  - .ansible-lint
+  - .claude
+  - .claude/**
+  - .codex
+  - .codex/**
+  - .DS_Store
+  - '**/.DS_Store'
+  - .github
+  - .github/**
+  - .gitignore
+  - .pre-commit-config.yaml
+  - .python-version
+  - .ruff.toml
+  - .ruff_cache
+  - .ruff_cache/**
+  - .yamllint
+  - AGENTS.md
+  - ansible.cfg
+  - CLAUDE.md
+  - Makefile
+  - requirements.txt
+  - requirements.yml
+  - roles/*/molecule
+  - roles/*/molecule/**
+  - venv
+  - venv/**
+  - '**/__pycache__'
+  - '**/__pycache__/**'
+  - '**/*.pyc'
+  - '**/*.pyo'
+  - '**/AGENTS.md'
+  - '*.tar.gz'
+  - '*.tgz'
 description: A collection of linux roles
 dependencies:
   ansible.posix: '*'
@@ -16,8 +54,7 @@ namespace: linuxhq
 readme: README.md
 repository: https://github.com/linuxhq/ansible-collection-linux
 tags:
-  - cloud
   - infrastructure
   - linux
-version: 2.2.5
+version: 2.2.6
 ...

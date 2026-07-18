@@ -3,7 +3,7 @@
   tags:
     - kopia
   become: true
-  ansible.builtin.service:
+  ansible.builtin.systemd_service:
     name: kopia.service
     state: restarted
 ...

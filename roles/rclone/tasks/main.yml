@@ -5,14 +5,10 @@
   ansible.builtin.set_fact:
     __rclone_profile:
       "{{ rclone_profile |
-          combine({
-            'rclone_config': rclone_config_path
-          }) }}"
+          combine({'rclone_config': rclone_config_path}) }}"
     __rclone_sysconfig:
       "{{ rclone_sysconfig |
-          combine({
-            'rclone_config': rclone_config_path
-          }) }}"
+          combine({'rclone_config': rclone_config_path}) }}"
 
 - name: Ensure rclone config pass facts are generated
   tags:
@@ -20,9 +16,7 @@
   ansible.builtin.set_fact:
     __rclone_sysconfig:
       "{{ __rclone_sysconfig |
-          combine({
-            'rclone_config_pass': rclone_config_pass
-          }) }}"
+          combine({'rclone_config_pass': rclone_config_pass}) }}"
   when:
     - rclone_config_pass is not none
     - rclone_mounts | length > 0

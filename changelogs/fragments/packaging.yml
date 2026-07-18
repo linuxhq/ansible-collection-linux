@@ -1,0 +1,7 @@
+---
+breaking_changes:
+  - meta - bump min_ansible_version to 2.18.0 across all roles.
+minor_changes:
+  - galaxy - add build_ignore so published artifacts exclude development
+    files and molecule scenarios.
+  - readme - document collection requirements and simplify molecule setup.

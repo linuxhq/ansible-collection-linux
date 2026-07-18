@@ -3,7 +3,7 @@
   tags:
     - postfix
   become: true
-  ansible.builtin.service:
+  ansible.builtin.systemd_service:
     name: postfix
     state: restarted
 ...

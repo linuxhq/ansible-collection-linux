@@ -1,5 +1,9 @@
 # .gitignore
 
-.ansible
+.ansible/
 .DS_Store
-venv
+.ruff_cache/
+changelogs/.plugin-cache.yaml
+__pycache__/
+venv/
+*.py[co]

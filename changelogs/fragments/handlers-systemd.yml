@@ -1,0 +1,3 @@
+---
+trivial:
+  - handlers - use systemd_service consistently in place of service.

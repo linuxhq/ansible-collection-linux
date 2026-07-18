@@ -3,129 +3,152 @@ ancestor: null
 releases:
   2.2.5:
     changes:
-      minor_changes:
-        - cloudflared_tunnel - fixes loop / mapping issue
+      bugfixes:
+        - cloudflared_tunnel - fix service loop / mapping issue.
       release_summary:
-        Fixes cloudflared_tunnel service loop issue
+        Fixes the cloudflared_tunnel service loop issue.
+    release_date: '2026-05-26'
   2.2.4:
     changes:
+      bugfixes:
+        - needs_restarting - fix stderr crontab output redirection.
       minor_changes:
-        - needs_restarting - fixes stderr crontab output redirection
-        - ansible-lint - ignore molecule tests
-        - pre-commit - multiple updates
+        - ansible-lint - ignore molecule tests.
+        - pre-commit - multiple updates.
       release_summary:
-        Fixes needs_restarting crontab stderr redirection
+        Fixes needs_restarting crontab stderr redirection.
+    release_date: '2026-04-15'
   2.2.3:
     changes:
       minor_changes:
-        - Update pre-commit configs and fix linting issues
+        - pre-commit - update configs and fix linting issues.
       release_summary:
-        Update pre-commit configs and fix linting issues
+        Updates pre-commit configs and fixes linting issues.
+    release_date: '2026-02-28'
   2.2.2:
     changes:
       minor_changes:
-        - Loosen ansible.posix dependency versioning
+        - galaxy - loosen ansible.posix dependency versioning.
       release_summary:
-        Loosen ansible.posix dependency versioning
+        Loosens ansible.posix dependency versioning.
+    release_date: '2026-02-27'
   2.2.1:
     changes:
       minor_changes:
-        - cloudflare_warp - use systemd override instead of lineinfile
-        - cloudflare_warp - add support for changing log level
+        - cloudflare_warp - use systemd override instead of lineinfile.
+        - cloudflare_warp - add support for changing log level.
       release_summary:
-        Update cloudflare_warp role to support modification of log level
-        at the systemd service level
+        Updates the cloudflare_warp role to support modification of log level
+        at the systemd service level.
+    release_date: '2026-02-24'
   2.2.0:
     changes:
       minor_changes:
-        - cloudflare_warp - add option to toggle no color environment variable
+        - cloudflare_warp - add option to toggle no color environment variable.
       release_summary:
         This release provides a toggle for a cloudflare warp systemd addition
         by defining NO_COLOR=1 in the service files.
+    release_date: '2026-02-24'
   2.1.9:
     changes:
       breaking_changes:
-        - cloudflared - use managed tunnels and only overlay a single token
+        - cloudflared - use managed tunnels and only overlay a single token.
       release_summary:
         This release changes cloudflared role behavior migrating from locally
         configured tunnels to cloudflare managed tunnels, therefore only
         overlaying a tunnel token.
+    release_date: '2026-02-23'
   2.1.8:
     changes:
       minor_changes:
-        - cloudflare_warp - add support for overlaying custom scripts
+        - cloudflare_warp - add support for overlaying custom scripts.
       release_summary:
-        This release adds support for overlaying custom scripts alongside cloudflare warp
+        This release adds support for overlaying custom scripts alongside
+        cloudflare warp.
+    release_date: '2026-01-15'
   2.1.7:
     changes:
       minor_changes:
-        - openssh_server - add support for defining include files in sshd_config
+        - openssh_server - add support for defining include files in
+          sshd_config.
       release_summary:
-        This release adds support for defining include files in openssh server configuration file
+        This release adds support for defining include files in the openssh
+        server configuration file.
+    release_date: '2026-01-15'
   2.1.6:
     changes:
       minor_changes:
-        - rclone - only populate rclone_config_pass is mounts are defined
+        - rclone - only populate rclone_config_pass if mounts are defined.
       release_summary:
-        This release includes a minor change to rclone role config pass population
+        This release includes a minor change to rclone role config pass
+        population.
+    release_date: '2025-11-28'
   2.1.5:
     changes:
       minor_changes:
-        - cloudflare_warp - initial commit
+        - cloudflare_warp - initial commit.
       release_summary:
-        This release includes a new role - cloudflare_warp
+        This release includes a new role - cloudflare_warp.
+    release_date: '2025-11-28'
   2.1.4:
     changes:
       breaking_changes:
-        - rclone - renamed rclone_conf to rclone_config to align with other defaults
+        - rclone - renamed rclone_conf to rclone_config to align with other
+          defaults.
       minor_changes:
-        - rclone - added support for encrypting rclone configuration file
+        - rclone - add support for encrypting the rclone configuration file.
       release_summary: >-
-        A set of breaking and minor changes to the rclone role
+        A set of breaking and minor changes to the rclone role.
+    release_date: '2025-11-23'
   2.1.3:
     changes:
-      minor_changes:
-        - epel - fix conditional around ansible_distribution_major_version
-        - remi - fix remi-release installation, removal of rpm keys from defaults
+      bugfixes:
+        - epel - fix conditional around ansible_distribution_major_version.
+        - remi - fix remi-release installation, removal of rpm keys from
+          defaults.
       release_summary: >-
         A set of minor fixes for the epel and remi roles.
         Update galaxy requirements.yml versions.
+    release_date: '2025-11-22'
   2.1.2:
     changes:
       minor_changes:
-        - remi - initial commit
+        - remi - initial commit.
       release_summary: >-
-        Addition of remis rpm repository role
+        Addition of the Remi's RPM repository role.
+    release_date: '2025-11-21'
   2.1.1:
     changes:
       breaking_changes:
-        - systemd_resolved - iterable values are now handled differently
+        - systemd_resolved - iterable values are now handled differently.
       release_summary: >-
-        Updates systemd_resolved configuration template to correctly
-        handle iterable values
+        Updates the systemd_resolved configuration template to correctly
+        handle iterable values.
+    release_date: '2025-11-15'
   2.1.0:
     changes:
       minor_changes:
-        - galaxy - ensure dependencies are less strict
+        - galaxy - ensure dependencies are less strict.
       release_summary: >-
-        Ensure galaxy dependencies are less strict
+        Ensures galaxy dependencies are less strict.
+    release_date: '2025-11-13'
   2.0.9:
     changes:
       breaking_changes:
-        - hostnamectl - deprecated
-        - localectl - deprecated
-        - logind - deprecated
-        - timedatectl - deprecated
-        - network_manager - deprecated
-        - rclone - update rclone_conf from dict->list
+        - hostnamectl - deprecated.
+        - localectl - deprecated.
+        - logind - deprecated.
+        - timedatectl - deprecated.
+        - network_manager - deprecated.
+        - rclone - update rclone_conf from dict to list.
       minor_changes:
-        - changelog - addition of antsibull-changelog
-        - cloudflared - update systemd unit (network-online.target)
-        - galaxy - update dependency versions
-        - rclone - use epel package
-        - systemd - initial commit
-        - systemd_networkd - initial commit
-        - systemd_resolved - initial commit
+        - changelog - addition of antsibull-changelog.
+        - cloudflared - update systemd unit (network-online.target).
+        - galaxy - update dependency versions.
+        - rclone - use epel package.
+        - systemd - initial commit.
+        - systemd_networkd - initial commit.
+        - systemd_resolved - initial commit.
       release_summary: >-
         This is the beginning of the linuxhq.linux collection changelog.
-...
+    release_date: '2025-11-13'

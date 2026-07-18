@@ -10,12 +10,12 @@ v2.2.5
 Release Summary
 ---------------
 
-Fixes cloudflared_tunnel service loop issue
+Fixes the cloudflared_tunnel service loop issue.
 
-Minor Changes
--------------
+Bugfixes
+--------
 
-- cloudflared_tunnel - fixes loop / mapping issue
+- cloudflared_tunnel - fix service loop / mapping issue.
 
 v2.2.4
 ======
@@ -23,14 +23,18 @@ v2.2.4
 Release Summary
 ---------------
 
-Fixes needs_restarting crontab stderr redirection
+Fixes needs_restarting crontab stderr redirection.
 
 Minor Changes
 -------------
 
-- ansible-lint - ignore molecule tests
-- needs_restarting - fixes stderr crontab output redirection
-- pre-commit - multiple updates
+- ansible-lint - ignore molecule tests.
+- pre-commit - multiple updates.
+
+Bugfixes
+--------
+
+- needs_restarting - fix stderr crontab output redirection.
 
 v2.2.3
 ======
@@ -38,12 +42,12 @@ v2.2.3
 Release Summary
 ---------------
 
-Update pre-commit configs and fix linting issues
+Updates pre-commit configs and fixes linting issues.
 
 Minor Changes
 -------------
 
-- Update pre-commit configs and fix linting issues
+- pre-commit - update configs and fix linting issues.
 
 v2.2.2
 ======
@@ -51,12 +55,12 @@ v2.2.2
 Release Summary
 ---------------
 
-Loosen ansible.posix dependency versioning
+Loosens ansible.posix dependency versioning.
 
 Minor Changes
 -------------
 
-- Loosen ansible.posix dependency versioning
+- galaxy - loosen ansible.posix dependency versioning.
 
 v2.2.1
 ======
@@ -64,13 +68,13 @@ v2.2.1
 Release Summary
 ---------------
 
-Update cloudflare_warp role to support modification of log level at the systemd service level
+Updates the cloudflare_warp role to support modification of log level at the systemd service level.
 
 Minor Changes
 -------------
 
-- cloudflare_warp - add support for changing log level
-- cloudflare_warp - use systemd override instead of lineinfile
+- cloudflare_warp - add support for changing log level.
+- cloudflare_warp - use systemd override instead of lineinfile.
 
 v2.2.0
 ======
@@ -83,7 +87,7 @@ This release provides a toggle for a cloudflare warp systemd addition by definin
 Minor Changes
 -------------
 
-- cloudflare_warp - add option to toggle no color environment variable
+- cloudflare_warp - add option to toggle no color environment variable.
 
 v2.1.9
 ======
@@ -96,7 +100,7 @@ This release changes cloudflared role behavior migrating from locally configured
 Breaking Changes / Porting Guide
 --------------------------------
 
-- cloudflared - use managed tunnels and only overlay a single token
+- cloudflared - use managed tunnels and only overlay a single token.
 
 v2.1.8
 ======
@@ -104,12 +108,12 @@ v2.1.8
 Release Summary
 ---------------
 
-This release adds support for overlaying custom scripts alongside cloudflare warp
+This release adds support for overlaying custom scripts alongside cloudflare warp.
 
 Minor Changes
 -------------
 
-- cloudflare_warp - add support for overlaying custom scripts
+- cloudflare_warp - add support for overlaying custom scripts.
 
 v2.1.7
 ======
@@ -117,12 +121,12 @@ v2.1.7
 Release Summary
 ---------------
 
-This release adds support for defining include files in openssh server configuration file
+This release adds support for defining include files in the openssh server configuration file.
 
 Minor Changes
 -------------
 
-- openssh_server - add support for defining include files in sshd_config
+- openssh_server - add support for defining include files in sshd_config.
 
 v2.1.6
 ======
@@ -130,12 +134,12 @@ v2.1.6
 Release Summary
 ---------------
 
-This release includes a minor change to rclone role config pass population
+This release includes a minor change to rclone role config pass population.
 
 Minor Changes
 -------------
 
-- rclone - only populate rclone_config_pass is mounts are defined
+- rclone - only populate rclone_config_pass if mounts are defined.
 
 v2.1.5
 ======
@@ -143,12 +147,12 @@ v2.1.5
 Release Summary
 ---------------
 
-This release includes a new role - cloudflare_warp
+This release includes a new role - cloudflare_warp.
 
 Minor Changes
 -------------
 
-- cloudflare_warp - initial commit
+- cloudflare_warp - initial commit.
 
 v2.1.4
 ======
@@ -156,17 +160,17 @@ v2.1.4
 Release Summary
 ---------------
 
-A set of breaking and minor changes to the rclone role
+A set of breaking and minor changes to the rclone role.
 
 Minor Changes
 -------------
 
-- rclone - added support for encrypting rclone configuration file
+- rclone - add support for encrypting the rclone configuration file.
 
 Breaking Changes / Porting Guide
 --------------------------------
 
-- rclone - renamed rclone_conf to rclone_config to align with other defaults
+- rclone - renamed rclone_conf to rclone_config to align with other defaults.
 
 v2.1.3
 ======
@@ -176,11 +180,11 @@ Release Summary
 
 A set of minor fixes for the epel and remi roles. Update galaxy requirements.yml versions.
 
-Minor Changes
--------------
+Bugfixes
+--------
 
-- epel - fix conditional around ansible_distribution_major_version
-- remi - fix remi-release installation, removal of rpm keys from defaults
+- epel - fix conditional around ansible_distribution_major_version.
+- remi - fix remi-release installation, removal of rpm keys from defaults.
 
 v2.1.2
 ======
@@ -188,12 +192,12 @@ v2.1.2
 Release Summary
 ---------------
 
-Addition of remis rpm repository role
+Addition of the Remi's RPM repository role.
 
 Minor Changes
 -------------
 
-- remi - initial commit
+- remi - initial commit.
 
 v2.1.1
 ======
@@ -201,12 +205,12 @@ v2.1.1
 Release Summary
 ---------------
 
-Updates systemd_resolved configuration template to correctly handle iterable values
+Updates the systemd_resolved configuration template to correctly handle iterable values.
 
 Breaking Changes / Porting Guide
 --------------------------------
 
-- systemd_resolved - iterable values are now handled differently
+- systemd_resolved - iterable values are now handled differently.
 
 v2.1.0
 ======
@@ -214,12 +218,12 @@ v2.1.0
 Release Summary
 ---------------
 
-Ensure galaxy dependencies are less strict
+Ensures galaxy dependencies are less strict.
 
 Minor Changes
 -------------
 
-- galaxy - ensure dependencies are less strict
+- galaxy - ensure dependencies are less strict.
 
 v2.0.9
 ======
@@ -232,20 +236,20 @@ This is the beginning of the linuxhq.linux collection changelog.
 Minor Changes
 -------------
 
-- changelog - addition of antsibull-changelog
-- cloudflared - update systemd unit (network-online.target)
-- galaxy - update dependency versions
-- rclone - use epel package
-- systemd - initial commit
-- systemd_networkd - initial commit
-- systemd_resolved - initial commit
+- changelog - addition of antsibull-changelog.
+- cloudflared - update systemd unit (network-online.target).
+- galaxy - update dependency versions.
+- rclone - use epel package.
+- systemd - initial commit.
+- systemd_networkd - initial commit.
+- systemd_resolved - initial commit.
 
 Breaking Changes / Porting Guide
 --------------------------------
 
-- hostnamectl - deprecated
-- localectl - deprecated
-- logind - deprecated
-- network_manager - deprecated
-- rclone - update rclone_conf from dict->list
-- timedatectl - deprecated
+- hostnamectl - deprecated.
+- localectl - deprecated.
+- logind - deprecated.
+- network_manager - deprecated.
+- rclone - update rclone_conf from dict to list.
+- timedatectl - deprecated.
