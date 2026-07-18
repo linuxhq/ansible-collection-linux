@@ -1,0 +1,6 @@
+---
+minor_changes:
+  - rclone_obscure - new filter plugin to obscure plaintext values for
+    rclone configurations (requires pycryptodome).
+  - rclone_deobscure - new filter plugin to reveal obscured rclone
+    configuration values (requires pycryptodome).

@@ -17,6 +17,7 @@
     mode: "{{ _sshd.mode }}"
     owner: root
     src: "{{ _sshd.src }}"
+    validate: /usr/sbin/sshd -t -f %s
   notify: Restart sshd
   loop:
     - dest: /etc/ssh/sshd_config

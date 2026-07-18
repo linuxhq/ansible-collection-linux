@@ -3,7 +3,7 @@
   tags:
     - docker
   become: true
-  ansible.builtin.service:
+  ansible.builtin.systemd_service:
     name: docker
     state: reloaded
 ...

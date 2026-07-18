@@ -3,7 +3,7 @@
   tags:
     - monit
   become: true
-  ansible.builtin.service:
+  ansible.builtin.systemd_service:
     name: monit
     state: reloaded
 ...

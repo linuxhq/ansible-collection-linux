@@ -17,11 +17,19 @@ A collection of linux roles
 
     ansible-galaxy collection install linuxhq.linux
 
+## Requirements
+
+* Python `>= 3.13`
+* `ansible-core >= 2.18.0`
+* `ansible.posix`
+* `community.docker >= 5.0.0`
+* `community.general >= 12.0.0`
+* `pycryptodome >= 3.23.0` (rclone filter plugins only)
+
 ## Molecule
 
-    python3 -m venv venv
+    make
     source venv/bin/activate
-    venv/bin/pip3 install -r requirements.txt
 
 # Playbook
 
