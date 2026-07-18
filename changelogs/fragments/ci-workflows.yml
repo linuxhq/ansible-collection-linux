@@ -1,5 +1,0 @@
----
-minor_changes:
-  - ci - add an ansible-test sanity workflow matching sibling collections.
-  - ci - gate releases on pre-commit and sanity, and verify the tag matches
-    the galaxy.yml version before publishing.

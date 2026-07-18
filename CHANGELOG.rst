@@ -4,6 +4,44 @@ linuxhq.linux Release Notes
 
 .. contents:: Topics
 
+v2.2.6
+======
+
+Release Summary
+---------------
+
+Adds rclone obscure/deobscure filter plugins, drops support for ansible-core older than 2.18, and introduces CI sanity testing and gated releases.
+
+Minor Changes
+-------------
+
+- ci - add an ansible-test sanity workflow matching sibling collections.
+- ci - gate releases on pre-commit and sanity, and verify the tag matches the galaxy.yml version before publishing.
+- dependabot - add weekly updates for github-actions, pip, and pre-commit.
+- galaxy - add build_ignore so published artifacts exclude development files and molecule scenarios.
+- pre-commit - sync hooks with sibling collections (antsibull-changelog, ruff, black, ansible-lint v26.6.0).
+- python - drop unused awscli, boto3, botocore, docker, hvac, and python-gilt requirements.
+- python - update ansible to >=14,<15 to match ansible-collection-aws.
+- python - update pinned Python to 3.13.
+- rclone_deobscure - new filter plugin to reveal obscured rclone configuration values (requires pycryptodome).
+- rclone_obscure - new filter plugin to obscure plaintext values for rclone configurations (requires pycryptodome).
+- readme - document collection requirements and simplify molecule setup.
+
+Breaking Changes / Porting Guide
+--------------------------------
+
+- meta - bump min_ansible_version to 2.18.0 across all roles.
+- meta - require ansible-core >=2.18.0; older ansible-core releases are no longer supported.
+
+New Plugins
+-----------
+
+Filter
+~~~~~~
+
+- rclone_deobscure - Reveal a password from an obscured rclone value
+- rclone_obscure - Obscure a password for an rclone configuration
+
 v2.2.5
 ======
 
