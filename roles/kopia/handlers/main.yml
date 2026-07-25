@@ -6,7 +6,4 @@
   ansible.builtin.systemd_service:
     name: kopia.service
     state: restarted
-  when:
-    - kopia_repository | length > 0
-    - kopia_repository.state | d('present') == 'present'
 ...

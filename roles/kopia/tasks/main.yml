@@ -40,7 +40,6 @@
     state: directory
   when:
     - kopia_repository.storage | d(none) == 'filesystem'
-    - kopia_repository.state | d('present') == 'present'
     - kopia_repository.options.path is defined
 
 - name: Ensure kopia repository is managed
@@ -51,8 +50,7 @@
     options: "{{ kopia_repository.options | d(omit) }}"
     password: "{{ kopia_password }}"
     secrets: "{{ kopia_repository.secrets | d(omit) }}"
-    state: "{{ kopia_repository.state | d('present') }}"
-    storage: "{{ kopia_repository.storage | d(omit) }}"
+    storage: "{{ kopia_repository.storage }}"
     validate_provider: "{{ kopia_repository.validate_provider | d(false) }}"
   when:
     - kopia_repository | length > 0
@@ -127,16 +125,12 @@
   ansible.builtin.systemd_service:
     daemon_reload: true
 
-- name: Ensure kopia service state is managed
+- name: Ensure kopia is started and enabled on boot
   tags:
     - kopia
   become: true
-  vars:
-    __kopia_connected:
-      "{{ kopia_repository | length > 0 and
-          kopia_repository.state | d('present') == 'present' }}"
   ansible.builtin.service:
-    enabled: "{{ __kopia_connected | bool }}"
+    enabled: true
     name: kopia.service
-    state: "{{ 'started' if __kopia_connected | bool else 'stopped' }}"
+    state: started
 ...
