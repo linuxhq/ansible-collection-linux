@@ -6,40 +6,53 @@ DOCUMENTATION = r"""
 module: rclone_config_encryption
 author:
   - Taylor Kimball (@tkimball83)
-version_added: 2.2.7
+version_added: 2.3.0
 short_description: Manage rclone configuration file encryption
 description:
-  - Encrypt or decrypt an rclone configuration file in place, using the same
+  - Write an rclone configuration file, encrypted or decrypted, using the same
     C(RCLONE_ENCRYPT_V0) envelope that C(rclone config encryption set) writes.
   - The configuration key is the SHA256 digest of the NFKC normalized password,
     and the body is sealed with XSalsa20-Poly1305, so rclone reads back what this
     module writes and the module reads back what rclone writes.
-  - The module is idempotent. An already encrypted file that opens with O(password)
-    is left untouched, as is an already decrypted one, so no needless rewrite
-    churns the ciphertext.
+  - Supply O(content) to manage the configuration body as well as its encryption,
+    which keeps the plaintext off disk entirely. Omit it to encrypt or decrypt a
+    file that is already in place.
+  - The module is idempotent. It compares the decrypted configuration against the
+    desired one and rewrites nothing when they match, so the ciphertext does not
+    churn on repeated runs.
   - Neither the password nor the decrypted configuration is ever placed on a
     command line or returned to the controller.
 options:
+  content:
+    description:
+      - Configuration body to write, most often rendered with the
+        P(ansible.builtin.template#lookup) lookup.
+      - When set, the file is created if it does not exist, and an existing file
+        that cannot be opened with O(password) is replaced rather than failing,
+        which is what makes a password rotation a single run.
+      - When omitted, the file must already exist and only its encryption state
+        is managed.
+    type: str
   password:
     description:
       - Password securing the configuration file.
-      - Used to encrypt when O(state=present) and to decrypt when O(state=absent).
+      - Required when O(state=present), which needs it to encrypt.
+      - Optional when O(state=absent), where it is only needed to open a file that
+        is currently encrypted. It can be omitted when O(content) is set and the
+        file on disk is already plaintext.
       - Whitespace is significant and is not stripped, matching rclone. A password
         that is empty or entirely whitespace is rejected.
     type: str
-    required: true
   path:
     description:
-      - Path to the rclone configuration file to encrypt or decrypt.
-      - The file must already exist.
+      - Path to the rclone configuration file to manage.
+      - Must already exist unless O(content) is set.
     type: path
     required: true
   state:
     description:
-      - V(present) encrypts the configuration file, leaving an already encrypted
-        file alone when it opens with O(password).
-      - V(absent) decrypts the configuration file, leaving an already decrypted
-        file alone.
+      - V(present) writes the configuration encrypted.
+      - V(absent) writes the configuration decrypted.
     type: str
     choices:
       - absent
@@ -48,24 +61,25 @@ options:
 extends_documentation_fragment:
   - ansible.builtin.files
 requirements:
-  - pycryptodome
+  - pycryptodome or pycryptodomex
 """
 
 EXAMPLES = r"""
-- name: Ensure rclone configuration is encrypted
+- name: Ensure rclone configuration is managed and encrypted
   linuxhq.linux.rclone_config_encryption:
-    password: "{{ rclone_config_pass }}"
-    path: /root/.config/rclone/rclone.conf
-    state: present
-
-- name: Ensure rclone configuration is encrypted with strict ownership
-  linuxhq.linux.rclone_config_encryption:
+    content: "{{ lookup('ansible.builtin.template', 'rclone.conf.j2') }}"
     password: "{{ rclone_config_pass }}"
     path: /root/.config/rclone/rclone.conf
     state: present
     group: root
     mode: '0600'
     owner: root
+
+- name: Ensure an existing rclone configuration is encrypted
+  linuxhq.linux.rclone_config_encryption:
+    password: "{{ rclone_config_pass }}"
+    path: /root/.config/rclone/rclone.conf
+    state: present
 
 - name: Ensure rclone configuration is decrypted
   linuxhq.linux.rclone_config_encryption:
@@ -104,7 +118,10 @@ def read_config(module):
     path = module.params["path"]
 
     if not os.path.exists(path):
-        module.fail_json(msg="configuration file does not exist: %s" % path)
+        if module.params["content"] is None:
+            module.fail_json(msg="configuration file does not exist: %s" % path)
+
+        return None, None
 
     try:
         with open(path, "rb") as handle:
@@ -151,40 +168,9 @@ def write_config(module, content):
             discard_file(tmp)
 
 
-def ensure_present(module):
-    raw, text = read_config(module)
-    password = module.params["password"]
-
-    try:
-        encrypted = is_encrypted(text)
-    except ValueError as error:
-        module.fail_json(msg=to_native(error))
-
-    if encrypted:
-        if decrypt_config(text, password) is None:
-            module.fail_json(
-                msg="configuration file is already encrypted with a different password"
-            )
-
-        changed = module.set_fs_attributes_if_different(
-            module.load_file_common_arguments(module.params), False
-        )
-
-        module.exit_json(changed=changed, encrypted=True, path=module.params["path"])
-
-    if not module.check_mode:
-        write_config(module, encrypt_config(raw, password))
-
-    changed = module.set_fs_attributes_if_different(
-        module.load_file_common_arguments(module.params), True
-    )
-
-    module.exit_json(changed=changed, encrypted=True, path=module.params["path"])
-
-
-def ensure_absent(module):
-    dummy, text = read_config(module)
-    password = module.params["password"]
+def current_config(module, raw, text):
+    if text is None:
+        return False, None
 
     try:
         encrypted = is_encrypted(text)
@@ -192,30 +178,85 @@ def ensure_absent(module):
         module.fail_json(msg=to_native(error))
 
     if not encrypted:
-        changed = module.set_fs_attributes_if_different(
-            module.load_file_common_arguments(module.params), False
-        )
+        return False, raw
 
-        module.exit_json(changed=changed, encrypted=False, path=module.params["path"])
+    if module.params["password"] is None:
+        return True, None
 
-    plaintext = decrypt_config(text, password)
+    return True, decrypt_config(text, module.params["password"])
 
-    if plaintext is None:
-        module.fail_json(msg="unable to decrypt configuration file, wrong password")
 
-    if not module.check_mode:
-        write_config(module, plaintext)
+def config_diff(module, before, after):
+    if not module._diff:
+        return {}
+
+    return {"diff": {"before": to_text(before or b""), "after": to_text(after or b"")}}
+
+
+def ensure_present(module):
+    raw, text = read_config(module)
+    encrypted, current = current_config(module, raw, text)
+    desired = module.params["content"]
+
+    if desired is None:
+        if encrypted and current is None:
+            module.fail_json(
+                msg="configuration file is already encrypted with a different password"
+            )
+        desired = current
+    else:
+        desired = to_bytes(desired)
+
+    changed = not encrypted or current != desired
+
+    if changed and not module.check_mode:
+        write_config(module, encrypt_config(desired, module.params["password"]))
+
+    diff = config_diff(module, current, desired)
 
     changed = module.set_fs_attributes_if_different(
-        module.load_file_common_arguments(module.params), True
+        module.load_file_common_arguments(module.params), changed
     )
 
-    module.exit_json(changed=changed, encrypted=False, path=module.params["path"])
+    module.exit_json(
+        changed=changed, encrypted=True, path=module.params["path"], **diff
+    )
+
+
+def ensure_absent(module):
+    raw, text = read_config(module)
+    encrypted, current = current_config(module, raw, text)
+    desired = module.params["content"]
+
+    if desired is None:
+        if encrypted and current is None:
+            module.fail_json(
+                msg="unable to decrypt configuration file, wrong or missing password"
+            )
+        desired = current
+    else:
+        desired = to_bytes(desired)
+
+    changed = encrypted or current != desired
+
+    if changed and not module.check_mode:
+        write_config(module, desired)
+
+    diff = config_diff(module, current, desired)
+
+    changed = module.set_fs_attributes_if_different(
+        module.load_file_common_arguments(module.params), changed
+    )
+
+    module.exit_json(
+        changed=changed, encrypted=False, path=module.params["path"], **diff
+    )
 
 
 def main():
     argument_spec = dict(
-        password={"type": "str", "required": True, "no_log": True},
+        content={"type": "str"},
+        password={"type": "str", "no_log": True},
         path={"type": "path", "required": True},
         state={"type": "str", "choices": ["absent", "present"], "default": "present"},
     )
@@ -223,13 +264,16 @@ def main():
     module = AnsibleModule(
         argument_spec=argument_spec,
         add_file_common_args=True,
+        required_if=[("state", "present", ("password",))],
         supports_check_mode=True,
     )
 
     if not HAS_PYCRYPTODOME:
         module.fail_json(msg=missing_required_lib("pycryptodome"))
 
-    if not module.params["password"].strip():
+    password = module.params["password"]
+
+    if password is not None and not password.strip():
         module.fail_json(msg="no characters in password")
 
     if module.params["state"] == "present":

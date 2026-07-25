@@ -14,7 +14,13 @@ try:
 
     HAS_PYCRYPTODOME = True
 except ImportError:
-    HAS_PYCRYPTODOME = False
+    try:
+        from Cryptodome.Cipher import AES, Salsa20
+        from Cryptodome.Hash import Poly1305
+
+        HAS_PYCRYPTODOME = True
+    except ImportError:
+        HAS_PYCRYPTODOME = False
 
 SECRET_KEY = (
     b"\x9c\x93\x5b\x48\x73\x0a\x55\x4d\x6b\xfd\x7c\x63\xc8\x86\xa9\x2b"
