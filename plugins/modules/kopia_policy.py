@@ -147,7 +147,7 @@ def ensure_present(module):
 
 def ensure_absent(module):
     if module.check_mode and not kopia_available(module):
-        module.exit_json(changed=True)
+        module.exit_json(changed=False)
 
     target = module.params["target"]
     current = policy_export(module, target)
