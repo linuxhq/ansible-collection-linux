@@ -127,15 +127,16 @@
   ansible.builtin.systemd_service:
     daemon_reload: true
 
-- name: Ensure kopia is started and enabled on boot
+- name: Ensure kopia service state is managed
   tags:
     - kopia
   become: true
+  vars:
+    __kopia_connected:
+      "{{ kopia_repository | length > 0 and
+          kopia_repository.state | d('present') == 'present' }}"
   ansible.builtin.service:
-    enabled: true
+    enabled: "{{ __kopia_connected | bool }}"
     name: kopia.service
-    state: started
-  when:
-    - kopia_repository | length > 0
-    - kopia_repository.state | d('present') == 'present'
+    state: "{{ 'started' if __kopia_connected | bool else 'stopped' }}"
 ...

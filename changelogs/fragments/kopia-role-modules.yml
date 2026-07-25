@@ -9,7 +9,11 @@ breaking_changes:
     ``flags``; ``kopia_maintenance`` becomes a dict of settings in place of a
     list of flags; and each entry in ``kopia_policies`` carries a ``policy``
     dict in place of ``flags``.
-  - kopia - ``kopia_server`` is removed and the server is always configured.
+  - kopia - ``kopia_server`` is removed and the server is always configured. The
+    unit is always managed, while the service itself follows the repository. It
+    is started and enabled once a repository is connected, and stopped and
+    disabled when ``kopia_repository`` is empty or its state is V(absent), so a
+    server is never left running against a repository it can no longer reach.
 minor_changes:
   - kopia - add ``kopia_snapshot``, a boolean that defaults to V(false),
     controlling whether a snapshot is taken for each policy target on every run.
