@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 import base64
@@ -51,7 +50,7 @@ def base64_urlsafe_decode(string):
 
 def obscure(plaintext):
     if not isinstance(plaintext, (str, bytes)):
-        raise TypeError("requires a string or bytes, got %s" % type(plaintext).__name__)
+        raise TypeError(f"requires a string or bytes, got {type(plaintext).__name__}")
 
     if not plaintext:
         return plaintext
@@ -68,7 +67,7 @@ def obscure(plaintext):
 
 def deobscure(obscured):
     if not isinstance(obscured, (str, bytes)):
-        raise TypeError("requires a string or bytes, got %s" % type(obscured).__name__)
+        raise TypeError(f"requires a string or bytes, got {type(obscured).__name__}")
 
     if not obscured:
         return obscured
@@ -212,7 +211,7 @@ def config_body(text):
     for index, line in enumerate(lines):
         stripped = line.strip()
 
-        if not stripped or stripped.startswith("#") or stripped.startswith(";"):
+        if not stripped or stripped.startswith(("#", ";")):
             continue
         if stripped == CONFIG_MARKER:
             return "".join(item.strip() for item in lines[index + 1 :])
@@ -241,7 +240,7 @@ def encrypt_config(plaintext, password, nonce=None):
     box = _secretbox_seal(plaintext, nonce, config_key(password))
     payload = base64.b64encode(nonce + box).decode("ascii")
 
-    return "%s\n\n%s\n%s" % (CONFIG_HEADER, CONFIG_MARKER, payload)
+    return f"{CONFIG_HEADER}\n\n{CONFIG_MARKER}\n{payload}"
 
 
 def decrypt_config(text, password):

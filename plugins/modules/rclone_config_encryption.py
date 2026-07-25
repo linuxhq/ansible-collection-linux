@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 DOCUMENTATION = r"""
@@ -119,15 +118,15 @@ def read_config(module):
 
     if not os.path.exists(path):
         if module.params["content"] is None:
-            module.fail_json(msg="configuration file does not exist: %s" % path)
+            module.fail_json(msg=f"configuration file does not exist: {path}")
 
         return None, None
 
     try:
         with open(path, "rb") as handle:
             raw = handle.read()
-    except IOError as error:
-        module.fail_json(msg="unable to read %s: %s" % (path, to_native(error)))
+    except OSError as error:
+        module.fail_json(msg=f"unable to read {path}: {to_native(error)}")
 
     return raw, to_text(raw, errors="replace")
 
@@ -153,16 +152,17 @@ def write_config(module, content):
     tmp = None
 
     try:
-        handle, tmp = tempfile.mkstemp(dir=os.path.dirname(path) or ".")
+        try:
+            handle, tmp = tempfile.mkstemp(dir=os.path.dirname(path) or ".")
 
-        with os.fdopen(handle, "wb") as stream:
-            stream.write(to_bytes(content))
-            stream.flush()
-            os.fsync(stream.fileno())
+            with os.fdopen(handle, "wb") as stream:
+                stream.write(to_bytes(content))
+                stream.flush()
+                os.fsync(stream.fileno())
+        except OSError as error:
+            module.fail_json(msg=f"unable to write {path}: {to_native(error)}")
 
         module.atomic_move(tmp, path)
-    except Exception as error:
-        module.fail_json(msg="unable to write %s: %s" % (path, to_native(error)))
     finally:
         if tmp is not None:
             discard_file(tmp)
@@ -254,12 +254,16 @@ def ensure_absent(module):
 
 
 def main():
-    argument_spec = dict(
-        content={"type": "str"},
-        password={"type": "str", "no_log": True},
-        path={"type": "path", "required": True},
-        state={"type": "str", "choices": ["absent", "present"], "default": "present"},
-    )
+    argument_spec = {
+        "content": {"type": "str"},
+        "password": {"type": "str", "no_log": True},
+        "path": {"type": "path", "required": True},
+        "state": {
+            "type": "str",
+            "choices": ["absent", "present"],
+            "default": "present",
+        },
+    }
 
     module = AnsibleModule(
         argument_spec=argument_spec,
