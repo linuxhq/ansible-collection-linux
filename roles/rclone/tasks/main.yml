@@ -29,6 +29,7 @@
     name:
       - fuse3
       - fuse3-libs
+      - python3-pycryptodomex
       - rclone
     state: present
     validate_certs: true
@@ -44,62 +45,19 @@
     path: "{{ rclone_config_path | dirname }}"
     state: directory
 
-- name: Ensure rclone encryption configuration is checked
-  tags:
-    - rclone
-  become: true
-  ansible.builtin.command:
-    cmd: >
-      rclone config encryption check
-        --config {{ rclone_config_path }}
-        --password-command '/bin/echo {{ rclone_config_pass }}'
-  register: __rclone_encryption_check
-  changed_when: false
-  failed_when: false
-  when:
-    - rclone_config | length > 0
-    - rclone_config_pass is not none
-
-- name: Ensure rclone encryption configuration is removed
-  tags:
-    - rclone
-  become: true
-  ansible.builtin.command:
-    cmd: >
-      rclone config encryption remove
-        --config {{ rclone_config_path }}
-        --password-command '/bin/echo {{ rclone_config_pass }}'
-  changed_when: false
-  when:
-    - rclone_config | length > 0
-    - rclone_config_pass is not none
-    - __rclone_encryption_check.rc == 0
-
 - name: Ensure rclone configuration file is managed
   tags:
     - rclone
   become: true
   no_log: "{{ rclone_no_log }}"
-  ansible.builtin.template:
+  linuxhq.linux.rclone_config_encryption:
+    content: "{{ lookup('ansible.builtin.template', 'rclone.conf.j2') }}"
     group: root
-    dest: "{{ rclone_config_path }}"
     mode: '0600'
     owner: root
-    src: rclone.conf.j2
-
-- name: Ensure rclone encryption configuration is set
-  tags:
-    - rclone
-  become: true
-  ansible.builtin.command:
-    cmd: >
-      rclone config encryption set
-        --config {{ rclone_config_path }}
-        --password-command '/bin/echo {{ rclone_config_pass }}'
-  changed_when: false
-  when:
-    - rclone_config | length > 0
-    - rclone_config_pass is not none
+    password: "{{ rclone_config_pass | d(omit) }}"
+    path: "{{ rclone_config_path }}"
+    state: "{{ 'present' if rclone_config_pass is not none else 'absent' }}"
 
 - name: Ensure rclone profile configuration is managed
   tags:

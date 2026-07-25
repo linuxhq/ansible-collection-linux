@@ -3,31 +3,13 @@
   hosts: all
   roles:
     - role: rclone
+      rclone_config: []
+      rclone_config_pass: null
+      rclone_mounts: []
+      rclone_profile: {}
+      rclone_sysconfig: {}
       tags:
         - molecule-idempotence-notest
 
-    - role: rclone
-      rclone_config:
-        - name: koofr
-          password: "{{ lookup('env', 'KOOFR_PASSWORD') }}"
-          provider: koofr
-          type: koofr
-          user: "{{ lookup('env', 'KOOFR_USERNAME') }}"
-
-      rclone_config_pass: VhpgjeaYPbXzrAx9ogXE3Txp
-
-      rclone_mounts:
-        - name: rclone-koofr
-          remote: 'koofr:'
-          mountpoint: /mnt/koofr
-          flags:
-            - --read-only
-
-      rclone_profile:
-        rclone_progress: true
-        rclone_verbose: 1
-
-      rclone_sysconfig:
-        rclone_allow_other: true
-        rclone_read_only: true
+    - rclone
 ...

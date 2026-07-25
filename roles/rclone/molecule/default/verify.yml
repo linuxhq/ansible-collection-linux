@@ -2,13 +2,56 @@
 - name: Verify
   hosts: all
   tasks:
+    - name: Ensure rclone configuration file is gathered
+      tags:
+        - rclone
+      become: true
+      ansible.builtin.slurp:
+        src: "{{ rclone_config_path }}"
+      register: __rclone_config_file
+
+    - name: Ensure rclone configuration file is encrypted
+      tags:
+        - rclone
+      vars:
+        __rclone_config_content: "{{ __rclone_config_file.content | b64decode }}"
+      ansible.builtin.assert:
+        that:
+          - __rclone_config_content is search('RCLONE_ENCRYPT_V0:')
+          - __rclone_config_content is search('Encrypted rclone configuration File')
+          - __rclone_config_content is not search('\[source\]')
+          - __rclone_config_content is not search('txj-ko0iBZ')
+
+    - name: Ensure rclone configuration file is decrypted by rclone
+      tags:
+        - rclone
+      become: true
+      environment:
+        RCLONE_CONFIG_PASS: "{{ rclone_config_pass }}"
+      ansible.builtin.command:
+        cmd: >
+          rclone config show
+            --config {{ rclone_config_path }}
+      register: __rclone_config_show
+      changed_when: false
+
+    - name: Ensure rclone remotes are verified
+      tags:
+        - rclone
+      ansible.builtin.assert:
+        that:
+          - __rclone_config_show.stdout is search('\[source\]')
+          - __rclone_config_show.stdout is search('\[backup\]')
+          - __rclone_config_show.stdout is search('\[secret\]')
+          - __rclone_config_show.stdout is search('txj-ko0iBZ')
+
     - name: Ensure rclone mountpoint is checked
       tags:
         - rclone
       become: true
       ansible.builtin.command:
         cmd: >
-          mountpoint /mnt/koofr
+          mountpoint /mnt/backup
       register: __rclone_mountpoint
       changed_when: false
 
