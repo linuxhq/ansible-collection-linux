@@ -1,0 +1,20 @@
+---
+dependencies: []
+galaxy_info:
+  role_name: kopia_repository_info
+  author: Taylor Kimball
+  description: Gather information about a kopia repository
+  license: GPL-3.0-or-later
+  min_ansible_version: 2.18.0
+  namespace: linuxhq
+  platforms:
+    - name: EL
+      versions:
+        - '9'
+        - '10'
+  galaxy_tags:
+    - backup
+    - info
+    - kopia
+    - repository
+...

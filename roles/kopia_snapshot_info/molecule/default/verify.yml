@@ -1,0 +1,21 @@
+---
+- name: Verify
+  hosts: all
+  roles:
+    - kopia_snapshot_info
+
+  post_tasks:
+    - name: Ensure kopia information is verified
+      tags:
+        - kopia_snapshot_info
+      ansible.builtin.assert:
+        that:
+          - _kopia_snapshot_info_list is iterable
+
+    - name: Ensure kopia information is displayed
+      tags:
+        - kopia_snapshot_info
+      ansible.builtin.debug:
+        msg: |
+          {{ _kopia_snapshot_info_list | to_nice_yaml }}
+...

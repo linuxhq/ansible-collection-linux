@@ -1,0 +1,16 @@
+---
+- name: Ensure kopia repository information is gathered
+  tags:
+    - kopia_repository_info
+  become: true
+  linuxhq.linux.kopia_repository_info:
+    config_file: "{{ kopia_repository_info_config_file | d(omit) }}"
+  register: __kopia_repository_info_query
+
+- name: Ensure kopia repository facts are generated
+  tags:
+    - kopia_repository_info
+  ansible.builtin.set_fact:
+    _kopia_repository_info_dict:
+      "{{ __kopia_repository_info_query.repository | d({}) }}"
+...

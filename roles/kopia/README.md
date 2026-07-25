@@ -24,10 +24,6 @@ None
       - --without-password
     kopia_snapshot: false
 
-The role connects the repository named in `kopia_repository` and leaves it
-connected. Disconnecting a host is not managed here, since a server left
-without a repository has nothing to serve.
-
 ## Dependencies
 
 None

@@ -1,0 +1,16 @@
+---
+- name: Ensure kopia maintenance information is gathered
+  tags:
+    - kopia_maintenance_info
+  become: true
+  linuxhq.linux.kopia_maintenance_info:
+    config_file: "{{ kopia_maintenance_info_config_file | d(omit) }}"
+  register: __kopia_maintenance_info_query
+
+- name: Ensure kopia maintenance facts are generated
+  tags:
+    - kopia_maintenance_info
+  ansible.builtin.set_fact:
+    _kopia_maintenance_info_dict:
+      "{{ __kopia_maintenance_info_query.maintenance | d({}) }}"
+...

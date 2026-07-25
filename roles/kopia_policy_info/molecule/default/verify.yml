@@ -1,0 +1,22 @@
+---
+- name: Verify
+  hosts: all
+  roles:
+    - kopia_policy_info
+
+  post_tasks:
+    - name: Ensure kopia information is verified
+      tags:
+        - kopia_policy_info
+      ansible.builtin.assert:
+        that:
+          - _kopia_policy_info_dict | length > 0
+          - _kopia_policy_info_dict.retention.keep_latest == 2
+
+    - name: Ensure kopia information is displayed
+      tags:
+        - kopia_policy_info
+      ansible.builtin.debug:
+        msg: |
+          {{ _kopia_policy_info_list | to_nice_yaml }}
+...

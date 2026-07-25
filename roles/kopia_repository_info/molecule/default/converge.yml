@@ -1,0 +1,10 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - role: kopia
+      tags:
+        - molecule-idempotence-notest
+
+    - kopia_repository_info
+...
