@@ -40,15 +40,9 @@ None
           kopia_password: "{{ vault_kopia_password }}"
 
           kopia_repository:
-            storage: s3
+            storage: filesystem
             options:
-              bucket: kopia-backup
-              endpoint: s3.us-west-1.amazonaws.com
-              prefix: server/
-              region: us-west-1
-            secrets:
-              access_key: "{{ vault_kopia_access_key }}"
-              secret_access_key: "{{ vault_kopia_secret_access_key }}"
+              path: /srv/kopia
 
           kopia_maintenance:
             enable_full: true
