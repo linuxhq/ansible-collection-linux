@@ -33,6 +33,7 @@
       - rclone
     state: present
     validate_certs: true
+  ignore_errors: "{{ ansible_check_mode }}"
 
 - name: Ensure rclone configuration path is present
   tags:
@@ -110,6 +111,19 @@
   when:
     - rclone_mounts | length > 0
 
+- name: Ensure rclone systemd units are checked
+  tags:
+    - rclone
+  become: true
+  ansible.builtin.stat:
+    path: /usr/lib/systemd/system/{{ _mount.name }}.service
+  loop: "{{ rclone_mounts }}"
+  loop_control:
+    label: "{{ _mount.name | d(none) }}"
+    loop_var: _mount
+  when:
+    - _mount.name is defined
+
 - name: Ensure rclone systemd units are started and enabled on boot
   tags:
     - rclone
@@ -122,6 +136,7 @@
   loop_control:
     label: "{{ _mount.name | d(none) }}"
     loop_var: _mount
+  ignore_errors: "{{ ansible_check_mode }}"
   when:
     - _mount.name is defined
     - _mount.mountpoint is defined

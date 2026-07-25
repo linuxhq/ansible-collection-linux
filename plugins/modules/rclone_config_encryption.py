@@ -273,6 +273,13 @@ def main():
     )
 
     if not HAS_PYCRYPTODOME:
+        if module.check_mode:
+            module.exit_json(
+                changed=True,
+                encrypted=module.params["state"] == "present",
+                path=module.params["path"],
+            )
+
         module.fail_json(msg=missing_required_lib("pycryptodome"))
 
     password = module.params["password"]

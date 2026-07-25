@@ -61,6 +61,22 @@ provisioner:
           rclone_allow_other: true
           rclone_read_only: true
 
+scenario:
+  test_sequence:
+    - dependency
+    - cleanup
+    - destroy
+    - syntax
+    - create
+    - prepare
+    - check
+    - converge
+    - check
+    - idempotence
+    - verify
+    - cleanup
+    - destroy
+
 verifier:
   name: ansible
   options:

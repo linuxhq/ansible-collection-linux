@@ -34,10 +34,12 @@
   community.general.dnf_config_manager:
     name: "{{ _epel.name }}"
     state: "{{ _epel.state }}"
+  register: __epel_repositories
   loop: "{{ epel_repositories }}"
   loop_control:
     label: "{{ _epel.name | d(none) }}"
     loop_var: _epel
+  ignore_errors: "{{ ansible_check_mode }}"
   when:
     - _epel.name is defined
     - _epel.state is defined
@@ -49,6 +51,7 @@
   ansible.builtin.rpm_key:
     key: "/etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-{{ ansible_facts.distribution_major_version }}"
     state: present
+  ignore_errors: "{{ ansible_check_mode }}"
 
 - name: Ensure epel repository packages are present
   tags:
@@ -57,4 +60,5 @@
   ansible.builtin.dnf:
     name: "{{ epel_packages }}"
     state: present
+  ignore_errors: "{{ ansible_check_mode }}"
 ...

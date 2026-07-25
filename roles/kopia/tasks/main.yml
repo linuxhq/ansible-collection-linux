@@ -19,6 +19,7 @@
     gpgkey: https://kopia.io/signing-key
     file: kopia
     name: Kopia
+  register: __kopia_repo
 
 - name: Ensure kopia packages are present
   tags:
@@ -27,6 +28,8 @@
   ansible.builtin.dnf:
     name: "{{ kopia_packages }}"
     state: present
+  when:
+    - not (ansible_check_mode and __kopia_repo is changed)
 
 - name: Ensure kopia repository path is present
   tags:
@@ -125,6 +128,14 @@
   ansible.builtin.systemd_service:
     daemon_reload: true
 
+- name: Ensure kopia systemd unit is checked
+  tags:
+    - kopia
+  become: true
+  ansible.builtin.stat:
+    path: /usr/lib/systemd/system/kopia.service
+  register: __kopia_unit
+
 - name: Ensure kopia is started and enabled on boot
   tags:
     - kopia
@@ -135,4 +146,5 @@
     state: started
   when:
     - kopia_repository | length > 0
+    - __kopia_unit.stat.exists or not ansible_check_mode
 ...

@@ -102,14 +102,12 @@ _SALSA20_CONSTANTS = (0x61707865, 0x3320646E, 0x79622D32, 0x6B206574)
 
 
 def _rotl32(value, count):
-    """Rotate a 32-bit word left."""
     value &= 0xFFFFFFFF
 
     return ((value << count) | (value >> (32 - count))) & 0xFFFFFFFF
 
 
 def _salsa20_core(state):
-    """Run the Salsa20 core over 16 words, omitting the final feedforward."""
     words = list(state)
 
     for dummy in range(10):
@@ -123,7 +121,6 @@ def _salsa20_core(state):
 
 
 def _hsalsa20(key, nonce):
-    """Derive the XSalsa20 subkey, the HSalsa20 step NaCl secretbox begins with."""
     k = struct.unpack("<8I", key)
     n = struct.unpack("<4I", nonce)
 
@@ -162,7 +159,6 @@ def _hsalsa20(key, nonce):
 
 
 def _secretbox_seal(plaintext, nonce, key):
-    """Seal plaintext with XSalsa20-Poly1305, returning the tag followed by ciphertext."""
     cipher = Salsa20.new(key=_hsalsa20(key, nonce[:16]), nonce=nonce[16:])
 
     mac_key = cipher.encrypt(b"\x00" * 32)
@@ -173,7 +169,6 @@ def _secretbox_seal(plaintext, nonce, key):
 
 
 def _secretbox_open(box, nonce, key):
-    """Open an XSalsa20-Poly1305 box, returning None when authentication fails."""
     cipher = Salsa20.new(key=_hsalsa20(key, nonce[:16]), nonce=nonce[16:])
 
     mac_key = cipher.encrypt(b"\x00" * 32)
@@ -189,7 +184,6 @@ def _secretbox_open(box, nonce, key):
 
 
 def config_key(password):
-    """Derive the 32 byte configuration key rclone hashes out of the password."""
     normalized = unicodedata.normalize("NFKC", password)
     seed = "[" + normalized + "][rclone-config]"
 
@@ -197,7 +191,6 @@ def config_key(password):
 
 
 def check_config_password(password):
-    """Raise when the password is one rclone itself refuses."""
     if not password or not password.strip():
         raise ValueError("no characters in password")
 
@@ -205,7 +198,6 @@ def check_config_password(password):
 
 
 def config_body(text):
-    """Return the base64 payload of an encrypted configuration, or None when plain."""
     lines = text.splitlines()
 
     for index, line in enumerate(lines):
@@ -226,12 +218,10 @@ def config_body(text):
 
 
 def is_encrypted(text):
-    """Report whether the configuration text carries the rclone encryption marker."""
     return config_body(text) is not None
 
 
 def encrypt_config(plaintext, password, nonce=None):
-    """Wrap configuration bytes in rclone's RCLONE_ENCRYPT_V0 envelope."""
     check_config_password(password)
 
     if nonce is None:
@@ -244,7 +234,6 @@ def encrypt_config(plaintext, password, nonce=None):
 
 
 def decrypt_config(text, password):
-    """Unwrap an encrypted configuration, returning None when the password is wrong."""
     check_config_password(password)
 
     body = config_body(text)

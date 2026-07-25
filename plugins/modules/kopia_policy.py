@@ -104,6 +104,7 @@ from ansible.module_utils.common.dict_transformations import (
     snake_dict_to_camel_dict,
 )
 from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
+    kopia_available,
     kopia_command,
     policy_export,
     prune_empty,
@@ -111,6 +112,9 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
 
 
 def ensure_present(module):
+    if module.check_mode and not kopia_available(module):
+        module.exit_json(changed=True, policy={})
+
     target = module.params["target"]
     desired = prune_empty(snake_dict_to_camel_dict(module.params["policy"]))
     current = policy_export(module, target)
@@ -142,6 +146,9 @@ def ensure_present(module):
 
 
 def ensure_absent(module):
+    if module.check_mode and not kopia_available(module):
+        module.exit_json(changed=True)
+
     target = module.params["target"]
     current = policy_export(module, target)
 

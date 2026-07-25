@@ -6,4 +6,6 @@
   ansible.builtin.systemd_service:
     name: kopia.service
     state: restarted
+  when:
+    - __kopia_unit.stat.exists | d(false) or not ansible_check_mode
 ...

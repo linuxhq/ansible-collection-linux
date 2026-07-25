@@ -4,7 +4,6 @@ import json
 
 
 def kopia_flags(options):
-    """Convert a snake_case options dict into kopia CLI flags."""
     flags = []
 
     for key, value in sorted(options.items()):
@@ -21,8 +20,11 @@ def kopia_flags(options):
     return flags
 
 
+def kopia_available(module):
+    return module.get_bin_path("kopia") is not None
+
+
 def kopia_command(module, args, password=None):
-    """Run the kopia CLI and return (rc, stdout, stderr)."""
     kopia = module.get_bin_path("kopia", required=True)
 
     command = [kopia]
@@ -38,7 +40,6 @@ def kopia_command(module, args, password=None):
 
 
 def repository_status(module):
-    """Return the parsed repository status, or None when not connected."""
     rc, stdout, stderr = kopia_command(module, ["repository", "status", "--json"])
 
     if rc == 0:
@@ -56,7 +57,6 @@ def repository_status(module):
 
 
 def maintenance_info(module):
-    """Return the parsed maintenance settings and schedule."""
     rc, stdout, stderr = kopia_command(module, ["maintenance", "info", "--json"])
 
     if rc != 0:
@@ -73,7 +73,6 @@ def maintenance_info(module):
 
 
 def policy_export(module, target):
-    """Return the defined policy for target, or None when no policy is defined."""
     rc, stdout, stderr = kopia_command(module, ["policy", "export", target])
 
     if rc == 0:
@@ -92,7 +91,6 @@ def policy_export(module, target):
 
 
 def prune_empty(value):
-    """Recursively drop dict entries whose value is None or an empty dict."""
     if not isinstance(value, dict):
         return value
 

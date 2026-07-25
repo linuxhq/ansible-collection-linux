@@ -85,6 +85,7 @@ import json
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.common.dict_transformations import camel_dict_to_snake_dict
 from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
+    kopia_available,
     kopia_command,
     policy_export,
     prune_empty,
@@ -92,6 +93,9 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
 
 
 def info(module):
+    if module.check_mode and not kopia_available(module):
+        module.exit_json(changed=False, defined=False, effective_policy={})
+
     target = module.params["target"]
     defined = policy_export(module, target)
 
