@@ -1,14 +1,15 @@
 ---
-kopia_maintenance: []
+kopia_maintenance: {}
 kopia_packages:
   - kopia
 kopia_password: kopia
 kopia_policies: []
-kopia_server: false
+kopia_repository: {}
 kopia_server_args:
   - --address=127.0.0.1:51515
   - --disable-csrf-token-checks
   - --insecure
   - --no-check-for-updates
   - --without-password
+kopia_snapshot: false
 ...

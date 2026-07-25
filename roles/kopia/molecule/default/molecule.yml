@@ -22,6 +22,40 @@ provisioner:
   log: true
   options:
     diff: true
+  inventory:
+    group_vars:
+      all:
+        kopia_password: molecule-kopia-pass
+
+        kopia_repository:
+          storage: filesystem
+          options:
+            path: /srv/kopia
+
+        kopia_maintenance:
+          enable_full: true
+          enable_quick: true
+          full_interval: 86400
+          quick_interval: 3600
+
+        kopia_policies:
+          - target: /home/vagrant
+            policy:
+              compression:
+                compressor_name: gzip
+              files:
+                ignore:
+                  - '*.log'
+                  - '*.tmp'
+                  - .cache/
+              retention:
+                keep_annual: 0
+                keep_hourly: 24
+                keep_latest: 2
+                keep_monthly: 3
+                keep_weekly: 4
+              scheduling:
+                interval_seconds: 3600
 
 verifier:
   name: ansible

@@ -2,29 +2,12 @@
 - name: Converge
   hosts: all
   roles:
-    - kopia
-
     - role: kopia
-      kopia_maintenance:
-        - --enable-quick true
-      kopia_policies:
-        - target: /home/vagrant
-          flags:
-            - --compression gzip
-            - --keep-annual 0
-            - --keep-hourly 24
-            - --keep-latest 2
-            - --keep-monthly 3
-            - --keep-weekly 4
-            - --snapshot-interval 1h
-      kopia_repository:
-        location: s3
-        flags:
-          - "--access-key AKIATG524EM7GHSXQNUA"
-          - "--bucket vagrant-kopia-backup"
-          - "--endpoint s3.us-west-1.amazonaws.com"
-          - "--prefix vagrant/"
-          - "--region us-west-1"
-          - "--secret-access-key 5D4Oa6QGInHvwBEWJwJoImmAjsQi2hO65+FfhGUK"
-      kopia_server: true
+      kopia_maintenance: {}
+      kopia_policies: []
+      kopia_repository: {}
+      tags:
+        - molecule-idempotence-notest
+
+    - kopia
 ...
