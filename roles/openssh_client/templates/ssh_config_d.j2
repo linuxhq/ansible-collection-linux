@@ -1,5 +1,3 @@
-# {{ ansible_managed }}
-
 Host {{ _include.host }}
 {% for key, value in _include.parameters | dictsort %}
 {%   if value is sameas true %}

@@ -1,5 +1,3 @@
-# {{ ansible_managed }}
-
 [Match]
 {% for key, value in _network.match | dictsort %}
 {%   if value is not defined %}

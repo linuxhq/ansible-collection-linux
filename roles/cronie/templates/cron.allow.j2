@@ -1,5 +1,3 @@
-# {{ ansible_managed }}
-
 {% if cronie_allow | length > 0 %}
 {%   for allow in cronie_allow | sort %}
 {{ allow }}

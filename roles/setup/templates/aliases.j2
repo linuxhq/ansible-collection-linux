@@ -1,5 +1,3 @@
-# {{ ansible_managed }}
-
 {% for alias in setup_aliases %}
 {%   if alias.key is defined and alias.value is defined %}
 {{ alias.key }}:		{{ alias.value }}

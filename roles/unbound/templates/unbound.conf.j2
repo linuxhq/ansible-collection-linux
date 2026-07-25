@@ -1,5 +1,3 @@
-# {{ ansible_managed }}
-
 {% if unbound_auth_zones | length > 0 %}
 {%   for zone in unbound_auth_zones.keys() | sort %}
 {%     for key, value in unbound_auth_zones[zone] | dictsort %}

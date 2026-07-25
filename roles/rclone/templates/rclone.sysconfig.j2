@@ -1,5 +1,3 @@
-# {{ ansible_managed }}
-
 {% for key, value in __rclone_sysconfig | dictsort %}
 {%   if value is sameas true %}
 {{ key | upper }}=true

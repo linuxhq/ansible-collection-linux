@@ -1,5 +1,3 @@
-## {{ ansible_managed }}
-
 {% if sudo_aliases | length > 0 %}
 {%   for alias in q('ansible.builtin.subelements', sudo_aliases, 'aliases', {'skip_missing': true}) %}
 {%     if alias.0.type is defined and

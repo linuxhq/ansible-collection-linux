@@ -1,5 +1,3 @@
-# {{ ansible_managed }}
-
 {% for remote in rclone_config %}
 [{{ remote.name }}]
 {%   for key, value in remote | dictsort if key != 'name' %}

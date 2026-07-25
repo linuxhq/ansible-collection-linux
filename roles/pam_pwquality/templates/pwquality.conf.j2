@@ -1,5 +1,3 @@
-# {{ ansible_managed }}
-
 {% if pam_pwquality_badwords | length > 0 %}
 badwords {{ pam_pwquality_badwords | join(' ') }}
 {% endif %}

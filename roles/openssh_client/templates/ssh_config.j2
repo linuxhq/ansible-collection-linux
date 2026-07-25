@@ -1,5 +1,3 @@
-# {{ ansible_managed }}
-
 {% if openssh_client_parameters | length > 0 %}
 Host *
 {%   for key, value in openssh_client_parameters | dictsort %}

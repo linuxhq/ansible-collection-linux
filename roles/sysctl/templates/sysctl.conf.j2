@@ -1,5 +1,3 @@
-# {{ ansible_managed }}
-
 {% for key, value in sysctl_conf | dictsort %}
 {{ key }} = {{ value | string }}
 {% endfor %}

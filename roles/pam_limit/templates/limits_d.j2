@@ -1,5 +1,3 @@
-# {{ ansible_managed }}
-
 {% for limit in _limit.limits %}
 {%   if limit.domain is defined and
         limit.limit_item is defined and
