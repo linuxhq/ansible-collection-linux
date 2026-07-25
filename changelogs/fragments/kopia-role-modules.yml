@@ -9,11 +9,11 @@ breaking_changes:
     ``flags``; ``kopia_maintenance`` becomes a dict of settings in place of a
     list of flags; and each entry in ``kopia_policies`` carries a ``policy``
     dict in place of ``flags``.
-  - kopia - ``kopia_server`` is removed and the server is always configured. The
-    role connects the repository and leaves it connected, so it no longer reads
-    a state from ``kopia_repository``. Disconnecting a host is done with the
-    ``kopia_repository`` module directly, which can stop the server first rather
-    than stranding it with nothing to serve.
+  - kopia - ``kopia_server`` is removed and the server is always configured, and
+    the role connects the repository and leaves it connected.
+  - kopia_repository - the ``state`` option is removed and the module only
+    connects. Disconnecting left a server running with nothing to serve, so
+    tearing a host down is no longer modelled here.
 minor_changes:
   - kopia - add ``kopia_snapshot``, a boolean that defaults to V(false),
     controlling whether a snapshot is taken for each policy target on every run.

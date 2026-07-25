@@ -25,8 +25,8 @@ None
     kopia_snapshot: false
 
 The role connects the repository named in `kopia_repository` and leaves it
-connected. To disconnect a host, call the `kopia_repository` module directly
-with `state: absent`, which also lets you stop the server first.
+connected. Disconnecting a host is not managed here, since a server left
+without a repository has nothing to serve.
 
 ## Dependencies
 

@@ -9,7 +9,7 @@ version_added: 2.3.0
 short_description: Manage the kopia repository connection
 description:
   - Connect the host to a kopia repository, creating the repository when the
-    storage location has not been initialized yet, or disconnect from it.
+    storage location has not been initialized yet.
   - The module is idempotent on the connection state reported by
     C(kopia repository status), so an already connected host is left untouched.
 options:
@@ -35,8 +35,8 @@ options:
       - Password securing the kopia repository.
       - Exported to the kopia CLI as E(KOPIA_PASSWORD), never on the command
         line.
-      - Required when O(state=present).
     type: str
+    required: true
   secrets:
     description:
       - Storage provider flags whose values are secrets, such as
@@ -44,21 +44,11 @@ options:
       - Converted to CLI flags exactly like O(options), but kept out of logs.
     type: dict
     default: {}
-  state:
-    description:
-      - V(present) connects the host to the repository, creating it first when
-        the storage location is empty.
-      - V(absent) disconnects the host from the repository.
-    type: str
-    choices:
-      - absent
-      - present
-    default: present
   storage:
     description:
       - Storage provider backing the repository.
-      - Required when O(state=present).
     type: str
+    required: true
     choices:
       - azure
       - b2
@@ -84,7 +74,6 @@ EXAMPLES = r"""
 - name: Ensure kopia filesystem repository is present
   linuxhq.linux.kopia_repository:
     password: "{{ kopia_password }}"
-    state: present
     storage: filesystem
     options:
       path: /srv/backup/kopia
@@ -92,7 +81,6 @@ EXAMPLES = r"""
 - name: Ensure kopia s3 repository is present
   linuxhq.linux.kopia_repository:
     password: "{{ kopia_password }}"
-    state: present
     storage: s3
     options:
       bucket: vagrant-kopia-backup
@@ -103,10 +91,6 @@ EXAMPLES = r"""
       access_key: "{{ lookup('ansible.builtin.env', 'AWS_ACCESS_KEY_ID') }}"
       secret_access_key: "{{ lookup('ansible.builtin.env', 'AWS_SECRET_ACCESS_KEY') }}"
     validate_provider: true
-
-- name: Ensure kopia repository is absent
-  linuxhq.linux.kopia_repository:
-    state: absent
 """
 
 RETURN = r"""
@@ -177,38 +161,15 @@ def ensure_present(module):
     module.exit_json(changed=True, repository=camel_dict_to_snake_dict(status or {}))
 
 
-def ensure_absent(module):
-    status = repository_status(module)
-
-    if status is None:
-        module.exit_json(changed=False)
-
-    if module.check_mode:
-        module.exit_json(changed=True)
-
-    rc, _dummy, stderr = kopia_command(module, ["repository", "disconnect"])
-
-    if rc != 0:
-        module.fail_json(
-            msg=f"unable to disconnect from kopia repository: {stderr.strip()}"
-        )
-
-    module.exit_json(changed=True)
-
-
 def main():
     argument_spec = {
         "config_file": {"type": "path"},
         "options": {"type": "dict", "default": {}},
-        "password": {"type": "str", "no_log": True},
+        "password": {"type": "str", "required": True, "no_log": True},
         "secrets": {"type": "dict", "default": {}, "no_log": True},
-        "state": {
-            "type": "str",
-            "choices": ["absent", "present"],
-            "default": "present",
-        },
         "storage": {
             "type": "str",
+            "required": True,
             "choices": [
                 "azure",
                 "b2",
@@ -227,14 +188,10 @@ def main():
 
     module = AnsibleModule(
         argument_spec=argument_spec,
-        required_if=[("state", "present", ("password", "storage"))],
         supports_check_mode=True,
     )
 
-    if module.params["state"] == "present":
-        ensure_present(module)
-
-    ensure_absent(module)
+    ensure_present(module)
 
 
 if __name__ == "__main__":
