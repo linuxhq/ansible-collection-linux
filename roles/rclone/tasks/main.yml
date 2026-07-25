@@ -51,7 +51,8 @@
   become: true
   no_log: "{{ rclone_no_log }}"
   linuxhq.linux.rclone_config_encryption:
-    content: "{{ lookup('ansible.builtin.template', 'rclone.conf.j2') }}"
+    content:
+      "{{ lookup('ansible.builtin.template', 'rclone.conf.j2') | d('', true) }}"
     group: root
     mode: '0600'
     owner: root
