@@ -1,0 +1,6 @@
+---
+trivial:
+  - rclone_config_encryption - new modules are announced automatically in the
+    New Modules section on release; this fragment records the rclone
+    configuration file encryption helpers added to the shared
+    ``plugins/module_utils/rclone.py`` alongside it.
