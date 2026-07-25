@@ -50,7 +50,8 @@
     options: "{{ kopia_repository.options | d(omit) }}"
     password: "{{ kopia_password }}"
     secrets: "{{ kopia_repository.secrets | d(omit) }}"
-    storage: "{{ kopia_repository.storage }}"
+    state: "{{ kopia_repository.state | d('present') }}"
+    storage: "{{ kopia_repository.storage | d(omit) }}"
     validate_provider: "{{ kopia_repository.validate_provider | d(false) }}"
   when:
     - kopia_repository | length > 0
