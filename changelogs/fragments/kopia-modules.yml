@@ -1,0 +1,6 @@
+---
+trivial:
+  - kopia_repository, kopia_repository_info, kopia_policy, kopia_policy_info,
+    kopia_maintenance, kopia_maintenance_info - new modules are announced
+    automatically in the New Modules section on release; this fragment records
+    the shared ``plugins/module_utils/kopia.py`` plumbing added alongside them.
