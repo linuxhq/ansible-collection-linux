@@ -1,5 +1,3 @@
-# {{ ansible_managed }}
-
 {% for key, value in __rclone_profile | dictsort %}
 {%   if value is sameas true %}
 export {{ key | upper }}=true

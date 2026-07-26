@@ -1,5 +1,3 @@
-# {{ ansible_managed }}
-
 {% if dnf_versionlock_packages | length > 0 %}
 {%   for package in dnf_versionlock_packages %}
 {%     if package.name is defined and package.version is defined %}

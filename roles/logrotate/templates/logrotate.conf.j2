@@ -1,5 +1,3 @@
-# {{ ansible_managed }}
-
 {% if logrotate_conf | length > 0 %}
 {%   for option in logrotate_conf %}
 {{ option }}

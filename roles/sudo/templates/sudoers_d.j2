@@ -1,5 +1,3 @@
-# {{ ansible_managed }}
-
 {% for command in _sudoers.commands %}
 {{ _sudoers.user }} {{ _sudoers.host | upper }} = ({{ _sudoers.runas }}) {{ command }}
 {% endfor %}

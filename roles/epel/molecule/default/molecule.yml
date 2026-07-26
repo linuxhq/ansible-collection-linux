@@ -22,9 +22,28 @@ platforms:
 
 provisioner:
   name: ansible
+  env:
+    ANSIBLE_ACTION_WARNINGS: false
+    ANSIBLE_DEPRECATION_WARNINGS: false
   log: true
   options:
     diff: true
+
+scenario:
+  test_sequence:
+    - dependency
+    - cleanup
+    - destroy
+    - syntax
+    - create
+    - prepare
+    - check
+    - converge
+    - check
+    - idempotence
+    - verify
+    - cleanup
+    - destroy
 
 verifier:
   name: ansible

@@ -1,5 +1,3 @@
-; {{ ansible_managed }}
-
 [snoopy]
 datasource_message_max_length = {{ snoopy_datasource_message_max_length | int }}
 error_logging = {{ 'yes' if snoopy_error_logging | bool else 'no' }}

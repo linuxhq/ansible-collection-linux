@@ -1,5 +1,3 @@
-# {{ ansible_managed }}
-
 {% for _log in _logrotate.logs %}
 {%   if _log.path is defined and
         _log.options is defined and

@@ -1,0 +1,14 @@
+---
+minor_changes:
+  - roles - drop the ``{{ ansible_managed }}`` header from every template. The
+    ``DEFAULT_MANAGED_STR`` configuration that populates the variable is
+    deprecated and slated for removal in ansible-core 2.23, after which the
+    variable is no longer provided and the templates would render it undefined.
+    Managed files no longer carry the generated header comment.
+  - rclone - manage the configuration file with a single ``rclone_config_encryption``
+    task instead of templating it and then shelling out to ``rclone config
+    encryption``. The plaintext no longer lands on disk before being encrypted,
+    and the password is no longer passed on a command line where it was visible
+    in the process table.
+  - rclone - install ``python3-pycryptodomex``, required by
+    ``rclone_config_encryption``.

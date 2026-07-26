@@ -1,0 +1,18 @@
+---
+- name: Ensure kopia snapshot information is gathered
+  tags:
+    - kopia_snapshot_info
+  become: true
+  linuxhq.linux.kopia_snapshot_info:
+    config_file: "{{ kopia_snapshot_info_config_file | d(omit) }}"
+    password: "{{ kopia_snapshot_info_password | d(omit) }}"
+    path: "{{ kopia_snapshot_info_path | d(omit) }}"
+  register: __kopia_snapshot_info_query
+
+- name: Ensure kopia snapshot facts are generated
+  tags:
+    - kopia_snapshot_info
+  ansible.builtin.set_fact:
+    _kopia_snapshot_info_list:
+      "{{ __kopia_snapshot_info_query.snapshots | d([]) }}"
+...

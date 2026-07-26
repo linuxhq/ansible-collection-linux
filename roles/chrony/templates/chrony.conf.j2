@@ -1,5 +1,3 @@
-# {{ ansible_managed }}
-
 {% for cfg in chrony_conf | sort %}
 {{ cfg }}
 {% endfor %}

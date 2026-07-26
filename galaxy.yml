@@ -56,5 +56,5 @@ repository: https://github.com/linuxhq/ansible-collection-linux
 tags:
   - infrastructure
   - linux
-version: 2.2.6
+version: 2.3.0
 ...

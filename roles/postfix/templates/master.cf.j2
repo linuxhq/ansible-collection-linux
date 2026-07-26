@@ -1,5 +1,3 @@
-# {{ ansible_managed }}
-
 {% if postfix_service_smtp | d(true) %}
 smtp       inet n - n -     - smtpd
 {% endif %}

@@ -1,0 +1,22 @@
+---
+- name: Verify
+  hosts: all
+  roles:
+    - kopia_maintenance_info
+
+  post_tasks:
+    - name: Ensure kopia information is verified
+      tags:
+        - kopia_maintenance_info
+      ansible.builtin.assert:
+        that:
+          - _kopia_maintenance_info_dict | length > 0
+          - _kopia_maintenance_info_dict.quick is defined
+
+    - name: Ensure kopia information is displayed
+      tags:
+        - kopia_maintenance_info
+      ansible.builtin.debug:
+        msg: |
+          {{ _kopia_maintenance_info_dict | to_nice_yaml }}
+...

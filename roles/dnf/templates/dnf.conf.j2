@@ -1,5 +1,3 @@
-# {{ ansible_managed }}
-
 {% for section in dnf_conf.keys() %}
 [{{ section }}]
 {%   for key, value in dnf_conf[section] | dictsort %}

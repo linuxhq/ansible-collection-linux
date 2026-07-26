@@ -1,5 +1,3 @@
-# {{ ansible_managed }}
-
 {% for key, value in openssh_server_parameters | dictsort %}
 {%   if value is sameas true %}
 {{ key }} yes

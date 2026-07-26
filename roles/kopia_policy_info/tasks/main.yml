@@ -1,0 +1,19 @@
+---
+- name: Ensure kopia policy information is gathered
+  tags:
+    - kopia_policy_info
+  become: true
+  linuxhq.linux.kopia_policy_info:
+    config_file: "{{ kopia_policy_info_config_file | d(omit) }}"
+    target: "{{ kopia_policy_info_target | d(omit) }}"
+  register: __kopia_policy_info_query
+
+- name: Ensure kopia policy facts are generated
+  tags:
+    - kopia_policy_info
+  ansible.builtin.set_fact:
+    _kopia_policy_info_list:
+      "{{ __kopia_policy_info_query.policies | d([]) }}"
+    _kopia_policy_info_dict:
+      "{{ __kopia_policy_info_query.effective_policy | d({}) }}"
+...

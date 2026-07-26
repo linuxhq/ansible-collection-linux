@@ -28,18 +28,25 @@ None
       roles:
         - role: linuxhq.linux.rclone
           rclone_config:
-            - name: koofr
-              password: "{{ lookup('env', 'KOOFR_PASSWORD') }}"
-              provider: koofr
-              type: koofr
-              user: "{{ lookup('env', 'KOOFR_USERNAME') }}"
+            - name: source
+              type: local
+              nounc: true
 
-          rclone_config_pass: VhpgjeaYPbXzrAx9ogXE3Txp
+            - name: backup
+              type: alias
+              remote: source:/srv
+
+            - name: secret
+              type: crypt
+              remote: source:/srv/rclone
+              password: "{{ vault_rclone_crypt_pass | linuxhq.linux.rclone_obscure }}"
+
+          rclone_config_pass: "{{ vault_rclone_config_pass }}"
 
           rclone_mounts:
-            - name: rclone-koofr
-              remote: 'koofr:'
-              mountpoint: /mnt/koofr
+            - name: rclone-backup
+              remote: 'backup:'
+              mountpoint: /mnt/backup
               flags:
                 - --read-only
 
@@ -50,20 +57,3 @@ None
           rclone_sysconfig:
             rclone_allow_other: true
             rclone_read_only: true
-
-## License
-
-Copyright (c) Linux HeadQuarters
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program. If not, see <http://www.gnu.org/licenses/>.

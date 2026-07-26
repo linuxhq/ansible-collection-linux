@@ -2,6 +2,103 @@
 - name: Verify
   hosts: all
   tasks:
+    - name: Ensure kopia repository information is gathered
+      tags:
+        - kopia
+      become: true
+      linuxhq.linux.kopia_repository_info:
+      register: __kopia_repository_query
+
+    - name: Ensure kopia repository is verified
+      tags:
+        - kopia
+      ansible.builtin.assert:
+        that:
+          - __kopia_repository_query.connected
+          - __kopia_repository_query.repository.storage.type == kopia_repository.storage
+          - __kopia_repository_query.repository.storage.config.path ==
+            kopia_repository.options.path
+
+    - name: Ensure kopia maintenance information is gathered
+      tags:
+        - kopia
+      become: true
+      linuxhq.linux.kopia_maintenance_info:
+      register: __kopia_maintenance_query
+
+    - name: Ensure kopia maintenance settings are verified
+      tags:
+        - kopia
+      vars:
+        __kopia_maintenance: "{{ __kopia_maintenance_query.maintenance }}"
+      ansible.builtin.assert:
+        that:
+          - __kopia_maintenance.full.enabled
+          - __kopia_maintenance.quick.enabled
+          - __kopia_maintenance.full.interval ==
+            kopia_maintenance.full_interval * 1000000000
+          - __kopia_maintenance.quick.interval ==
+            kopia_maintenance.quick_interval * 1000000000
+
+    - name: Ensure kopia policy information is gathered
+      tags:
+        - kopia
+      become: true
+      linuxhq.linux.kopia_policy_info:
+        target: "{{ kopia_policies[0].target }}"
+      register: __kopia_policy_query
+
+    - name: Ensure kopia policy is verified
+      tags:
+        - kopia
+      vars:
+        __kopia_policy: "{{ __kopia_policy_query.effective_policy }}"
+      ansible.builtin.assert:
+        that:
+          - __kopia_policy_query.defined
+          - __kopia_policy.compression.compressor_name == 'gzip'
+          - "'*.log' in __kopia_policy.files.ignore"
+          - "'*.tmp' in __kopia_policy.files.ignore"
+          - "'.cache/' in __kopia_policy.files.ignore"
+          - __kopia_policy.retention.keep_hourly == 24
+          - __kopia_policy.retention.keep_latest == 2
+          - __kopia_policy.retention.keep_monthly == 3
+          - __kopia_policy.retention.keep_weekly == 4
+          - __kopia_policy.scheduling.interval_seconds == 3600
+
+    - name: Ensure kopia snapshot is created
+      tags:
+        - kopia
+      become: true
+      linuxhq.linux.kopia_snapshot:
+        password: "{{ kopia_password }}"
+        path: "{{ kopia_policies[0].target }}"
+      register: __kopia_snapshot_result
+
+    - name: Ensure kopia snapshot creation is verified
+      tags:
+        - kopia
+      ansible.builtin.assert:
+        that:
+          - __kopia_snapshot_result.changed
+
+    - name: Ensure kopia snapshot information is gathered
+      tags:
+        - kopia
+      become: true
+      linuxhq.linux.kopia_snapshot_info:
+        path: "{{ kopia_policies[0].target }}"
+      register: __kopia_snapshot_query
+
+    - name: Ensure kopia snapshots are verified
+      tags:
+        - kopia
+      ansible.builtin.assert:
+        that:
+          - __kopia_snapshot_query.snapshots | length > 0
+          - __kopia_snapshot_query.snapshots[-1].source.path ==
+            kopia_policies[0].target
+
     - name: Ensure kopia service information is gathered
       tags:
         - kopia

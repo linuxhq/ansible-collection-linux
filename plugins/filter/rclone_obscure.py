@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 DOCUMENTATION = r"""
@@ -39,7 +38,6 @@ _value:
 """
 
 from ansible.errors import AnsibleFilterError
-
 from ansible_collections.linuxhq.linux.plugins.module_utils.rclone import (
     HAS_PYCRYPTODOME,
     obscure,
@@ -52,11 +50,11 @@ def rclone_obscure(plaintext):
 
     try:
         return obscure(plaintext)
-    except Exception as e:
-        raise AnsibleFilterError("rclone_obscure failed: %s" % e)
+    except (TypeError, ValueError) as e:
+        raise AnsibleFilterError(f"rclone_obscure failed: {e}")
 
 
-class FilterModule(object):
+class FilterModule:
     def filters(self):
         return {
             "rclone_obscure": rclone_obscure,
