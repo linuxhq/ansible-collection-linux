@@ -4,6 +4,48 @@ linuxhq.linux Release Notes
 
 .. contents:: Topics
 
+v2.3.0
+======
+
+Release Summary
+---------------
+
+Adds an rclone configuration encryption module and a set of kopia modules,
+and rewrites both roles to use them rather than shelling out to the CLI.
+Neither role now places a repository password on a command line, and the
+rclone configuration is never written to disk in plaintext before being
+encrypted. The kopia role variables change shape as a result, so read the
+porting guide before upgrading.
+
+Minor Changes
+-------------
+
+- kopia - add ``kopia_snapshot``, a boolean that defaults to V(false), controlling whether a snapshot is taken for each policy target on every run.
+- kopia - the repository password is passed to the modules rather than interpolated into a command line, so it no longer appears in the process table.
+- rclone - install ``python3-pycryptodomex``, required by ``rclone_config_encryption``.
+- rclone - manage the configuration file with a single ``rclone_config_encryption`` task instead of templating it and then shelling out to ``rclone config encryption``. The plaintext no longer lands on disk before being encrypted, and the password is no longer passed on a command line where it was visible in the process table.
+- roles - drop the ``{{ ansible_managed }}`` header from every template. The ``DEFAULT_MANAGED_STR`` configuration that populates the variable is deprecated and slated for removal in ansible-core 2.23, after which the variable is no longer provided and the templates would render it undefined. Managed files no longer carry the generated header comment.
+
+Breaking Changes / Porting Guide
+--------------------------------
+
+- kopia - ``kopia_server`` is removed and the server is always configured, and the role connects the repository and leaves it connected.
+- kopia - the role now manages the repository, maintenance settings, policies and snapshots with the ``kopia_repository``, ``kopia_maintenance``, ``kopia_policy`` and ``kopia_snapshot`` modules instead of shelling out to the kopia CLI, so the variables that fed those commands take structured values rather than command line flags. ``kopia_repository`` becomes a dict of ``storage``, ``options`` and ``secrets`` in place of ``location`` and ``flags``; ``kopia_maintenance`` becomes a dict of settings in place of a list of flags; and each entry in ``kopia_policies`` carries a ``policy`` dict in place of ``flags``.
+- kopia_repository - the ``state`` option is removed and the module only connects. Disconnecting left a server running with nothing to serve, so tearing a host down is no longer modelled here.
+
+New Modules
+-----------
+
+- kopia_maintenance - Manage kopia repository maintenance settings
+- kopia_maintenance_info - Gather kopia repository maintenance settings
+- kopia_policy - Manage a kopia snapshot policy
+- kopia_policy_info - Gather kopia snapshot policies
+- kopia_repository - Manage the kopia repository connection
+- kopia_repository_info - Gather kopia repository status
+- kopia_snapshot - Create a kopia snapshot
+- kopia_snapshot_info - Gather information about kopia snapshots
+- rclone_config_encryption - Manage rclone configuration file encryption
+
 v2.2.6
 ======
 
