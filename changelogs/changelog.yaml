@@ -257,3 +257,48 @@ releases:
       name: rclone_config_encryption
       namespace: ''
     release_date: '2026-07-25'
+  2.4.0:
+    changes:
+      breaking_changes:
+      - systemd - the ``systemd_hostnamectl``, ``systemd_localectl`` and ``systemd_timedatectl``
+        variables have been removed. The settings they drove now live in the dedicated
+        ``systemd_hostname``, ``systemd_locale`` and ``systemd_timedate`` roles, which
+        call the matching modules over the system bus and report changes accurately,
+        rather than running ``hostnamectl``, ``localectl`` and ``timedatectl`` with
+        ``changed_when`` pinned to false.
+      minor_changes:
+      - systemd_hostname - new role to manage the systemd hostname settings.
+      - systemd_hostname_info - new role to gather the systemd hostname settings.
+      - systemd_locale - new role to manage the systemd locale and keyboard settings.
+      - systemd_locale_info - new role to gather the systemd locale and keyboard settings.
+      - systemd_timedate - new role to manage the systemd time and date settings.
+      - systemd_timedate_info - new role to gather the systemd time and date settings.
+      release_summary: Adds D-Bus modules and roles for systemd hostname, locale
+        and timedate management, replacing the shell-based hostnamectl, localectl
+        and timedatectl tasks that were previously part of the systemd role. The new
+        modules talk directly to the system bus via dasbus, support check mode, and
+        report changes accurately. The old variables are removed from the systemd
+        role, so read the porting guide before upgrading.
+    fragments:
+    - release-summary.yml
+    - systemd-dbus-roles.yml
+    modules:
+    - description: Manage the systemd hostname
+      name: systemd_hostname
+      namespace: ''
+    - description: Gather the systemd hostname settings
+      name: systemd_hostname_info
+      namespace: ''
+    - description: Manage the systemd locale and keyboard settings
+      name: systemd_locale
+      namespace: ''
+    - description: Gather the systemd locale and keyboard settings
+      name: systemd_locale_info
+      namespace: ''
+    - description: Manage the systemd time and date settings
+      name: systemd_timedate
+      namespace: ''
+    - description: Gather the systemd time and date settings
+      name: systemd_timedate_info
+      namespace: ''
+    release_date: '2026-07-27'

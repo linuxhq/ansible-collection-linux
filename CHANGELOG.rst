@@ -4,6 +4,39 @@ linuxhq.linux Release Notes
 
 .. contents:: Topics
 
+v2.4.0
+======
+
+Release Summary
+---------------
+
+Adds D-Bus modules and roles for systemd hostname, locale and timedate management, replacing the shell-based hostnamectl, localectl and timedatectl tasks that were previously part of the systemd role. The new modules talk directly to the system bus via dasbus, support check mode, and report changes accurately. The old variables are removed from the systemd role, so read the porting guide before upgrading.
+
+Minor Changes
+-------------
+
+- systemd_hostname - new role to manage the systemd hostname settings.
+- systemd_hostname_info - new role to gather the systemd hostname settings.
+- systemd_locale - new role to manage the systemd locale and keyboard settings.
+- systemd_locale_info - new role to gather the systemd locale and keyboard settings.
+- systemd_timedate - new role to manage the systemd time and date settings.
+- systemd_timedate_info - new role to gather the systemd time and date settings.
+
+Breaking Changes / Porting Guide
+--------------------------------
+
+- systemd - the ``systemd_hostnamectl``, ``systemd_localectl`` and ``systemd_timedatectl`` variables have been removed. The settings they drove now live in the dedicated ``systemd_hostname``, ``systemd_locale`` and ``systemd_timedate`` roles, which call the matching modules over the system bus and report changes accurately, rather than running ``hostnamectl``, ``localectl`` and ``timedatectl`` with ``changed_when`` pinned to false.
+
+New Modules
+-----------
+
+- systemd_hostname - Manage the systemd hostname
+- systemd_hostname_info - Gather the systemd hostname settings
+- systemd_locale - Manage the systemd locale and keyboard settings
+- systemd_locale_info - Gather the systemd locale and keyboard settings
+- systemd_timedate - Manage the systemd time and date settings
+- systemd_timedate_info - Gather the systemd time and date settings
+
 v2.3.0
 ======
 
