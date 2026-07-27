@@ -1,0 +1,57 @@
+---
+- name: Ensure systemd hostname packages are present
+  tags:
+    - systemd_hostname
+  become: true
+  ansible.builtin.apt:
+    cache_valid_time: 3600
+    name: "{{ systemd_hostname_packages }}"
+    state: present
+    update_cache: true
+  when:
+    - ansible_facts.os_family == 'Debian'
+
+- name: Ensure systemd hostname packages are present
+  tags:
+    - systemd_hostname
+  become: true
+  ansible.builtin.dnf:
+    name: "{{ systemd_hostname_packages }}"
+    state: present
+  when:
+    - ansible_facts.os_family == 'RedHat'
+
+- name: Ensure systemd hostname settings are managed
+  tags:
+    - systemd_hostname
+  become: true
+  linuxhq.linux.systemd_hostname:
+    chassis: >-
+      {{ systemd_hostname_chassis
+         if systemd_hostname_chassis is not none
+         else omit }}
+    deployment: >-
+      {{ systemd_hostname_deployment
+         if systemd_hostname_deployment is not none
+         else omit }}
+    icon_name: >-
+      {{ systemd_hostname_icon_name
+         if systemd_hostname_icon_name is not none
+         else omit }}
+    location: >-
+      {{ systemd_hostname_location
+         if systemd_hostname_location is not none
+         else omit }}
+    pretty_hostname: >-
+      {{ systemd_hostname_pretty_hostname
+         if systemd_hostname_pretty_hostname is not none
+         else omit }}
+    static_hostname: >-
+      {{ systemd_hostname_static_hostname
+         if systemd_hostname_static_hostname is not none
+         else omit }}
+    transient_hostname: >-
+      {{ systemd_hostname_transient_hostname
+         if systemd_hostname_transient_hostname is not none
+         else omit }}
+...

@@ -15,11 +15,8 @@ galaxy_info:
       versions:
         - all
   galaxy_tags:
-    - hostnamectl
     - journald
     - linux
-    - localectl
     - logind
-    - timedatectl
     - systemd
 ...

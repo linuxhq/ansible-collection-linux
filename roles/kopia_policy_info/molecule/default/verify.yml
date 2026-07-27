@@ -12,11 +12,4 @@
         that:
           - _kopia_policy_info_dict | length > 0
           - _kopia_policy_info_dict.retention.keep_latest == 2
-
-    - name: Ensure kopia information is displayed
-      tags:
-        - kopia_policy_info
-      ansible.builtin.debug:
-        msg: |
-          {{ _kopia_policy_info_list | to_nice_yaml }}
 ...

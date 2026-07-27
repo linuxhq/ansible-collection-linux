@@ -1,0 +1,10 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - role: systemd_hostname
+      tags:
+        - molecule-idempotence-notest
+
+    - systemd_hostname_info
+...

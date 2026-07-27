@@ -1,0 +1,16 @@
+---
+- name: Verify
+  hosts: all
+  roles:
+    - systemd_locale_info
+
+  post_tasks:
+    - name: Ensure systemd locale settings are verified
+      tags:
+        - systemd_locale
+      ansible.builtin.assert:
+        that:
+          - _systemd_locale_info_dict.locale.lang == 'C.UTF-8'
+          - _systemd_locale_info_dict.locale.lc_numeric is none
+          - _systemd_locale_info_dict.locale.lc_time == 'C'
+...

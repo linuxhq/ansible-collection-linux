@@ -1,0 +1,16 @@
+---
+- name: Verify
+  hosts: all
+  roles:
+    - systemd_timedate_info
+
+  post_tasks:
+    - name: Ensure systemd time and date settings are verified
+      tags:
+        - systemd_timedate
+      ansible.builtin.assert:
+        that:
+          - _systemd_timedate_info_dict.local_rtc is false
+          - _systemd_timedate_info_dict.ntp is true
+          - _systemd_timedate_info_dict.timezone == 'America/Los_Angeles'
+...

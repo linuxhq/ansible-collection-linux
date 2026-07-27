@@ -1,0 +1,24 @@
+---
+dependencies: []
+galaxy_info:
+  role_name: systemd_locale_info
+  author: Taylor Kimball
+  description: Gather information about the systemd locale and keyboard settings
+  license: GPL-3.0-or-later
+  min_ansible_version: 2.18.0
+  namespace: linuxhq
+  platforms:
+    - name: Debian
+      versions:
+        - all
+    - name: EL
+      versions:
+        - all
+  galaxy_tags:
+    - info
+    - keyboard
+    - linux
+    - locale
+    - localectl
+    - systemd
+...

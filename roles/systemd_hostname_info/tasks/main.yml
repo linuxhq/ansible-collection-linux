@@ -1,0 +1,36 @@
+---
+- name: Ensure systemd hostname packages are present
+  tags:
+    - systemd_hostname_info
+  become: true
+  ansible.builtin.apt:
+    cache_valid_time: 3600
+    name: "{{ systemd_hostname_info_packages }}"
+    state: present
+    update_cache: true
+  when:
+    - ansible_facts.os_family == 'Debian'
+
+- name: Ensure systemd hostname packages are present
+  tags:
+    - systemd_hostname_info
+  become: true
+  ansible.builtin.dnf:
+    name: "{{ systemd_hostname_info_packages }}"
+    state: present
+  when:
+    - ansible_facts.os_family == 'RedHat'
+
+- name: Ensure systemd hostname information is gathered
+  tags:
+    - systemd_hostname_info
+  linuxhq.linux.systemd_hostname_info:
+  register: __systemd_hostname_info_query
+
+- name: Ensure systemd hostname facts are generated
+  tags:
+    - systemd_hostname_info
+  ansible.builtin.set_fact:
+    _systemd_hostname_info_dict:
+      "{{ __systemd_hostname_info_query.hostname | d({}) }}"
+...

@@ -1,0 +1,15 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - role: systemd_timedate
+      systemd_timedate_adjust_system_clock: null
+      systemd_timedate_local_rtc: null
+      systemd_timedate_ntp: null
+      systemd_timedate_time: null
+      systemd_timedate_timezone: null
+      tags:
+        - molecule-idempotence-notest
+
+    - systemd_timedate
+...

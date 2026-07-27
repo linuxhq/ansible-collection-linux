@@ -1,0 +1,57 @@
+---
+- name: Ensure systemd locale packages are present
+  tags:
+    - systemd_locale
+  become: true
+  ansible.builtin.apt:
+    cache_valid_time: 3600
+    name: "{{ systemd_locale_packages }}"
+    state: present
+    update_cache: true
+  when:
+    - ansible_facts.os_family == 'Debian'
+
+- name: Ensure systemd locale packages are present
+  tags:
+    - systemd_locale
+  become: true
+  ansible.builtin.dnf:
+    name: "{{ systemd_locale_packages }}"
+    state: present
+  when:
+    - ansible_facts.os_family == 'RedHat'
+
+- name: Ensure systemd locale and keyboard settings are managed
+  tags:
+    - systemd_locale
+  become: true
+  linuxhq.linux.systemd_locale:
+    locale: >-
+      {{ systemd_locale_locale
+         if systemd_locale_locale is not none
+         else omit }}
+    vconsole_keymap: >-
+      {{ systemd_locale_vconsole_keymap
+         if systemd_locale_vconsole_keymap is not none
+         else omit }}
+    vconsole_keymap_toggle: >-
+      {{ systemd_locale_vconsole_keymap_toggle
+         if systemd_locale_vconsole_keymap_toggle is not none
+         else omit }}
+    x11_layout: >-
+      {{ systemd_locale_x11_layout
+         if systemd_locale_x11_layout is not none
+         else omit }}
+    x11_model: >-
+      {{ systemd_locale_x11_model
+         if systemd_locale_x11_model is not none
+         else omit }}
+    x11_options: >-
+      {{ systemd_locale_x11_options
+         if systemd_locale_x11_options is not none
+         else omit }}
+    x11_variant: >-
+      {{ systemd_locale_x11_variant
+         if systemd_locale_x11_variant is not none
+         else omit }}
+...
