@@ -2,6 +2,17 @@
 - name: Converge
   hosts: all
   roles:
+    - role: package
+      package_list:
+        - name: python3.11
+          state: present
+        - name: python3.11-pip
+          state: present
+      when:
+        - ansible_facts.os_family == 'RedHat'
+      tags:
+        - molecule-idempotence-notest
+
     - role: virtualenv
       virtualenv_list: []
 

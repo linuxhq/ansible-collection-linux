@@ -5,11 +5,19 @@
     - device_info
 
   post_tasks:
-    - name: Ensure device info information is displayed
+    - name: Ensure info is verified
       tags:
         - device_info
-      ansible.builtin.debug:
-        msg: |
-          {{ _device_info_dict | to_nice_yaml }}
-          {{ _device_info_list | to_nice_yaml }}
+      ansible.builtin.assert:
+        that:
+          - _device_info_list | length > 0
+          - _device_info_list | selectattr('device', 'defined') | list | length ==
+            _device_info_list | length
+          - _device_info_list | selectattr('partitions', 'defined') | list | length ==
+            _device_info_list | length
+          - _device_info_dict is mapping
+          - _device_info_dict | length == _device_info_list | length
+          - _device_info_dict | list | sort ==
+            _device_info_list | map(attribute='device') | list | sort
+          - _device_info_dict | dict2items | selectattr('value') | list | length > 0
 ...

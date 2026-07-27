@@ -13,11 +13,4 @@
           - _kopia_repository_info_dict.storage.type == kopia_repository.storage
           - _kopia_repository_info_dict.storage.config.path ==
             kopia_repository.options.path
-
-    - name: Ensure kopia information is displayed
-      tags:
-        - kopia_repository_info
-      ansible.builtin.debug:
-        msg: |
-          {{ _kopia_repository_info_dict | to_nice_yaml }}
 ...

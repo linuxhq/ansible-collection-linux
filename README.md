@@ -24,6 +24,7 @@ A collection of linux roles
 * `ansible.posix`
 * `community.docker >= 5.0.0`
 * `community.general >= 12.0.0`
+* `dasbus` (systemd modules only)
 * `pycryptodome >= 3.23.0` (rclone filter plugins only)
 
 ## Molecule

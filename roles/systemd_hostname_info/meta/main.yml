@@ -1,0 +1,23 @@
+---
+dependencies: []
+galaxy_info:
+  role_name: systemd_hostname_info
+  author: Taylor Kimball
+  description: Gather information about the systemd hostname
+  license: GPL-3.0-or-later
+  min_ansible_version: 2.18.0
+  namespace: linuxhq
+  platforms:
+    - name: Debian
+      versions:
+        - all
+    - name: EL
+      versions:
+        - all
+  galaxy_tags:
+    - hostname
+    - hostnamectl
+    - info
+    - linux
+    - systemd
+...

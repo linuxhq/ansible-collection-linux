@@ -2,23 +2,19 @@
 - name: Verify
   hosts: all
   tasks:
-    - name: Ensure virtualenv ansible versions are gathered
+    - name: Ensure virtualenv ansible version is gathered
       tags:
         - virtualenv
       ansible.builtin.command:
         cmd: >
-          {{ _venv.virtualenv }}/bin/ansible --version
+          {{ virtualenv_list[0].virtualenv }}/bin/ansible --version
       register: __virtualenv_ansible_version
-      loop: "{{ virtualenv_list }}"
-      loop_control:
-        label: "{{ _venv.virtualenv | d(none) }}"
-        loop_var: _venv
       changed_when: false
 
-    - name: Ensure virtualenv ansible versions are displayed
+    - name: Ensure virtualenv ansible version is verified
       tags:
         - virtualenv
-      ansible.builtin.debug:
-        msg: |
-          "{{ __virtualenv_ansible_version.results.0.stdout }}"
+      ansible.builtin.assert:
+        that:
+          - __virtualenv_ansible_version.stdout is search('ansible.*core.*2\.18')
 ...

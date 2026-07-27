@@ -1,0 +1,17 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - role: systemd_locale
+      systemd_locale_locale: null
+      systemd_locale_vconsole_keymap: null
+      systemd_locale_vconsole_keymap_toggle: null
+      systemd_locale_x11_layout: null
+      systemd_locale_x11_model: null
+      systemd_locale_x11_options: null
+      systemd_locale_x11_variant: null
+      tags:
+        - molecule-idempotence-notest
+
+    - systemd_locale
+...

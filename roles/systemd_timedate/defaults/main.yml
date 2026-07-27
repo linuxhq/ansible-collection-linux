@@ -1,0 +1,9 @@
+---
+systemd_timedate_adjust_system_clock: null
+systemd_timedate_local_rtc: null
+systemd_timedate_ntp: null
+systemd_timedate_packages:
+  - python3-dasbus
+systemd_timedate_time: null
+systemd_timedate_timezone: null
+...

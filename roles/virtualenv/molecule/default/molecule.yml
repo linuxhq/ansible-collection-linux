@@ -34,9 +34,9 @@ provisioner:
         virtualenv_become: true
         virtualenv_list:
           - virtualenv: /opt/ansible
-            virtualenv_command: /usr/bin/python3 -m venv
+            virtualenv_command: /usr/bin/python3.11 -m venv
             name:
-              - 'ansible>8,<9'
+              - ansible==11.4.0
             extra_args: '--no-cache-dir'
 
 verifier:

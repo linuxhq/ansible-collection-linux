@@ -1,0 +1,38 @@
+---
+- name: Ensure systemd timedate packages are present
+  tags:
+    - systemd_timedate_info
+  become: true
+  ansible.builtin.apt:
+    cache_valid_time: 3600
+    name: "{{ systemd_timedate_info_packages }}"
+    state: present
+    update_cache: true
+  when:
+    - ansible_facts.os_family == 'Debian'
+
+- name: Ensure systemd timedate packages are present
+  tags:
+    - systemd_timedate_info
+  become: true
+  ansible.builtin.dnf:
+    name: "{{ systemd_timedate_info_packages }}"
+    state: present
+  when:
+    - ansible_facts.os_family == 'RedHat'
+
+- name: Ensure systemd time and date information is gathered
+  tags:
+    - systemd_timedate_info
+  linuxhq.linux.systemd_timedate_info:
+  register: __systemd_timedate_info_query
+
+- name: Ensure systemd time and date facts are generated
+  tags:
+    - systemd_timedate_info
+  ansible.builtin.set_fact:
+    _systemd_timedate_info_dict:
+      "{{ __systemd_timedate_info_query.timedate | d({}) }}"
+    _systemd_timedate_info_list:
+      "{{ __systemd_timedate_info_query.timezones | d([]) }}"
+...

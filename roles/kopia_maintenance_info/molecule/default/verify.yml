@@ -12,11 +12,4 @@
         that:
           - _kopia_maintenance_info_dict | length > 0
           - _kopia_maintenance_info_dict.quick is defined
-
-    - name: Ensure kopia information is displayed
-      tags:
-        - kopia_maintenance_info
-      ansible.builtin.debug:
-        msg: |
-          {{ _kopia_maintenance_info_dict | to_nice_yaml }}
 ...

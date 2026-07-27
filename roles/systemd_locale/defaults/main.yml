@@ -1,0 +1,11 @@
+---
+systemd_locale_locale: null
+systemd_locale_packages:
+  - python3-dasbus
+systemd_locale_vconsole_keymap: null
+systemd_locale_vconsole_keymap_toggle: null
+systemd_locale_x11_layout: null
+systemd_locale_x11_model: null
+systemd_locale_x11_options: null
+systemd_locale_x11_variant: null
+...

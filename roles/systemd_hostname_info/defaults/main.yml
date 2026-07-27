@@ -1,0 +1,4 @@
+---
+systemd_hostname_info_packages:
+  - python3-dasbus
+...

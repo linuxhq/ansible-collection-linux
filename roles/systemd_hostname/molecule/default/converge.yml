@@ -1,0 +1,17 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - role: systemd_hostname
+      systemd_hostname_chassis: null
+      systemd_hostname_deployment: null
+      systemd_hostname_icon_name: null
+      systemd_hostname_location: null
+      systemd_hostname_pretty_hostname: null
+      systemd_hostname_static_hostname: null
+      systemd_hostname_transient_hostname: null
+      tags:
+        - molecule-idempotence-notest
+
+    - systemd_hostname
+...

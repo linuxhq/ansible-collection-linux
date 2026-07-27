@@ -1,0 +1,22 @@
+---
+- name: Verify
+  hosts: all
+  roles:
+    - systemd_hostname_info
+
+  post_tasks:
+    - name: Ensure systemd hostname information is verified
+      tags:
+        - systemd_hostname_info
+      ansible.builtin.assert:
+        that:
+          - _systemd_hostname_info_dict.chassis == 'vm'
+          - _systemd_hostname_info_dict.deployment == 'production'
+          - _systemd_hostname_info_dict.hostname_source == 'static'
+          - _systemd_hostname_info_dict.icon_name == 'computer-vm'
+          - _systemd_hostname_info_dict.kernel_name == 'Linux'
+          - _systemd_hostname_info_dict.location == 'molecule'
+          - _systemd_hostname_info_dict.pretty_hostname == 'Molecule Test'
+          - _systemd_hostname_info_dict.static_hostname ==
+            inventory_hostname ~ '.example.com'
+...
