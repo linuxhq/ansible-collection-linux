@@ -5,36 +5,47 @@
 [![Lint](https://github.com/linuxhq/ansible-collection-linux/actions/workflows/pre-commit.yml/badge.svg)](https://github.com/linuxhq/ansible-collection-linux/actions/workflows/pre-commit.yml)
 [![Release](https://github.com/linuxhq/ansible-collection-linux/actions/workflows/release.yml/badge.svg)](https://github.com/linuxhq/ansible-collection-linux/actions/workflows/release.yml)
 
-A collection of linux roles
-
-# Collection
-
-## Build
-
-    ansible-galaxy collection build
-
-## Install
-
-    ansible-galaxy collection install linuxhq.linux
+An Ansible collection of Linux modules, plugins, and roles.
 
 ## Requirements
 
-* Python `>= 3.13`
-* `ansible-core >= 2.18.0`
-* `ansible.posix`
-* `community.docker >= 5.0.0`
-* `community.general >= 12.0.0`
-* `dasbus` (systemd modules only)
-* `pycryptodome >= 3.23.0` (rclone filter plugins only)
+- Python `>= 3.13`
+- `ansible-core >= 2.18.0`
+- `ansible.posix`
+- `community.docker >= 5.0.0`
+- `community.general >= 12.0.0`
+- `dasbus` (systemd modules only)
+- `pycryptodome >= 3.23.0` (rclone filter plugins only)
 
-## Molecule
+## Installation
+
+    ansible-galaxy collection install linuxhq.linux
+
+## Development
 
     make
     source venv/bin/activate
 
-# Playbook
+### Build
 
-An example playbook utilizing roles available in this collection
+    ansible-galaxy collection build
+
+### Changelog
+
+    antsibull-changelog generate
+
+### Lint
+
+    ansible-lint
+    yamllint -s .
+
+### Test
+
+Every role includes a Molecule scenario with an example playbook.
+
+## Playbook
+
+An example playbook using roles from this collection:
 
     - hosts: server
       vars:
