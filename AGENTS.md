@@ -27,18 +27,22 @@ Always-on agent rules.  Append new rules to imports section below.
 
 Invoke skills rather than running commands ad hoc.
 
-| Skill              | Purpose                       |
-| ------------------ | ----------------------------- |
-| `pyenv`            | Install pyenv + pinned Python |
-| `virtualenv`       | Set up the venv               |
-| `ansible-lint`     | Lint roles & playbooks        |
-| `yamllint`         | Lint YAML                     |
-| `black`            | Format Python                 |
-| `ruff`             | Lint Python                   |
-| `ansible-test`     | Module sanity                 |
-| `molecule`         | Role tests                    |
-| `changelog`        | Changelog fragments & release |
-| `collection-build` | Build the collection tarball  |
+| Skill                     | Purpose                       |
+| ------------------------- | ----------------------------- |
+| `ansible-lint`            | Lint roles & playbooks        |
+| `ansible-test`            | Module sanity                 |
+| `black`                   | Format Python                 |
+| `blank-line-after-blocks` | Space Python blocks           |
+| `changelog`               | Changelog fragments & release |
+| `collection-build`        | Build the collection tarball  |
+| `isort`                   | Sort Python imports           |
+| `molecule`                | Role tests                    |
+| `plugins-audit`           | Exhaustive plugins audit      |
+| `pyenv`                   | Install pyenv + pinned Python |
+| `ruff`                    | Lint Python                   |
+| `tox`                     | Set up isolated environments  |
+| `unit`                    | Run unit tests                |
+| `yamllint`                | Lint YAML                     |
 
 ## Setup
 

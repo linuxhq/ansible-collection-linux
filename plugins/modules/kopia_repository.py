@@ -119,6 +119,7 @@ repository:
 
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.common.dict_transformations import camel_dict_to_snake_dict
+
 from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
     kopia_available,
     kopia_command,
@@ -144,18 +145,12 @@ def ensure_present(module):
     target = [module.params["storage"]] + kopia_flags(options)
     password = module.params["password"]
 
-    rc, _dummy, stderr = kopia_command(
-        module, ["repository", "connect"] + target, password=password
-    )
+    rc, _dummy, stderr = kopia_command(module, ["repository", "connect"] + target, password=password)
 
     if rc != 0 and "repository not initialized" in stderr:
-        rc, _dummy, stderr = kopia_command(
-            module, ["repository", "create"] + target, password=password
-        )
+        rc, _dummy, stderr = kopia_command(module, ["repository", "create"] + target, password=password)
         if rc == 0 and module.params["validate_provider"]:
-            rc, _dummy, stderr = kopia_command(
-                module, ["repository", "validate-provider"], password=password
-            )
+            rc, _dummy, stderr = kopia_command(module, ["repository", "validate-provider"], password=password)
 
     if rc != 0:
         module.fail_json(msg=f"unable to connect to kopia repository: {stderr.strip()}")

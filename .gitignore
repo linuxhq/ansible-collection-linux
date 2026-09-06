@@ -3,6 +3,7 @@
 .ansible/
 .DS_Store
 .ruff_cache/
+.tox/
 changelogs/.plugin-cache.yaml
 __pycache__/
 venv/

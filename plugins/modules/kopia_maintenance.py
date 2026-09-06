@@ -100,6 +100,7 @@ from copy import deepcopy
 
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.common.dict_transformations import camel_dict_to_snake_dict
+
 from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
     kopia_available,
     kopia_command,
@@ -141,16 +142,20 @@ SETTINGS = [
 def normalize(kind, value):
     if kind == "duration":
         return value * NANOSECONDS
+
     if kind == "megabytes":
         return value * MEGABYTES
+
     return value
 
 
 def flag_value(kind, value):
     if kind == "bool":
         return "true" if value else "false"
+
     if kind == "duration":
         return f"{value}s"
+
     return f"{value}"
 
 
@@ -185,9 +190,7 @@ def ensure_present(module):
     rc, _dummy, stderr = kopia_command(module, ["maintenance", "set"] + flags)
 
     if rc != 0:
-        module.fail_json(
-            msg=f"unable to set kopia maintenance settings: {stderr.strip()}"
-        )
+        module.fail_json(msg=f"unable to set kopia maintenance settings: {stderr.strip()}")
 
     current = maintenance_info(module)
 

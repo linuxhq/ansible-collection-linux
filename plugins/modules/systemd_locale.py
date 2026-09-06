@@ -176,6 +176,7 @@ locale:
 """
 
 from ansible.module_utils.basic import AnsibleModule
+
 from ansible_collections.linuxhq.linux.plugins.module_utils.systemd import (
     HAS_DASBUS,
     LOCALE_VARIABLES,
@@ -213,9 +214,7 @@ def vconsole_change(module, current):
         return None
 
     desired = {
-        "vconsole_keymap": (
-            current["vconsole_keymap"] or "" if keymap is None else keymap
-        ),
+        "vconsole_keymap": (current["vconsole_keymap"] or "" if keymap is None else keymap),
         "vconsole_keymap_toggle": toggle or "",
     }
 
@@ -231,10 +230,7 @@ def keyboard_change(module, current, names):
     if all(value is None for value in values.values()):
         return None
 
-    desired = {
-        name: (current[name] or "") if value is None else value
-        for name, value in values.items()
-    }
+    desired = {name: (current[name] or "") if value is None else value for name, value in values.items()}
 
     if all(desired[name] == (current[name] or "") for name in names):
         return None
@@ -248,8 +244,7 @@ def ensure_present(module):
         requested = locale_present(module.params["locale"] or {})
 
         module.exit_json(
-            changed=bool(requested)
-            or any(module.params[param] is not None for param in keyboard),
+            changed=bool(requested) or any(module.params[param] is not None for param in keyboard),
             locale={},
         )
 

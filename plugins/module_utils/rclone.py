@@ -205,12 +205,12 @@ def config_body(text):
 
         if not stripped or stripped.startswith(("#", ";")):
             continue
+
         if stripped == CONFIG_MARKER:
             return "".join(item.strip() for item in lines[index + 1 :])
+
         if stripped.startswith("RCLONE_ENCRYPT_V"):
-            raise ValueError(
-                "unsupported configuration encryption, update rclone for support"
-            )
+            raise ValueError("unsupported configuration encryption, update rclone for support")
 
         return None
 
@@ -246,6 +246,4 @@ def decrypt_config(text, password):
     if len(raw) < CONFIG_NONCE_SIZE + CONFIG_TAG_SIZE:
         raise ValueError("configuration data too short")
 
-    return _secretbox_open(
-        raw[CONFIG_NONCE_SIZE:], raw[:CONFIG_NONCE_SIZE], config_key(password)
-    )
+    return _secretbox_open(raw[CONFIG_NONCE_SIZE:], raw[:CONFIG_NONCE_SIZE], config_key(password))

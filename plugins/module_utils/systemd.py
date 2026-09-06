@@ -99,9 +99,7 @@ TIMEDATE_PROPERTIES = [
 
 def systemd_proxy(module, interface):
     if not HAS_DASBUS:
-        module.fail_json(
-            msg=missing_required_lib("dasbus"), exception=DASBUS_IMPORT_ERROR
-        )
+        module.fail_json(msg=missing_required_lib("dasbus"), exception=DASBUS_IMPORT_ERROR)
 
     service, path = INTERFACES[interface]
 
@@ -118,10 +116,7 @@ def systemd_value(value):
     if (
         isinstance(value, list)
         and value
-        and all(
-            isinstance(item, int) and not isinstance(item, bool) and 0 <= item <= 255
-            for item in value
-        )
+        and all(isinstance(item, int) and not isinstance(item, bool) and 0 <= item <= 255 for item in value)
     ):
         return bytes(value).hex()
 
@@ -162,9 +157,7 @@ def systemd_call(module, proxy, method, *args):
 def locale_status(module, proxy):
     status = systemd_properties(module, proxy, LOCALE_PROPERTIES)
 
-    variables = dict(
-        entry.split("=", 1) for entry in status["locale"] or [] if "=" in entry
-    )
+    variables = dict(entry.split("=", 1) for entry in status["locale"] or [] if "=" in entry)
 
     status["locale"] = {name: variables.get(name.upper()) for name in LOCALE_VARIABLES}
 
@@ -178,11 +171,7 @@ def locale_present(variables):
 def locale_simplify(variables):
     lang = variables.get("lang")
 
-    return {
-        name: value
-        for name, value in variables.items()
-        if value and (name == "lang" or value != lang)
-    }
+    return {name: value for name, value in variables.items() if value and (name == "lang" or value != lang)}
 
 
 def locale_setting(variables):

@@ -1,12 +1,12 @@
 ---
 name: changelog
-description: Manage changelog fragments and CHANGELOG.rst with antsibull-changelog from the project virtualenv. Add a fragment per user-facing change; release consumes fragments to cut a version.
+description: Manage changelog fragments and releases.
 ---
 
 # changelog
 
 Record user-facing changes as YAML fragments in `changelogs/fragments/`. `antsibull-changelog`
-(config `changelogs/config.yaml`) folds them into `CHANGELOG.rst`.
+folds them into `CHANGELOG.rst`.
 
 ## Add a fragment
 
@@ -33,16 +33,26 @@ Sections:
 ## Commands
 
 ```sh
-venv/bin/antsibull-changelog lint
-venv/bin/antsibull-changelog generate
-venv/bin/antsibull-changelog release
+tox run -e changelog -- lint
+tox run -e changelog -- lint-changelog-yaml --strict changelogs/changelog.yaml
+tox run -e changelog -- generate
 ```
 
 - `generate` doesn't touch fragments or show pending ones.
-- `release` records the `galaxy.yml` version and (with `keep_fragments: false`) deletes the
-  consumed fragments.
-- Bump `version` in `galaxy.yml` before `release` / tagging.
+- `lint-changelog-yaml` validates the generated changelog data used to render `CHANGELOG.rst`.
+
+## Release fragments
+
+After bumping `version` in `galaxy.yml`, consume the fragments:
+
+```sh
+tox run -e changelog -- release
+```
+
+With `keep_fragments: false`, `release` records the `galaxy.yml` version and deletes the consumed
+fragments. Review `CHANGELOG.rst` and `changelogs/changelog.yaml`, then run both lint commands again
+before tagging.
 
 ## Dependencies
 
-- `virtualenv` skill
+- `tox` skill

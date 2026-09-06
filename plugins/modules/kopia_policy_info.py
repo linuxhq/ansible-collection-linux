@@ -84,6 +84,7 @@ import json
 
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.common.dict_transformations import camel_dict_to_snake_dict
+
 from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
     kopia_available,
     kopia_command,
@@ -107,9 +108,7 @@ def info(module):
     try:
         effective = json.loads(stdout)
     except ValueError:
-        module.fail_json(
-            msg=f"unable to parse kopia policy show output: {stdout.strip()}"
-        )
+        module.fail_json(msg=f"unable to parse kopia policy show output: {stdout.strip()}")
 
     module.exit_json(
         changed=False,
@@ -128,9 +127,7 @@ def list_policies(module):
     try:
         policies = json.loads(stdout)
     except ValueError:
-        module.fail_json(
-            msg=f"unable to parse kopia policy list output: {stdout.strip()}"
-        )
+        module.fail_json(msg=f"unable to parse kopia policy list output: {stdout.strip()}")
 
     module.exit_json(
         changed=False,

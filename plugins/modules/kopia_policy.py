@@ -103,6 +103,7 @@ from ansible.module_utils.common.dict_transformations import (
     camel_dict_to_snake_dict,
     snake_dict_to_camel_dict,
 )
+
 from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
     kopia_available,
     kopia_command,
@@ -120,9 +121,7 @@ def ensure_present(module):
     current = policy_export(module, target)
 
     if current is not None and prune_empty(current) == desired:
-        module.exit_json(
-            changed=False, policy=camel_dict_to_snake_dict(prune_empty(current))
-        )
+        module.exit_json(changed=False, policy=camel_dict_to_snake_dict(prune_empty(current)))
 
     if module.check_mode:
         module.exit_json(changed=True, policy=camel_dict_to_snake_dict(desired))
@@ -131,18 +130,14 @@ def ensure_present(module):
     with open(source, "w") as handle:
         json.dump({target: desired}, handle)
 
-    rc, _dummy, stderr = kopia_command(
-        module, ["policy", "import", "--from-file", source]
-    )
+    rc, _dummy, stderr = kopia_command(module, ["policy", "import", "--from-file", source])
 
     if rc != 0:
         module.fail_json(msg=f"unable to import kopia policy: {stderr.strip()}")
 
     current = policy_export(module, target)
 
-    module.exit_json(
-        changed=True, policy=camel_dict_to_snake_dict(prune_empty(current or {}))
-    )
+    module.exit_json(changed=True, policy=camel_dict_to_snake_dict(prune_empty(current or {})))
 
 
 def ensure_absent(module):

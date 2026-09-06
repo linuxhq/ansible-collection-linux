@@ -64,6 +64,7 @@ import json
 
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.common.dict_transformations import camel_dict_to_snake_dict
+
 from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
     kopia_available,
     kopia_command,
@@ -79,9 +80,7 @@ def list_snapshots(module):
     if module.params["path"]:
         command.append(module.params["path"])
 
-    rc, stdout, stderr = kopia_command(
-        module, command, password=module.params["password"]
-    )
+    rc, stdout, stderr = kopia_command(module, command, password=module.params["password"])
 
     if rc != 0:
         module.fail_json(msg=f"unable to list kopia snapshots: {stderr.strip()}")
@@ -89,9 +88,7 @@ def list_snapshots(module):
     try:
         snapshots = json.loads(stdout)
     except ValueError:
-        module.fail_json(
-            msg=f"unable to parse kopia snapshot list output: {stdout.strip()}"
-        )
+        module.fail_json(msg=f"unable to parse kopia snapshot list output: {stdout.strip()}")
 
     return [camel_dict_to_snake_dict(snapshot) for snapshot in snapshots or []]
 
