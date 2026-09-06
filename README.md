@@ -46,11 +46,6 @@ Run grouped checks:
 ```sh
 tox run -m format
 tox run -m lint
-```
-
-Once unit tests and the Tox `unit` environment are added, run them with:
-
-```sh
 tox run -m unit
 ```
 

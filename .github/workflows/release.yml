@@ -1,5 +1,4 @@
 ---
-name: release
 'on':
   push:
     tags:
@@ -13,10 +12,9 @@ jobs:
     uses: ./.github/workflows/pre-commit.yml
 
   sanity:
-    uses: ./.github/workflows/sanity.yml
+    uses: ./.github/workflows/ansible-test.yml
 
   release:
-    name: release
     needs:
       - pre-commit
       - sanity

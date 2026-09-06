@@ -11,8 +11,6 @@ existing helpers, prefer deletion, and make the smallest root-cause fix.
 
 ## Boundaries
 
-- Ignore `ec2_vpc_vpn`; it is patched upstream.
-- Do not change the behavior of `ses_identity_tokens_info`.
 - Preserve unrelated worktree changes.
 - Update or add the smallest relevant tests when behavior changes or non-trivial
   logic is added.
@@ -70,8 +68,8 @@ blocker prevents continued work. No persistent repository ledger is required.
 ## Final verification
 
 After every inventory file has three consecutive clean passes, run the full
-applicable checks once through the `black`, `ruff`, and `ansible-test` skills,
-plus relevant unit tests. If a check exposes an issue or changes an in-scope
+applicable checks once through the `black`, `isort`, `ruff`, and `ansible-test`
+skills, plus relevant unit tests. If a check exposes an issue or changes an in-scope
 file, fix it, reset every affected file's clean-pass count to zero, and complete
 three new clean full-source passes on each affected file before rerunning final
 verification. Apply the same rule when a check exposes a worthwhile
