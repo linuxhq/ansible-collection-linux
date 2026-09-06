@@ -27,19 +27,31 @@ repos:
         files: \.(yaml|yml)$
         verbose: true
 
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.5
+  - repo: https://github.com/jsh9/blank-line-after-blocks
+    rev: 0.1.4
     hooks:
-      - id: ruff-check
-        exclude: ^venv/
-        files: \.(py)$
+      - id: blank-line-after-blocks
+        files: ^(plugins|tests)/.*\.py$
+        verbose: true
+
+  - repo: https://github.com/PyCQA/isort
+    rev: 8.0.1
+    hooks:
+      - id: isort
+        files: ^(plugins|tests)/.*\.py$
         verbose: true
 
   - repo: https://github.com/psf/black-pre-commit-mirror
     rev: 26.5.1
     hooks:
       - id: black
-        exclude: ^venv/
-        files: \.(py)$
+        files: ^(plugins|tests)/.*\.py$
+        verbose: true
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.5
+    hooks:
+      - id: ruff-check
+        files: ^(plugins|tests)/.*\.py$
         verbose: true
 ...

@@ -38,6 +38,7 @@ _value:
 """
 
 from ansible.errors import AnsibleFilterError
+
 from ansible_collections.linuxhq.linux.plugins.module_utils.rclone import (
     HAS_PYCRYPTODOME,
     obscure,

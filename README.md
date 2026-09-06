@@ -19,69 +19,59 @@ An Ansible collection of Linux modules, plugins, and roles.
 
 ## Installation
 
-    ansible-galaxy collection install linuxhq.linux
+```sh
+ansible-galaxy collection install linuxhq.linux
+```
 
 ## Development
 
-    make
-    source venv/bin/activate
+With Tox installed, install the pre-commit hook:
 
-### Build
+```sh
+tox run -e pre-commit
+```
 
-    ansible-galaxy collection build
+Tox manages isolated environments under `.tox/`; no environment activation is required.
 
-### Changelog
+### Checks
 
-    antsibull-changelog generate
+Run the default checks:
 
-### Lint
+```sh
+tox
+```
 
-    ansible-lint
-    yamllint -s .
+Run grouped checks:
 
-### Test
+```sh
+tox run -m format
+tox run -m lint
+```
 
-Every role includes a Molecule scenario with an example playbook.
+Once unit tests and the Tox `unit` environment are added, run them with:
 
-## Playbook
+```sh
+tox run -m unit
+```
 
-An example playbook using roles from this collection:
+Run Ansible sanity tests for a module:
 
-    - hosts: server
-      vars:
-        global_users:
-          - name: johnd
-            id: 2000
-            key: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIRtpHq0ih6ZsXzskVMqHLc3bvCp82l1lS/V9i3wXwQQ
-          - name: janed
-            id: 2001
-            key: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEQYZwthruEeeRtn4QE2x5xeVosMNha99UOVptoNjVbs
+```sh
+tox run -e ansible-test -- sanity --python "$(cat .python-version)" plugins/modules/systemd_timedate.py
+```
 
-      roles:
-        - role: linuxhq.linux.group
-          group_list:
-            "{{ (global_users |
-                json_query('[].{
-                  name: name,
-                  gid: id
-                }')) |
-                d([]) }}"
+### Molecule
 
-        - role: linuxhq.linux.user
-          user_list:
-            "{{ (global_users |
-                json_query('[].{
-                  name: name,
-                  uid: id
-                }')) |
-                d([]) }}"
+Each role has a Molecule scenario that also serves as an example playbook. Set `MOLECULE_ROLE`
+to select a role:
 
-        - role: linuxhq.linux.authorized_key
-          authorized_key_list:
-            "{{ (global_users |
-                json_query('[].{
-                  user: name,
-                  key: key,
-                  exclusive: `true`
-                }')) |
-                d([]) }}"
+```sh
+MOLECULE_ROLE=group tox run -e molecule -- test -s default
+```
+
+### Changelog and build
+
+```sh
+tox run -e changelog -- generate
+tox run -e build
+```

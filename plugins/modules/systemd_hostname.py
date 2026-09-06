@@ -145,6 +145,7 @@ hostname:
 """
 
 from ansible.module_utils.basic import AnsibleModule
+
 from ansible_collections.linuxhq.linux.plugins.module_utils.systemd import (
     HAS_DASBUS,
     HOSTNAME_PROPERTIES,
@@ -168,8 +169,7 @@ def ensure_present(module):
         module.exit_json(
             changed=any(
                 module.params[param] is not None
-                for param in [setting[0] for setting in SETTINGS]
-                + ["transient_hostname"]
+                for param in [setting[0] for setting in SETTINGS] + ["transient_hostname"]
             ),
             hostname={},
         )

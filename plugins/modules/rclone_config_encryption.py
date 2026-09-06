@@ -105,6 +105,7 @@ import tempfile
 
 from ansible.module_utils.basic import AnsibleModule, missing_required_lib
 from ansible.module_utils.common.text.converters import to_bytes, to_native, to_text
+
 from ansible_collections.linuxhq.linux.plugins.module_utils.rclone import (
     HAS_PYCRYPTODOME,
     decrypt_config,
@@ -200,9 +201,8 @@ def ensure_present(module):
 
     if desired is None:
         if encrypted and current is None:
-            module.fail_json(
-                msg="configuration file is already encrypted with a different password"
-            )
+            module.fail_json(msg="configuration file is already encrypted with a different password")
+
         desired = current
     else:
         desired = to_bytes(desired)
@@ -214,13 +214,9 @@ def ensure_present(module):
 
     diff = config_diff(module, current, desired)
 
-    changed = module.set_fs_attributes_if_different(
-        module.load_file_common_arguments(module.params), changed
-    )
+    changed = module.set_fs_attributes_if_different(module.load_file_common_arguments(module.params), changed)
 
-    module.exit_json(
-        changed=changed, encrypted=True, path=module.params["path"], **diff
-    )
+    module.exit_json(changed=changed, encrypted=True, path=module.params["path"], **diff)
 
 
 def ensure_absent(module):
@@ -230,9 +226,8 @@ def ensure_absent(module):
 
     if desired is None:
         if encrypted and current is None:
-            module.fail_json(
-                msg="unable to decrypt configuration file, wrong or missing password"
-            )
+            module.fail_json(msg="unable to decrypt configuration file, wrong or missing password")
+
         desired = current
     else:
         desired = to_bytes(desired)
@@ -244,13 +239,9 @@ def ensure_absent(module):
 
     diff = config_diff(module, current, desired)
 
-    changed = module.set_fs_attributes_if_different(
-        module.load_file_common_arguments(module.params), changed
-    )
+    changed = module.set_fs_attributes_if_different(module.load_file_common_arguments(module.params), changed)
 
-    module.exit_json(
-        changed=changed, encrypted=False, path=module.params["path"], **diff
-    )
+    module.exit_json(changed=changed, encrypted=False, path=module.params["path"], **diff)
 
 
 def main():

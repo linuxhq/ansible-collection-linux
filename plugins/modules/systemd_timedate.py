@@ -103,6 +103,7 @@ from datetime import datetime, timedelta, timezone
 from time import tzset
 
 from ansible.module_utils.basic import AnsibleModule
+
 from ansible_collections.linuxhq.linux.plugins.module_utils.systemd import (
     HAS_DASBUS,
     TIMEDATE_PROPERTIES,
@@ -287,6 +288,7 @@ def parse_time(module, value, zone):
                 os.environ.pop("TZ", None)
             else:
                 os.environ["TZ"] = origin
+
             tzset()
 
 
@@ -322,8 +324,7 @@ def ensure_present(module):
     if ntp is not None and current["ntp"] != ntp:
         if ntp and not current["can_ntp"]:
             module.fail_json(
-                msg="unable to enable network time synchronization: "
-                "no network time service is installed"
+                msg="unable to enable network time synchronization: " "no network time service is installed"
             )
 
         predicted["ntp"] = ntp

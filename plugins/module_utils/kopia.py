@@ -10,6 +10,7 @@ def kopia_flags(options):
         name = key.replace("_", "-")
         if value is None:
             continue
+
         if isinstance(value, bool):
             flags.append(f"--{name}" if value else f"--no-{name}")
         elif isinstance(value, (list, tuple)):
@@ -30,6 +31,7 @@ def kopia_command(module, args, password=None):
     command = [kopia]
     if module.params.get("config_file"):
         command.append(f"--config-file={module.params['config_file']}")
+
     command.extend(args)
 
     environ = {"KOPIA_CHECK_FOR_UPDATES": "false"}
@@ -46,9 +48,7 @@ def repository_status(module):
         try:
             return json.loads(stdout)
         except ValueError:
-            module.fail_json(
-                msg=f"unable to parse kopia repository status output: {stdout.strip()}"
-            )
+            module.fail_json(msg=f"unable to parse kopia repository status output: {stdout.strip()}")
 
     if "repository is not connected" in stderr:
         return None
@@ -60,16 +60,12 @@ def maintenance_info(module):
     rc, stdout, stderr = kopia_command(module, ["maintenance", "info", "--json"])
 
     if rc != 0:
-        module.fail_json(
-            msg=f"unable to query kopia maintenance info: {stderr.strip()}"
-        )
+        module.fail_json(msg=f"unable to query kopia maintenance info: {stderr.strip()}")
 
     try:
         return json.loads(stdout)
     except ValueError:
-        module.fail_json(
-            msg=f"unable to parse kopia maintenance info output: {stdout.strip()}"
-        )
+        module.fail_json(msg=f"unable to parse kopia maintenance info output: {stdout.strip()}")
 
 
 def policy_export(module, target):
@@ -79,9 +75,8 @@ def policy_export(module, target):
         try:
             policies = json.loads(stdout)
         except ValueError:
-            module.fail_json(
-                msg=f"unable to parse kopia policy export output: {stdout.strip()}"
-            )
+            module.fail_json(msg=f"unable to parse kopia policy export output: {stdout.strip()}")
+
         return next(iter(policies.values()), {})
 
     if "policy not found" in stderr:

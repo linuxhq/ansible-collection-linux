@@ -76,13 +76,12 @@ import json
 
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.common.dict_transformations import camel_dict_to_snake_dict
+
 from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import kopia_command
 
 
 def latest_snapshot(module, path):
-    rc, stdout, _dummy = kopia_command(
-        module, ["snapshot", "list", path, "--json"], password=module.params["password"]
-    )
+    rc, stdout, _dummy = kopia_command(module, ["snapshot", "list", path, "--json"], password=module.params["password"])
 
     if rc != 0:
         return {}
@@ -112,9 +111,7 @@ def ensure_present(module):
     for key, value in sorted((module.params["tags"] or {}).items()):
         command.append(f"--tags={key}:{value}")
 
-    rc, _dummy, stderr = kopia_command(
-        module, command, password=module.params["password"]
-    )
+    rc, _dummy, stderr = kopia_command(module, command, password=module.params["password"])
 
     if rc != 0:
         module.fail_json(msg=f"unable to create kopia snapshot: {stderr.strip()}")
