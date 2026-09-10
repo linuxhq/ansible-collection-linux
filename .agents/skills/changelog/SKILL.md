@@ -1,36 +1,29 @@
 ---
 name: changelog
-description: Manage changelog fragments and releases.
+description: Manage changelog fragments and releases with antsibull-changelog through Tox.
 ---
 
 # changelog
 
-Record user-facing changes as YAML fragments in `changelogs/fragments/`. `antsibull-changelog`
-folds them into `CHANGELOG.rst`.
+- Use the `tox` skill for environment setup and run from the collection root.
+- Add a YAML fragment in `changelogs/fragments/` for each user-facing change.
+- `changelogs/config.yaml` controls how changes appear in `CHANGELOG.rst`.
 
 ## Add a fragment
 
-Create `changelogs/fragments/{{ name }}.yml`, keyed by antsibull section (a list per section):
+- Create `changelogs/fragments/{{ name }}.yml` with a list of entries per section.
 
 ```yaml
 minor_changes:
   - {{ module_or_role }} - add X (https://github.com/.../pull/NNN).
 ```
 
-Sections:
+- Sections: `major_changes`, `minor_changes`, `breaking_changes`, `deprecated_features`,
+  `removed_features`, `security_fixes`, `bugfixes`, and `known_issues`.
+- `release_summary` takes a string for the release prelude.
+- `trivial` entries are not rendered.
 
-- `breaking_changes`
-- `bugfixes`
-- `deprecated_features`
-- `known_issues`
-- `major_changes`
-- `minor_changes`
-- `release_summary` (a string, prelude)
-- `removed_features`
-- `security_fixes`
-- `trivial` (not rendered)
-
-## Commands
+## Validate and generate
 
 ```sh
 tox run -e changelog -- lint
@@ -38,21 +31,19 @@ tox run -e changelog -- lint-changelog-yaml --strict changelogs/changelog.yaml
 tox run -e changelog -- generate
 ```
 
-- `generate` doesn't touch fragments or show pending ones.
-- `lint-changelog-yaml` validates the generated changelog data used to render `CHANGELOG.rst`.
+- `lint` validates fragments.
+- `lint-changelog-yaml` validates the changelog data used to render `CHANGELOG.rst`.
+- `generate` renders recorded changes; it leaves fragments untouched and omits pending ones.
 
-## Release fragments
+## Release
 
-After bumping `version` in `galaxy.yml`, consume the fragments:
+- Bump `version` in `galaxy.yml`, then consume the fragments:
 
 ```sh
 tox run -e changelog -- release
 ```
 
-With `keep_fragments: false`, `release` records the `galaxy.yml` version and deletes the consumed
-fragments. Review `CHANGELOG.rst` and `changelogs/changelog.yaml`, then run both lint commands again
-before tagging.
-
-## Dependencies
-
-- `tox` skill
+- `release` records the `galaxy.yml` version and deletes consumed fragments with
+  `keep_fragments: false`.
+- Review `CHANGELOG.rst` and `changelogs/changelog.yaml`, then rerun both lint commands
+  before tagging.
