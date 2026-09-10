@@ -1,3 +1,5 @@
+#!/usr/bin/python
+# Copyright: Ansible Project
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 DOCUMENTATION = r"""
@@ -68,6 +70,14 @@ options:
     default: false
 requirements:
   - kopia
+attributes:
+  check_mode:
+    description: Predicts changes without modifying the target.
+    support: full
+    details: Reports a potential change without querying current state when Kopia is unavailable.
+  diff_mode:
+    description: Diff mode is not supported.
+    support: none
 """
 
 EXAMPLES = r"""

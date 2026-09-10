@@ -1,3 +1,5 @@
+#!/usr/bin/python
+# Copyright: Ansible Project
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 DOCUMENTATION = r"""
@@ -25,6 +27,14 @@ options:
     type: str
 requirements:
   - kopia
+attributes:
+  check_mode:
+    description: This module only retrieves information and does not modify state.
+    support: full
+    details: Returns empty result data when Kopia is unavailable.
+  diff_mode:
+    description: Diff mode is not supported.
+    support: none
 """
 
 EXAMPLES = r"""

@@ -1,3 +1,5 @@
+#!/usr/bin/python
+# Copyright: Ansible Project
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 DOCUMENTATION = r"""
@@ -122,6 +124,14 @@ options:
     type: str
 requirements:
   - dasbus
+attributes:
+  check_mode:
+    description: Predicts changes without modifying the target.
+    support: full
+    details: When dasbus is unavailable, predicts changes from the supplied options without querying current state.
+  diff_mode:
+    description: Diff mode is not supported.
+    support: none
 """
 
 EXAMPLES = r"""
