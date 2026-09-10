@@ -28,4 +28,5 @@ sections:
     - Known Issues
 title: linuxhq.linux
 trivial_section_name: trivial
+vcs: git
 ...
