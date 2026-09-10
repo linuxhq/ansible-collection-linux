@@ -5,6 +5,7 @@ build_ignore:
   - '**/*.pyc'
   - '**/*.pyo'
   - '**/.DS_Store'
+  - '**/AGENTS.md'
   - '**/__pycache__'
   - '**/__pycache__/**'
   - '*.tar.gz'
@@ -21,6 +22,8 @@ build_ignore:
   - .github/**
   - .gitignore
   - .pre-commit-config.yaml
+  - .pytest_cache
+  - .pytest_cache/**
   - .python-version
   - .ruff.toml
   - .ruff_cache
