@@ -19,7 +19,7 @@ Merger of Dribble, Freshrpms, and Livna
 
 ## Dependencies
 
-* [linuxhq.linux.epel](https://github.com/linuxhq/ansible-collection-linux/tree/main/roles/epel)
+* [epel](../epel)
 
 ## Example Playbook
 

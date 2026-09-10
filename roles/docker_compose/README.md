@@ -18,7 +18,7 @@ Run multi-container applications with Docker
 
 ## Dependencies
 
-* [linuxhq.linux.docker](https://github.com/linuxhq/ansible-collection-linux/tree/main/roles/docker)
+* [docker](../docker)
 
 ## Example Playbook
 

@@ -4,6 +4,14 @@ linuxhq.linux Release Notes
 
 .. contents:: Topics
 
+v2.4.1
+======
+
+Release Summary
+---------------
+
+Maintenance release aligning agent setup guidance, using relative role dependency links, and forwarding the Cloudflare WARP token to Molecule scenarios.
+
 v2.4.0
 ======
 
