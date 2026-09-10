@@ -18,7 +18,7 @@ None
 
 ## Dependencies
 
-* [linuxhq.aws.device\_info](https://github.com/linuxhq/ansible-collection-linux/tree/main/roles/device_info)
+* [device\_info](../device_info)
 
 ## Example Playbook
 
