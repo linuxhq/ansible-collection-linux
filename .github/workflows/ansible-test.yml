@@ -18,9 +18,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - ansible: 'ansible-core==2.18.*'
+          - ansible: '>=11,<12'
+            python: '3.11'
+          - ansible: '>=12,<13'
             python: '3.12'
-          - ansible: 'ansible>=14.2,<15'
+          - ansible: '>=13,<14'
+            python: '3.13'
+          - ansible: '>=14.2,<15'
             python: '3.13'
     defaults:
       run:
@@ -37,11 +41,10 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "${{ matrix.python }}"
-      - run: pip install '${{ matrix.ansible }}'
+      - run: pip install 'ansible${{ matrix.ansible }}'
       - run: ansible-galaxy collection install -r requirements.yml -p ../..
       - run: >-
           ansible-test sanity --requirements --venv-system-site-packages --python "${{ matrix.python }}" --color -v
-
 
   unit:
     runs-on: ubuntu-latest
@@ -49,9 +52,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - ansible: 'ansible-core==2.18.*'
+          - ansible: '>=11,<12'
+            python: '3.11'
+          - ansible: '>=12,<13'
             python: '3.12'
-          - ansible: 'ansible>=14.2,<15'
+          - ansible: '>=13,<14'
+            python: '3.13'
+          - ansible: '>=14.2,<15'
             python: '3.13'
     defaults:
       run:
@@ -63,7 +70,7 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "${{ matrix.python }}"
-      - run: pip install '${{ matrix.ansible }}'
+      - run: pip install 'ansible${{ matrix.ansible }}'
       - run: pip install --constraint requirements.txt pycryptodome
       - run: ansible-galaxy collection install -r requirements.yml -p ../..
       - run: >-
