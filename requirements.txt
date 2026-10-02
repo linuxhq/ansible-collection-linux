@@ -1,4 +1,4 @@
-ansible>=14.3.1,<15
+ansible>=14.4.0,<15
 ansible-lint==26.9.0
 antsibull-changelog==0.35.1
 black==26.5.1
@@ -13,5 +13,5 @@ pre-commit==4.6.2
 pycryptodome==3.23.0
 pytest==9.1.1
 python-vagrant==1.0.0
-ruff==0.16.6
+ruff==0.16.9
 yamllint==1.38.0
