@@ -1,0 +1,133 @@
+---
+- name: Ensure podman quadlet user information is gathered
+  tags:
+    - podman_quadlet
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ podman_quadlet_user }}"
+
+- name: Ensure podman quadlet user information is generated
+  tags:
+    - podman_quadlet
+  ansible.builtin.set_fact:
+    __podman_quadlet_dir:
+      "{{ ansible_facts.getent_passwd[podman_quadlet_user][4] }}/.config/containers/systemd"
+    __podman_quadlet_uid:
+      "{{ ansible_facts.getent_passwd[podman_quadlet_user][1] }}"
+
+- name: Ensure podman quadlet user linger is enabled
+  tags:
+    - podman_quadlet
+  become: true
+  ansible.builtin.command:
+    argv:
+      - loginctl
+      - enable-linger
+      - "{{ podman_quadlet_user }}"
+    creates: "/var/lib/systemd/linger/{{ podman_quadlet_user }}"
+
+- name: Ensure podman quadlet target is present
+  tags:
+    - podman_quadlet
+  become: true
+  ansible.builtin.template:
+    dest: /etc/systemd/user/podman-quadlet.target
+    group: root
+    mode: '0644'
+    owner: root
+    src: podman-quadlet.systemd.j2
+  notify:
+    - Restart podman
+
+- name: Ensure podman quadlet directory is present
+  tags:
+    - podman_quadlet
+  become: true
+  become_user: "{{ podman_quadlet_user }}"
+  ansible.builtin.file:
+    mode: '0755'
+    path: "{{ __podman_quadlet_dir }}"
+    state: directory
+
+- name: Ensure podman quadlet networks are present
+  tags:
+    - podman_quadlet
+  become: true
+  become_user: "{{ podman_quadlet_user }}"
+  ansible.builtin.template:
+    dest: "{{ __podman_quadlet_dir }}/{{ _network.name }}.network"
+    mode: '0644'
+    src: network.systemd.j2
+  notify:
+    - Restart podman
+  loop: "{{ podman_quadlet_networks }}"
+  loop_control:
+    label: "{{ _network.name | d(none) }}"
+    loop_var: _network
+  when:
+    - _network.name is defined
+
+- name: Ensure podman quadlet secrets are present
+  tags:
+    - podman_quadlet
+  become: true
+  become_user: "{{ podman_quadlet_user }}"
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ __podman_quadlet_uid }}"
+  no_log: "{{ podman_quadlet_no_log }}"
+  containers.podman.podman_secret:
+    data: "{{ _secret.data }}"
+    name: "{{ _secret.name }}"
+  notify:
+    - Restart podman
+  loop: "{{ podman_quadlet_secrets }}"
+  loop_control:
+    label: "{{ _secret.name | d(none) }}"
+    loop_var: _secret
+  when:
+    - _secret.data is defined
+    - _secret.name is defined
+
+- name: Ensure podman quadlet containers are present
+  tags:
+    - podman_quadlet
+  become: true
+  become_user: "{{ podman_quadlet_user }}"
+  ansible.builtin.template:
+    dest: "{{ __podman_quadlet_dir }}/{{ _container.name }}.container"
+    mode: '0644'
+    src: container.systemd.j2
+  notify:
+    - Restart podman
+  loop: "{{ podman_quadlet_containers }}"
+  loop_control:
+    label: "{{ _container.name | d(none) }}"
+    loop_var: _container
+  when:
+    - _container.name is defined
+
+- name: Ensure podman quadlet user systemd settings are reloaded
+  tags:
+    - podman_quadlet
+  become: true
+  become_user: "{{ podman_quadlet_user }}"
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+    scope: user
+
+- name: Ensure podman quadlet user units are started and enabled on boot
+  tags:
+    - podman_quadlet
+  become: true
+  become_user: "{{ podman_quadlet_user }}"
+  ansible.builtin.systemd_service:
+    enabled: true
+    name: "{{ _service }}"
+    scope: user
+    state: started
+  loop:
+    - podman-auto-update.timer
+    - podman-quadlet.target
+  loop_control:
+    loop_var: _service
+...

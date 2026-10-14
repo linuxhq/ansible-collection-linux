@@ -1,0 +1,22 @@
+---
+dependencies:
+  - role: podman
+    tags: podman_quadlet
+galaxy_info:
+  role_name: podman_quadlet
+  author: Taylor Kimball
+  description: Allows users to manage quadlets
+  license: GPL-3.0-or-later
+  min_ansible_version: 2.18.0
+  namespace: linuxhq
+  platforms:
+    - name: EL
+      versions:
+        - all
+  galaxy_tags:
+    - containers
+    - linux
+    - podman
+    - quadlet
+    - systemd
+...

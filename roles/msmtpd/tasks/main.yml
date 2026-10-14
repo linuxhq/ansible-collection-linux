@@ -1,0 +1,52 @@
+---
+- name: Ensure msmtpd secrets are managed
+  tags:
+    - msmtpd
+  become: true
+  no_log: "{{ msmtpd_no_log }}"
+  containers.podman.podman_secret:
+    data: "{{ _secret.data }}"
+    name: "{{ _secret.name }}"
+  loop:
+    - name: msmtpd_from
+      data: "{{ msmtpd_from }}"
+    - name: msmtpd_host
+      data: "{{ msmtpd_host }}"
+    - name: msmtpd_password
+      data: "{{ msmtpd_password }}"
+    - name: msmtpd_user
+      data: "{{ msmtpd_user }}"
+  loop_control:
+    label: "{{ _secret.name }}"
+    loop_var: _secret
+  notify:
+    - Restart msmtpd
+
+- name: Ensure msmtpd quadlet is present
+  tags:
+    - msmtpd
+  become: true
+  ansible.builtin.template:
+    dest: /etc/containers/systemd/msmtpd.container
+    group: root
+    mode: '0644'
+    owner: root
+    src: msmtpd.container.j2
+  notify:
+    - Restart msmtpd
+
+- name: Ensure msmtpd systemd settings are reloaded
+  tags:
+    - msmtpd
+  become: true
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+
+- name: Ensure msmtpd is started
+  tags:
+    - msmtpd
+  become: true
+  ansible.builtin.systemd_service:
+    name: msmtpd.service
+    state: started
+...

@@ -1,0 +1,11 @@
+---
+- name: Restart podman
+  tags:
+    - podman_quadlet
+  become: true
+  become_user: "{{ podman_quadlet_user }}"
+  ansible.builtin.systemd_service:
+    name: podman-quadlet.target
+    scope: user
+    state: restarted
+...

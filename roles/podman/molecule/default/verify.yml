@@ -1,0 +1,28 @@
+---
+- name: Verify
+  hosts: all
+  tasks:
+    - name: Ensure podman package information is gathered
+      tags:
+        - podman
+      ansible.builtin.package_facts:
+        manager: auto
+
+    - name: Ensure podman auto-update timer information is gathered
+      tags:
+        - podman
+      community.general.systemd_info:
+        unitname:
+          - podman-auto-update.timer
+      register: __podman_systemd
+
+    - name: Ensure podman is verified
+      tags:
+        - podman
+      ansible.builtin.assert:
+        that:
+          - "'podman' in ansible_facts.packages"
+          - "'systemd-container' in ansible_facts.packages"
+          - __podman_systemd.units['podman-auto-update.timer'].unitfilestate == 'enabled'
+          - __podman_systemd.units['podman-auto-update.timer'].activestate == 'active'
+...

@@ -1,0 +1,62 @@
+---
+- name: Verify
+  hosts: all
+  tasks:
+    - name: Ensure podman quadlet file is gathered
+      tags:
+        - podman_quadlet
+      ansible.builtin.stat:
+        path: /home/vagrant/.config/containers/systemd/alpine.container
+      register: __podman_quadlet_file
+
+    - name: Ensure podman quadlet list is gathered
+      tags:
+        - podman_quadlet
+      ansible.builtin.command:
+        argv:
+          - podman
+          - quadlet
+          - list
+          - --format
+          - '{{ "{{" }}.Name{{ "}}" }}'
+      changed_when: false
+      register: __podman_quadlet_list
+
+    - name: Ensure podman quadlet container environment is gathered
+      tags:
+        - podman_quadlet
+      ansible.builtin.command:
+        argv:
+          - podman
+          - exec
+          - alpine
+          - env
+      changed_when: false
+      register: __podman_quadlet_env
+
+    - name: Ensure podman quadlet user units are gathered
+      tags:
+        - podman_quadlet
+      ansible.builtin.command:
+        argv:
+          - systemctl
+          - --user
+          - is-active
+          - alpine.service
+          - podman-quadlet.target
+          - podman-auto-update.timer
+      changed_when: false
+      register: __podman_quadlet_active
+
+    - name: Ensure podman quadlet is verified
+      tags:
+        - podman_quadlet
+      ansible.builtin.assert:
+        that:
+          - __podman_quadlet_file.stat.exists
+          - __podman_quadlet_file.stat.pw_name == 'vagrant'
+          - "'alpine.container' in __podman_quadlet_list.stdout_lines"
+          - "'COUNTRY=United States' in __podman_quadlet_env.stdout_lines"
+          - "'MOLECULE_SECRET=molecule' in __podman_quadlet_env.stdout_lines"
+          - __podman_quadlet_active.stdout_lines == ['active', 'active', 'active']
+...

@@ -1,0 +1,7 @@
+---
+podman_quadlet_containers: []
+podman_quadlet_networks: []
+podman_quadlet_no_log: false
+podman_quadlet_secrets: []
+podman_quadlet_user: null
+...

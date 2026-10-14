@@ -1,0 +1,22 @@
+---
+- name: Ensure podman packages are present
+  tags:
+    - podman
+  become: true
+  ansible.builtin.dnf:
+    name: "{{ podman_packages }}"
+    state: present
+
+- name: Ensure podman services are started and enabled on boot
+  tags:
+    - podman
+  become: true
+  ansible.builtin.systemd_service:
+    enabled: true
+    name: "{{ _service }}"
+    state: started
+  loop: "{{ podman_systemd }}"
+  loop_control:
+    label: "{{ _service | d(none) }}"
+    loop_var: _service
+...

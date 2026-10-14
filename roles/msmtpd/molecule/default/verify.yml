@@ -1,0 +1,33 @@
+---
+- name: Verify
+  hosts: all
+  tasks:
+    - name: Ensure msmtpd container environment is gathered
+      tags:
+        - msmtpd
+      ansible.builtin.command:
+        argv:
+          - podman
+          - exec
+          - msmtpd
+          - env
+      become: true
+      changed_when: false
+      no_log: true
+      register: __msmtpd_env
+
+    - name: Ensure msmtpd service information is gathered
+      tags:
+        - msmtpd
+      ansible.builtin.service_facts:
+
+    - name: Ensure msmtpd is verified
+      tags:
+        - msmtpd
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.services['msmtpd.service'].state == 'running'
+          - "'SMTP_HOST=smtp.example.com' in __msmtpd_env.stdout_lines"
+          - "'SMTP_PORT=587' in __msmtpd_env.stdout_lines"
+        quiet: true
+...

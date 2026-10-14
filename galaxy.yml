@@ -47,6 +47,7 @@ dependencies:
   ansible.posix: '*'
   community.docker: '>=5.0.0'
   community.general: '>=12.0.0'
+  containers.podman: '>=1.20.0'
 documentation: https://github.com/linuxhq/ansible-collection-linux/blob/main/README.md
 homepage: https://www.linuxhq.org
 issues: https://github.com/linuxhq/ansible-collection-linux/issues
@@ -59,5 +60,5 @@ repository: https://github.com/linuxhq/ansible-collection-linux
 tags:
   - infrastructure
   - linux
-version: 2.4.1
+version: 2.4.2
 ...

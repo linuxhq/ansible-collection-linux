@@ -1,0 +1,12 @@
+---
+- name: Prepare
+  hosts: all
+  tasks:
+    - name: Ensure podman package is latest
+      tags:
+        - podman_quadlet
+      become: true
+      ansible.builtin.dnf:
+        name: podman
+        state: latest
+...
