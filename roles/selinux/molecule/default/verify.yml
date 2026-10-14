@@ -16,5 +16,35 @@
         - selinux
       ansible.builtin.assert:
         that:
-          - "'disabled' in __selinux_sestatus.stdout"
+          - "'enforcing' in __selinux_sestatus.stdout"
+
+    - name: Ensure selinux boolean information is gathered
+      tags:
+        - selinux
+      ansible.builtin.command:
+        cmd: >
+          getsebool container_use_devices
+      register: __selinux_getsebool
+      changed_when: false
+
+    - name: Ensure selinux boolean information is verified
+      tags:
+        - selinux
+      ansible.builtin.assert:
+        that:
+          - "'--> on' in __selinux_getsebool.stdout"
+
+    - name: Ensure selinux autorelabel information is gathered
+      tags:
+        - selinux
+      ansible.builtin.stat:
+        path: /.autorelabel
+      register: __selinux_autorelabel
+
+    - name: Ensure selinux autorelabel information is verified
+      tags:
+        - selinux
+      ansible.builtin.assert:
+        that:
+          - not __selinux_autorelabel.stat.exists
 ...

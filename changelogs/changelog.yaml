@@ -324,3 +324,17 @@ releases:
     fragments:
     - podman-roles.yml
     release_date: '2026-10-14'
+  2.4.3:
+    changes:
+      bugfixes:
+      - selinux - create ``/.autorelabel`` before rebooting a host from disabled to
+        permissive or enforcing, so the filesystem is relabeled before policy is enforced.
+      minor_changes:
+      - selinux - add ``selinux_booleans`` to manage persistent SELinux booleans.
+      - selinux - install ``python3-libsemanage`` by default, which persistent boolean
+        changes require.
+      release_summary: Adds SELinux boolean management to the selinux role and schedules
+        a filesystem relabel before rebooting a host out of the disabled state.
+    fragments:
+    - selinux-booleans.yml
+    release_date: '2026-10-14'

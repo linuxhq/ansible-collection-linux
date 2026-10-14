@@ -10,9 +10,11 @@ None
 
 ## Role Variables
 
+    selinux_booleans: []
     selinux_conf: /etc/selinux/config
     selinux_packages:
       - python3-libselinux
+      - python3-libsemanage
       - selinux-policy
     selinux_policy: targeted
     selinux_reboot: false
@@ -29,5 +31,8 @@ None
     - hosts: server
       roles:
         - role: linuxhq.linux.selinux
-          selinux_state: disabled
+          selinux_booleans:
+            - name: container_use_devices
+              state: true
           selinux_reboot: true
+          selinux_state: enforcing
