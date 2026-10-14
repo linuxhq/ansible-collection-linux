@@ -12,6 +12,11 @@
       selinux_booleans:
         - name: container_use_devices
           state: true
+      selinux_fcontexts:
+        - target: '/srv(/.*)?'
+          setype: container_file_t
       selinux_reboot: true
+      selinux_restorecon:
+        - /srv
       selinux_state: enforcing
 ...

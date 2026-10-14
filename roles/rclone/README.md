@@ -6,21 +6,20 @@ A command-line program to manage files on cloud storage
 
 ## Requirements
 
-None
+* [podman](https://podman.io)
 
 ## Role Variables
 
     rclone_config: []
     rclone_config_pass: null
-    rclone_config_path: /etc/rclone/rclone.conf
+    rclone_image: docker.io/rclone/rclone:latest
     rclone_mounts: []
     rclone_no_log: false
-    rclone_profile: {}
-    rclone_sysconfig: {}
 
 ## Dependencies
 
 * [epel](../epel)
+* [podman](../podman)
 
 ## Example Playbook
 
@@ -28,32 +27,17 @@ None
       roles:
         - role: linuxhq.linux.rclone
           rclone_config:
-            - name: source
-              type: local
-              nounc: true
-
-            - name: backup
-              type: alias
-              remote: source:/srv
-
-            - name: secret
-              type: crypt
-              remote: source:/srv/rclone
-              password: "{{ vault_rclone_crypt_pass | linuxhq.linux.rclone_obscure }}"
+            - name: molecule
+              type: http
+              url: https://downloads.rclone.org
 
           rclone_config_pass: "{{ vault_rclone_config_pass }}"
 
           rclone_mounts:
-            - name: rclone-backup
-              remote: 'backup:'
-              mountpoint: /mnt/backup
-              flags:
-                - --read-only
-
-          rclone_profile:
-            rclone_progress: true
-            rclone_verbose: 1
-
-          rclone_sysconfig:
-            rclone_allow_other: true
-            rclone_read_only: true
+            - name: rclone-http
+              remote: 'molecule:'
+              mountpoint: /mnt/http
+              environment:
+                RCLONE_ALLOW_OTHER: true
+                RCLONE_READ_ONLY: true
+                RCLONE_VFS_CACHE_MODE: full

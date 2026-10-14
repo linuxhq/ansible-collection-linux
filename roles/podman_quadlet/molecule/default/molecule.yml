@@ -61,6 +61,22 @@ provisioner:
             data: molecule
         podman_quadlet_user: vagrant
 
+scenario:
+  test_sequence:
+    - dependency
+    - cleanup
+    - destroy
+    - syntax
+    - create
+    - prepare
+    - check
+    - converge
+    - check
+    - idempotence
+    - verify
+    - cleanup
+    - destroy
+
 verifier:
   name: ansible
   options:

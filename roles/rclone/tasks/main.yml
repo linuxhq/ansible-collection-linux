@@ -1,26 +1,4 @@
 ---
-- name: Ensure rclone config facts are generated
-  tags:
-    - rclone
-  ansible.builtin.set_fact:
-    __rclone_profile:
-      "{{ rclone_profile |
-          combine({'rclone_config': rclone_config_path}) }}"
-    __rclone_sysconfig:
-      "{{ rclone_sysconfig |
-          combine({'rclone_config': rclone_config_path}) }}"
-
-- name: Ensure rclone config pass facts are generated
-  tags:
-    - rclone
-  ansible.builtin.set_fact:
-    __rclone_sysconfig:
-      "{{ __rclone_sysconfig |
-          combine({'rclone_config_pass': rclone_config_pass}) }}"
-  when:
-    - rclone_config_pass is not none
-    - rclone_mounts | length > 0
-
 - name: Ensure rclone packages are present
   tags:
     - rclone
@@ -28,14 +6,13 @@
   ansible.builtin.dnf:
     name:
       - fuse3
-      - fuse3-libs
       - python3-pycryptodomex
       - rclone
     state: present
     validate_certs: true
   ignore_errors: "{{ ansible_check_mode }}"
 
-- name: Ensure rclone configuration path is present
+- name: Ensure rclone directory is present
   tags:
     - rclone
   become: true
@@ -43,8 +20,25 @@
     group: root
     mode: '0700'
     owner: root
-    path: "{{ rclone_config_path | dirname }}"
+    path: /root/.config/rclone
     state: directory
+
+- name: Ensure rclone cache directories are present
+  tags:
+    - rclone
+  become: true
+  ansible.builtin.file:
+    group: root
+    mode: '0700'
+    owner: root
+    path: /root/.cache/rclone/{{ _mount.name }}
+    state: directory
+  loop: "{{ rclone_mounts }}"
+  loop_control:
+    label: "{{ _mount.name | d(none) }}"
+    loop_var: _mount
+  when:
+    - _mount.name is defined
 
 - name: Ensure rclone configuration file is managed
   tags:
@@ -58,51 +52,47 @@
     mode: '0600'
     owner: root
     password: "{{ rclone_config_pass | d(omit) }}"
-    path: "{{ rclone_config_path }}"
+    path: /root/.config/rclone/rclone.conf
     state: "{{ 'present' if rclone_config_pass is not none else 'absent' }}"
+  notify:
+    - Restart rclone
 
-- name: Ensure rclone profile configuration is managed
+- name: Ensure rclone podman secret is managed
+  tags:
+    - rclone
+  become: true
+  no_log: "{{ rclone_no_log }}"
+  containers.podman.podman_secret:
+    data: "{{ rclone_config_pass }}"
+    name: rclone_config_pass
+  notify:
+    - Restart rclone
+  when:
+    - rclone_config_pass is not none
+    - rclone_mounts | length > 0
+
+- name: Ensure rclone podman quadlet is managed
   tags:
     - rclone
   become: true
   ansible.builtin.template:
+    dest: /etc/containers/systemd/{{ _mount.name }}.container
     group: root
-    dest: /etc/profile.d/rclone.sh
     mode: '0644'
     owner: root
-    src: rclone.profile.j2
-
-- name: Ensure rclone sysconfig configuration is managed
-  tags:
-    - rclone
-  become: true
-  ansible.builtin.template:
-    group: root
-    dest: /etc/sysconfig/rclone
-    mode: '0600'
-    owner: root
-    src: rclone.sysconfig.j2
-
-- name: Ensure rclone systemd unit is managed
-  tags:
-    - rclone
-  become: true
-  ansible.builtin.template:
-    group: root
-    dest: /usr/lib/systemd/system/{{ _mount.name }}.service
-    mode: '0644'
-    owner: root
-    src: rclone.systemd.j2
+    src: rclone.container.j2
+  notify:
+    - Restart rclone
   loop: "{{ rclone_mounts }}"
   loop_control:
     label: "{{ _mount.name | d(none) }}"
     loop_var: _mount
   when:
-    - _mount.name is defined
     - _mount.mountpoint is defined
+    - _mount.name is defined
     - _mount.remote is defined
 
-- name: Ensure rclone systemd unit is reloaded
+- name: Ensure rclone systemd settings are reloaded
   tags:
     - rclone
   become: true
@@ -111,25 +101,11 @@
   when:
     - rclone_mounts | length > 0
 
-- name: Ensure rclone systemd units are checked
-  tags:
-    - rclone
-  become: true
-  ansible.builtin.stat:
-    path: /usr/lib/systemd/system/{{ _mount.name }}.service
-  loop: "{{ rclone_mounts }}"
-  loop_control:
-    label: "{{ _mount.name | d(none) }}"
-    loop_var: _mount
-  when:
-    - _mount.name is defined
-
-- name: Ensure rclone systemd units are started and enabled on boot
+- name: Ensure rclone mounts are started
   tags:
     - rclone
   become: true
   ansible.builtin.systemd_service:
-    enabled: true
     name: "{{ _mount.name }}.service"
     state: started
   loop: "{{ rclone_mounts }}"
@@ -138,7 +114,7 @@
     loop_var: _mount
   ignore_errors: "{{ ansible_check_mode }}"
   when:
-    - _mount.name is defined
     - _mount.mountpoint is defined
+    - _mount.name is defined
     - _mount.remote is defined
 ...

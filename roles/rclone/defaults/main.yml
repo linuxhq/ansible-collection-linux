@@ -1,9 +1,7 @@
 ---
 rclone_config: []
 rclone_config_pass: null
-rclone_config_path: /etc/rclone/rclone.conf
+rclone_image: docker.io/rclone/rclone:latest
 rclone_mounts: []
 rclone_no_log: false
-rclone_profile: {}
-rclone_sysconfig: {}
 ...

@@ -130,4 +130,5 @@
     - podman-quadlet.target
   loop_control:
     loop_var: _service
+  ignore_errors: "{{ ansible_check_mode }}"
 ...

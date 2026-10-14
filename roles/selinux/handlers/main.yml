@@ -1,0 +1,15 @@
+---
+- name: Restore selinux file contexts
+  tags:
+    - selinux
+  become: true
+  ansible.builtin.command:
+    argv:
+      - restorecon
+      - -R
+      - "{{ _path }}"
+  changed_when: true
+  loop: "{{ selinux_restorecon }}"
+  loop_control:
+    loop_var: _path
+...

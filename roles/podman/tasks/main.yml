@@ -19,4 +19,5 @@
   loop_control:
     label: "{{ _service | d(none) }}"
     loop_var: _service
+  ignore_errors: "{{ ansible_check_mode }}"
 ...

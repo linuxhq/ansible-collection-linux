@@ -72,4 +72,23 @@
     - _boolean.state is defined
     - __selinux_getenforce.stdout != 'Disabled'
     - not ansible_check_mode
+
+- name: Ensure selinux file contexts are managed
+  tags:
+    - selinux
+  become: true
+  community.general.sefcontext:
+    setype: "{{ _fcontext.setype }}"
+    state: present
+    target: "{{ _fcontext.target }}"
+  notify:
+    - Restore selinux file contexts
+  loop: "{{ selinux_fcontexts }}"
+  loop_control:
+    label: "{{ _fcontext.target | d(none) }}"
+    loop_var: _fcontext
+  when:
+    - _fcontext.setype is defined
+    - _fcontext.target is defined
+    - __selinux_getenforce.stdout != 'Disabled'
 ...

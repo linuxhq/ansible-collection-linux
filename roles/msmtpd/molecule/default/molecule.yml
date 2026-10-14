@@ -37,6 +37,22 @@ provisioner:
         msmtpd_password: molecule
         msmtpd_user: molecule@example.com
 
+scenario:
+  test_sequence:
+    - dependency
+    - cleanup
+    - destroy
+    - syntax
+    - create
+    - prepare
+    - check
+    - converge
+    - check
+    - idempotence
+    - verify
+    - cleanup
+    - destroy
+
 verifier:
   name: ansible
   options:

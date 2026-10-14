@@ -338,3 +338,39 @@ releases:
     fragments:
     - selinux-booleans.yml
     release_date: '2026-10-14'
+  2.4.4:
+    changes:
+      breaking_changes:
+      - rclone - mounts now run only as rootful podman quadlets, one container per
+        mount in ``/etc/containers/systemd/<name>.container``. Host ``rclone mount``
+        services are no longer created.
+      - rclone - the ``flags`` key of ``rclone_mounts`` was replaced by ``environment``,
+        a mapping of ``RCLONE_*`` variables passed to the mount container.
+      - rclone - the ``rclone_profile`` and ``rclone_sysconfig`` variables were removed
+        along with ``/etc/profile.d/rclone.sh`` and ``/etc/sysconfig/rclone``. ``RCLONE_CONFIG_PASS``
+        is now provided by the ``rclone_config_pass`` podman secret.
+      - rclone - the configuration file moved from ``/etc/rclone/rclone.conf`` to
+        ``/root/.config/rclone/rclone.conf`` and the ``rclone_config_path`` variable
+        was removed.
+      bugfixes:
+      - msmtpd, podman, podman_quadlet, rclone - do not fail in check mode when starting
+        or restarting units that do not exist yet.
+      minor_changes:
+      - msmtpd, podman, podman_quadlet, rclone - run Molecule scenarios in check mode
+        before and after converge.
+      - rclone - add ``rclone_image`` to set the container image used for mounts.
+      - rclone - cache each mount in ``/root/.cache/rclone/<name>`` and order it after
+        the filesystems its mountpoint lives on.
+      - rclone - depend on the podman role and remount every mount when the configuration
+        or its password changes.
+      - selinux - add ``selinux_fcontexts`` to manage persistent SELinux file context
+        rules and ``selinux_restorecon`` to relabel paths when a rule changes.
+      - selinux - install ``python3-policycoreutils`` by default, which file context
+        management requires.
+      release_summary: Runs rclone mounts as rootful podman containers, adds SELinux
+        file context management to the selinux role, and makes the podman, podman_quadlet
+        and msmtpd roles safe to run in check mode. The rclone role drops its host
+        mounts and several variables, so read the porting guide before upgrading.
+    fragments:
+    - podman-rclone-selinux.yml
+    release_date: '2026-10-14'

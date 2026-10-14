@@ -1,0 +1,15 @@
+---
+- name: Prepare
+  hosts: all
+  tasks:
+    - name: Ensure selinux file context test file is present
+      tags:
+        - selinux
+      become: true
+      ansible.builtin.copy:
+        content: molecule
+        dest: /srv/molecule
+        group: root
+        mode: '0644'
+        owner: root
+...
