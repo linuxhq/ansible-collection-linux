@@ -18,6 +18,22 @@
     update_kernel_param: "{{ selinux_update_kernel_param }}"
   register: __selinux_status
 
+- name: Ensure selinux autorelabel is scheduled
+  tags:
+    - selinux
+  become: true
+  ansible.builtin.file:
+    access_time: preserve
+    group: root
+    mode: '0644'
+    modification_time: preserve
+    owner: root
+    path: /.autorelabel
+    state: touch
+  when:
+    - selinux_state != 'disabled'
+    - __selinux_status.reboot_required | d(false) | bool
+
 - name: Ensure selinux host is rebooted
   tags:
     - selinux
@@ -28,4 +44,32 @@
     - selinux_reboot | bool
     - __selinux_status is changed
     - __selinux_status.reboot_required | bool
+
+- name: Ensure selinux runtime status is gathered
+  tags:
+    - selinux
+  ansible.builtin.command:
+    cmd: >
+      getenforce
+  register: __selinux_getenforce
+  changed_when: false
+  check_mode: false
+
+- name: Ensure selinux booleans are managed
+  tags:
+    - selinux
+  become: true
+  ansible.posix.seboolean:
+    name: "{{ _boolean.name }}"
+    persistent: "{{ _boolean.persistent | d(true) }}"
+    state: "{{ _boolean.state }}"
+  loop: "{{ selinux_booleans }}"
+  loop_control:
+    label: "{{ _boolean.name | d(none) }}"
+    loop_var: _boolean
+  when:
+    - _boolean.name is defined
+    - _boolean.state is defined
+    - __selinux_getenforce.stdout != 'Disabled'
+    - not ansible_check_mode
 ...

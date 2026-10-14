@@ -3,10 +3,15 @@
   hosts: all
   roles:
     - role: selinux
+      selinux_reboot: true
+      selinux_state: disabled
       tags:
         - molecule-idempotence-notest
 
     - role: selinux
-      selinux_state: disabled
+      selinux_booleans:
+        - name: container_use_devices
+          state: true
       selinux_reboot: true
+      selinux_state: enforcing
 ...

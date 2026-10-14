@@ -12,7 +12,11 @@ driver:
 platforms:
   - name: almalinux9
     box: bento/almalinux-9.6
-    box_architecture: arm64
+    cpus: 4
+    memory: 4096
+
+  - name: almalinux10
+    box: bento/almalinux-10.0
     cpus: 4
     memory: 4096
 
@@ -25,6 +29,22 @@ provisioner:
   log: true
   options:
     diff: true
+
+scenario:
+  test_sequence:
+    - dependency
+    - cleanup
+    - destroy
+    - syntax
+    - create
+    - prepare
+    - check
+    - converge
+    - check
+    - idempotence
+    - verify
+    - cleanup
+    - destroy
 
 verifier:
   name: ansible

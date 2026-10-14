@@ -4,6 +4,25 @@ linuxhq.linux Release Notes
 
 .. contents:: Topics
 
+v2.4.3
+======
+
+Release Summary
+---------------
+
+Adds SELinux boolean management to the selinux role and schedules a filesystem relabel before rebooting a host out of the disabled state.
+
+Minor Changes
+-------------
+
+- selinux - add ``selinux_booleans`` to manage persistent SELinux booleans.
+- selinux - install ``python3-libsemanage`` by default, which persistent boolean changes require.
+
+Bugfixes
+--------
+
+- selinux - create ``/.autorelabel`` before rebooting a host from disabled to permissive or enforcing, so the filesystem is relabeled before policy is enforced.
+
 v2.4.2
 ======
 
