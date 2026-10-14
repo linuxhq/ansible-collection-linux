@@ -1,0 +1,9 @@
+---
+- name: Restart msmtpd
+  tags:
+    - msmtpd
+  become: true
+  ansible.builtin.systemd_service:
+    name: msmtpd.service
+    state: restarted
+...

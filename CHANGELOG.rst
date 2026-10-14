@@ -4,6 +4,22 @@ linuxhq.linux Release Notes
 
 .. contents:: Topics
 
+v2.4.2
+======
+
+Release Summary
+---------------
+
+Adds podman roles for the container engine, rootless quadlet stacks and a rootful msmtpd relay, along with a new dependency on the containers.podman collection.
+
+Minor Changes
+-------------
+
+- collection - add the ``containers.podman`` collection as a dependency.
+- msmtpd - new role to run a minimal SMTP relay as a rootful podman quadlet.
+- podman - new role to install the podman container engine and enable its system timers.
+- podman_quadlet - new role that allows users to manage quadlets.
+
 v2.4.1
 ======
 

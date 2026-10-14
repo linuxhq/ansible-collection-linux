@@ -1,0 +1,6 @@
+---
+podman_packages:
+  - podman
+podman_systemd:
+  - podman-auto-update.timer
+...

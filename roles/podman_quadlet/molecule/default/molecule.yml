@@ -1,0 +1,68 @@
+---
+prerun: false
+
+dependency:
+  name: galaxy
+  options:
+    requirements-file: ../../requirements.yml
+
+driver:
+  name: vagrant
+
+platforms:
+  - name: almalinux9
+    box: bento/almalinux-9.6
+    cpus: 4
+    memory: 4096
+
+  - name: almalinux10
+    box: bento/almalinux-10.0
+    cpus: 4
+    memory: 4096
+
+provisioner:
+  name: ansible
+  env:
+    ANSIBLE_ACTION_WARNINGS: false
+    ANSIBLE_COLLECTIONS_PATH: ${ANSIBLE_COLLECTIONS_PATH}
+    ANSIBLE_DEPRECATION_WARNINGS: false
+  log: true
+  options:
+    diff: true
+  inventory:
+    group_vars:
+      all:
+        podman_quadlet_containers:
+          - name: alpine
+            unit:
+              Unit:
+                PartOf: podman-quadlet.target
+              Container:
+                ContainerName: alpine
+                Environment:
+                  COUNTRY: United States
+                Exec: sleep infinity
+                Image: docker.io/library/alpine:latest
+                Network: molecule.network
+                Secret:
+                  - molecule,type=env,target=MOLECULE_SECRET
+              Service:
+                Restart: always
+              Install:
+                WantedBy: podman-quadlet.target
+        podman_quadlet_networks:
+          - name: molecule
+            unit:
+              Network:
+                NetworkName: molecule
+                Subnet: 192.168.0.0/24
+        podman_quadlet_secrets:
+          - name: molecule
+            data: molecule
+        podman_quadlet_user: vagrant
+
+verifier:
+  name: ansible
+  options:
+    diff: true
+...

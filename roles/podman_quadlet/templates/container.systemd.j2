@@ -1,0 +1,21 @@
+{% for section, options in _container.unit.items() %}
+[{{ section }}]
+{%   for key, value in options.items() %}
+{%     if value is mapping %}
+{%       for k, v in value.items() %}
+{{ key }}="{{ k }}={{ v }}"
+{%       endfor %}
+{%     elif value is iterable and value is not string %}
+{%       for v in value %}
+{{ key }}={{ v }}
+{%       endfor %}
+{%     elif value is boolean %}
+{{ key }}={{ 'true' if value else 'false' }}
+{%     else %}
+{{ key }}={{ value }}
+{%     endif %}
+{%   endfor %}
+{%   if not loop.last %}
+
+{%   endif %}
+{% endfor %}

@@ -1,0 +1,29 @@
+[Unit]
+StartLimitIntervalSec=0
+
+[Container]
+AutoUpdate=registry
+ContainerName=msmtpd
+Environment="SMTP_AUTH={{ 'on' if msmtpd_auth else 'off' }}"
+Environment="SMTP_PORT={{ msmtpd_port }}"
+Environment="SMTP_STARTTLS={{ 'on' if msmtpd_starttls else 'off' }}"
+Environment="SMTP_TLS={{ 'on' if msmtpd_tls else 'off' }}"
+GIDMap={{ msmtpd_gidmap }}
+HealthCmd=nc -z 0 2500
+HealthInterval=10s
+HealthOnFailure=kill
+HealthTimeout=5s
+Image={{ msmtpd_image }}
+PublishPort={{ msmtpd_publish }}
+Secret=msmtpd_from,type=env,target=SMTP_FROM
+Secret=msmtpd_host,type=env,target=SMTP_HOST
+Secret=msmtpd_password,type=env,target=SMTP_PASSWORD
+Secret=msmtpd_user,type=env,target=SMTP_USER
+UIDMap={{ msmtpd_uidmap }}
+
+[Service]
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

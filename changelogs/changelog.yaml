@@ -310,3 +310,17 @@ releases:
     fragments:
     - final-collection-cleanup.yml
     release_date: '2026-09-10'
+  2.4.2:
+    changes:
+      minor_changes:
+      - collection - add the ``containers.podman`` collection as a dependency.
+      - msmtpd - new role to run a minimal SMTP relay as a rootful podman quadlet.
+      - podman - new role to install the podman container engine and enable its system
+        timers.
+      - podman_quadlet - new role that allows users to manage quadlets.
+      release_summary: Adds podman roles for the container engine, rootless quadlet
+        stacks and a rootful msmtpd relay, along with a new dependency on the containers.podman
+        collection.
+    fragments:
+    - podman-roles.yml
+    release_date: '2026-10-14'
