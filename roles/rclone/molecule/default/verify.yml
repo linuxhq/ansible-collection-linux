@@ -2,12 +2,18 @@
 - name: Verify
   hosts: all
   tasks:
+    - name: Ensure rclone package information is gathered
+      tags:
+        - rclone
+      ansible.builtin.package_facts:
+        manager: auto
+
     - name: Ensure rclone configuration file is gathered
       tags:
         - rclone
       become: true
       ansible.builtin.slurp:
-        src: /root/.config/rclone/rclone.conf
+        src: /home/vagrant/.config/rclone/rclone.conf
       register: __rclone_config_file
 
     - name: Ensure rclone configuration file ownership is gathered
@@ -15,109 +21,35 @@
         - rclone
       become: true
       ansible.builtin.stat:
-        path: /root/.config/rclone/rclone.conf
+        path: /home/vagrant/.config/rclone/rclone.conf
       register: __rclone_config_stat
 
-    - name: Ensure rclone configuration file is encrypted
+    - name: Ensure rclone configuration file is decrypted by rclone
+      tags:
+        - rclone
+      environment:
+        RCLONE_CONFIG_PASS: "{{ rclone_config_pass }}"
+      ansible.builtin.command:
+        argv:
+          - rclone
+          - config
+          - show
+      register: __rclone_config_show
+      changed_when: false
+
+    - name: Ensure rclone is verified
       tags:
         - rclone
       vars:
         __rclone_config_content: "{{ __rclone_config_file.content | b64decode }}"
       ansible.builtin.assert:
         that:
-          - __rclone_config_stat.stat.pw_name == 'root'
+          - "'rclone' in ansible_facts.packages"
+          - __rclone_config_stat.stat.pw_name == 'vagrant'
           - __rclone_config_stat.stat.mode == '0600'
           - __rclone_config_content is search('RCLONE_ENCRYPT_V0:')
-          - __rclone_config_content is search('Encrypted rclone configuration File')
           - __rclone_config_content is not search('\[molecule\]')
           - __rclone_config_content is not search('downloads.rclone.org')
-
-    - name: Ensure rclone configuration file is decrypted by rclone
-      tags:
-        - rclone
-      become: true
-      ansible.builtin.command:
-        cmd: >
-          podman exec rclone-http
-            rclone config show
-      register: __rclone_config_show
-      changed_when: false
-
-    - name: Ensure rclone remotes are verified
-      tags:
-        - rclone
-      ansible.builtin.assert:
-        that:
           - __rclone_config_show.stdout is search('\[molecule\]')
           - __rclone_config_show.stdout is search('downloads.rclone.org')
-
-    - name: Ensure rclone mountpoint is checked
-      tags:
-        - rclone
-      become: true
-      ansible.builtin.command:
-        cmd: >
-          mountpoint /mnt/http
-      register: __rclone_mountpoint
-      changed_when: false
-
-    - name: Ensure rclone mountpoint is verified
-      tags:
-        - rclone
-      ansible.builtin.debug:
-        msg: "{{ __rclone_mountpoint.rc }}"
-      failed_when:
-        - __rclone_mountpoint.rc != 0
-
-    - name: Ensure rclone mount version file is gathered
-      tags:
-        - rclone
-      become: true
-      ansible.builtin.slurp:
-        src: /mnt/http/version.txt
-      register: __rclone_version
-
-    - name: Ensure rclone mount directory is gathered
-      tags:
-        - rclone
-      become: true
-      ansible.builtin.stat:
-        path: /mnt/http/v1.00
-      register: __rclone_directory
-
-    - name: Ensure rclone mount cache is gathered
-      tags:
-        - rclone
-      become: true
-      ansible.builtin.stat:
-        path: /root/.cache/rclone/rclone-http/vfs/molecule/version.txt
-      register: __rclone_cache
-
-    - name: Ensure rclone mount contents are verified
-      tags:
-        - rclone
-      ansible.builtin.assert:
-        that:
-          - __rclone_version.content | b64decode is search('^rclone v')
-          - __rclone_directory.stat.isdir
-          - __rclone_cache.stat.exists
-
-    - name: Ensure rclone package information is gathered
-      tags:
-        - rclone
-      ansible.builtin.package_facts:
-        manager: auto
-
-    - name: Ensure rclone service information is gathered
-      tags:
-        - rclone
-      ansible.builtin.service_facts:
-
-    - name: Ensure rclone package and mount service are verified
-      tags:
-        - rclone
-      ansible.builtin.assert:
-        that:
-          - "'rclone' in ansible_facts.packages"
-          - ansible_facts.services['rclone-http.service'].state == 'running'
 ...

@@ -372,9 +372,20 @@ releases:
         management requires.
       release_summary: Runs rclone mounts as rootful podman containers, adds SELinux
         file context management to the selinux role and quadlet volumes to the podman_quadlet
-        role, and makes the podman, podman_quadlet and msmtpd roles safe to run in check
-        mode. The rclone role drops its host
-        mounts and several variables, so read the porting guide before upgrading.
+        role, and makes the podman, podman_quadlet and msmtpd roles safe to run in
+        check mode. The rclone role drops its host mounts and several variables, so
+        read the porting guide before upgrading.
     fragments:
     - podman-rclone-selinux.yml
+    release_date: '2026-10-14'
+  2.4.5:
+    changes:
+      breaking_changes:
+      - rclone - removed ``rclone_mounts``, ``rclone_image`` and the podman role dependency.
+        Mount remotes with ``podman_quadlet_volumes`` using ``Type=rclone`` instead.
+      release_summary: Narrows the rclone role to installing rclone and managing a
+        per-user configuration. Mounts are no longer handled by the role; use podman
+        quadlet volumes instead.
+    fragments:
+    - rclone-config-only.yml
     release_date: '2026-10-14'

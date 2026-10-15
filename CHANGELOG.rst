@@ -4,6 +4,19 @@ linuxhq.linux Release Notes
 
 .. contents:: Topics
 
+v2.4.5
+======
+
+Release Summary
+---------------
+
+Narrows the rclone role to installing rclone and managing a per-user configuration. Mounts are no longer handled by the role; use podman quadlet volumes instead.
+
+Breaking Changes / Porting Guide
+--------------------------------
+
+- rclone - removed ``rclone_mounts``, ``rclone_image`` and the podman role dependency. Mount remotes with ``podman_quadlet_volumes`` using ``Type=rclone`` instead.
+
 v2.4.4
 ======
 
