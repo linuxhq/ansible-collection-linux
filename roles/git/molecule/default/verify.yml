@@ -5,12 +5,14 @@
     - name: Ensure git directory information is gathered
       tags:
         - git
+      become: true
       ansible.builtin.stat:
         path: "{{ _path }}"
       register: __git_stat
       loop:
         - /home/vagrant/ansible-collection-linux
         - /usr/local/ansible-collection-aws
+        - /home/molecule/ansible-collection-macos
       loop_control:
         label: "{{ _path | d(none) }}"
         loop_var: _path
@@ -24,4 +26,7 @@
           - __git_stat.results.0.stat.isdir | bool
           - __git_stat.results.1.stat.exists | bool
           - __git_stat.results.1.stat.isdir | bool
+          - __git_stat.results.2.stat.exists | bool
+          - __git_stat.results.2.stat.isdir | bool
+          - __git_stat.results.2.stat.pw_name == 'molecule'
 ...

@@ -28,6 +28,7 @@ provisioner:
     ANSIBLE_ACTION_WARNINGS: false
     ANSIBLE_COLLECTIONS_PATH: ${ANSIBLE_COLLECTIONS_PATH}
     ANSIBLE_DEPRECATION_WARNINGS: false
+    ANSIBLE_PIPELINING: true
   log: true
   options:
     diff: true

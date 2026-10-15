@@ -24,6 +24,7 @@
   tags:
     - git
   become: true
+  become_user: "{{ _repository.become_user | d('root') }}"
   ansible.builtin.git:
     accept_newhostkey: "{{ _repository.accept_newhostkey | d(false) }}"
     archive: "{{ _repository.archive | d(omit) }}"
