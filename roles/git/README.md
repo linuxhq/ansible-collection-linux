@@ -30,3 +30,8 @@ None
 
             - repo: https://github.com/linuxhq/ansible-collection-linux.git
               dest: /home/vagrant/ansible-collection-linux
+
+            - repo: https://github.com/linuxhq/ansible-collection-macos.git
+              dest: /home/molecule/ansible-collection-macos
+              become: true
+              become_user: molecule

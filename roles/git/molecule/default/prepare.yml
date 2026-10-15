@@ -1,0 +1,12 @@
+---
+- name: Prepare
+  hosts: all
+  tasks:
+    - name: Ensure git molecule user is present
+      tags:
+        - git
+      become: true
+      ansible.builtin.user:
+        name: molecule
+        shell: /bin/bash
+...

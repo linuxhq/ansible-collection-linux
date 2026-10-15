@@ -4,6 +4,19 @@ linuxhq.linux Release Notes
 
 .. contents:: Topics
 
+v2.4.6
+======
+
+Release Summary
+---------------
+
+Adds a per-repository become_user to the git role so repositories can be cloned and updated as the user that owns them.
+
+Minor Changes
+-------------
+
+- git - add ``become_user`` to ``git_repositories`` entries to run git as that user when ``become`` is set, defaulting to root.
+
 v2.4.5
 ======
 
