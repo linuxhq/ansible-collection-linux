@@ -36,17 +36,8 @@ provisioner:
           - name: molecule
             type: http
             url: https://downloads.rclone.org
-
         rclone_config_pass: molecule-config-pass
-
-        rclone_mounts:
-          - name: rclone-http
-            remote: 'molecule:'
-            mountpoint: /mnt/http
-            environment:
-              RCLONE_ALLOW_OTHER: true
-              RCLONE_READ_ONLY: true
-              RCLONE_VFS_CACHE_MODE: full
+        rclone_user: vagrant
 
 scenario:
   test_sequence:

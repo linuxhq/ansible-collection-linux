@@ -22,23 +22,6 @@
     path: ~/.config/rclone
     state: directory
 
-- name: Ensure rclone cache directories are present
-  tags:
-    - rclone
-  become: true
-  ansible.builtin.file:
-    group: root
-    mode: '0700'
-    owner: root
-    path: /root/.cache/rclone/{{ _mount.name }}
-    state: directory
-  loop: "{{ rclone_mounts }}"
-  loop_control:
-    label: "{{ _mount.name | d(none) }}"
-    loop_var: _mount
-  when:
-    - _mount.name is defined
-
 - name: Ensure rclone configuration file is managed
   tags:
     - rclone
@@ -52,67 +35,4 @@
     password: "{{ rclone_config_pass | d(omit) }}"
     path: ~/.config/rclone/rclone.conf
     state: "{{ 'present' if rclone_config_pass is not none else 'absent' }}"
-  notify:
-    - Restart rclone
-
-- name: Ensure rclone podman secret is managed
-  tags:
-    - rclone
-  become: true
-  no_log: "{{ rclone_no_log }}"
-  containers.podman.podman_secret:
-    data: "{{ rclone_config_pass }}"
-    name: rclone_config_pass
-  notify:
-    - Restart rclone
-  when:
-    - rclone_config_pass is not none
-    - rclone_mounts | length > 0
-
-- name: Ensure rclone podman quadlet is managed
-  tags:
-    - rclone
-  become: true
-  ansible.builtin.template:
-    dest: /etc/containers/systemd/{{ _mount.name }}.container
-    group: root
-    mode: '0644'
-    owner: root
-    src: rclone.container.j2
-  notify:
-    - Restart rclone
-  loop: "{{ rclone_mounts }}"
-  loop_control:
-    label: "{{ _mount.name | d(none) }}"
-    loop_var: _mount
-  when:
-    - _mount.mountpoint is defined
-    - _mount.name is defined
-    - _mount.remote is defined
-
-- name: Ensure rclone systemd settings are reloaded
-  tags:
-    - rclone
-  become: true
-  ansible.builtin.systemd_service:
-    daemon_reload: true
-  when:
-    - rclone_mounts | length > 0
-
-- name: Ensure rclone mounts are started
-  tags:
-    - rclone
-  become: true
-  ansible.builtin.systemd_service:
-    name: "{{ _mount.name }}.service"
-    state: started
-  loop: "{{ rclone_mounts }}"
-  loop_control:
-    label: "{{ _mount.name | d(none) }}"
-    loop_var: _mount
-  ignore_errors: "{{ ansible_check_mode }}"
-  when:
-    - _mount.mountpoint is defined
-    - _mount.name is defined
-    - _mount.remote is defined
 ...
