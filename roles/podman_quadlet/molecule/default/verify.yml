@@ -34,6 +34,13 @@
       changed_when: false
       register: __podman_quadlet_env
 
+    - name: Ensure podman quadlet container information is gathered
+      tags:
+        - podman_quadlet
+      containers.podman.podman_container_info:
+        name: alpine
+      register: __podman_quadlet_container
+
     - name: Ensure podman quadlet user units are gathered
       tags:
         - podman_quadlet
@@ -58,5 +65,6 @@
           - "'alpine.container' in __podman_quadlet_list.stdout_lines"
           - "'COUNTRY=United States' in __podman_quadlet_env.stdout_lines"
           - "'MOLECULE_SECRET=molecule' in __podman_quadlet_env.stdout_lines"
+          - "'molecule' in __podman_quadlet_container.containers[0].Mounts | map(attribute='Name')"
           - __podman_quadlet_active.stdout_lines == ['active', 'active', 'active']
 ...

@@ -1,6 +1,6 @@
 [Unit]
 Description={{ _mount.name }}
-RequiresMountsFor={{ _mount.mountpoint }}
+RequiresMountsFor={{ _mount.mountpoint | dirname }}
 StartLimitIntervalSec=0
 
 [Container]
@@ -30,7 +30,7 @@ Notify=healthy
 Secret=rclone_config_pass,type=env,target=RCLONE_CONFIG_PASS
 {% endif %}
 Volume=/root/.cache/rclone/{{ _mount.name }}:/root/.cache/rclone:z
-Volume=/root/.config/rclone:/config/rclone:ro,z
+Volume=%h/.config/rclone:/config/rclone:ro,z
 Volume={{ _mount.mountpoint }}:{{ _mount.mountpoint }}:rshared,z
 
 [Service]

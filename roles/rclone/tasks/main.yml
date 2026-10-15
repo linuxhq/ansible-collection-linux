@@ -16,11 +16,10 @@
   tags:
     - rclone
   become: true
+  become_user: "{{ rclone_user }}"
   ansible.builtin.file:
-    group: root
     mode: '0700'
-    owner: root
-    path: /root/.config/rclone
+    path: ~/.config/rclone
     state: directory
 
 - name: Ensure rclone cache directories are present
@@ -44,15 +43,14 @@
   tags:
     - rclone
   become: true
+  become_user: "{{ rclone_user }}"
   no_log: "{{ rclone_no_log }}"
   linuxhq.linux.rclone_config_encryption:
     content:
       "{{ lookup('ansible.builtin.template', 'rclone.conf.j2') | d('', true) }}"
-    group: root
     mode: '0600'
-    owner: root
     password: "{{ rclone_config_pass | d(omit) }}"
-    path: /root/.config/rclone/rclone.conf
+    path: ~/.config/rclone/rclone.conf
     state: "{{ 'present' if rclone_config_pass is not none else 'absent' }}"
   notify:
     - Restart rclone

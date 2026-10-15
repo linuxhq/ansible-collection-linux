@@ -15,6 +15,7 @@ A command-line program to manage files on cloud storage
     rclone_image: docker.io/rclone/rclone:latest
     rclone_mounts: []
     rclone_no_log: false
+    rclone_user: root
 
 ## Dependencies
 
