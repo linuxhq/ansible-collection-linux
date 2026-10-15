@@ -4,6 +4,39 @@ linuxhq.linux Release Notes
 
 .. contents:: Topics
 
+v2.4.4
+======
+
+Release Summary
+---------------
+
+Runs rclone mounts as rootful podman containers, adds SELinux file context management to the selinux role and quadlet volumes to the podman_quadlet role, and makes the podman, podman_quadlet and msmtpd roles safe to run in check mode. The rclone role drops its host mounts and several variables, so read the porting guide before upgrading.
+
+Minor Changes
+-------------
+
+- msmtpd, podman, podman_quadlet, rclone - run Molecule scenarios in check mode before and after converge.
+- podman_quadlet - add ``podman_quadlet_volumes`` to manage quadlet ``.volume`` units alongside containers and networks.
+- rclone - add ``rclone_image`` to set the container image used for mounts.
+- rclone - add ``rclone_user`` to write the configuration to that user's ``~/.config/rclone``.
+- rclone - cache each mount in ``/root/.cache/rclone/<name>`` and order it after the filesystems its mountpoint lives on.
+- rclone - depend on the podman role and remount every mount when the configuration or its password changes.
+- selinux - add ``selinux_fcontexts`` to manage persistent SELinux file context rules and ``selinux_restorecon`` to relabel paths when a rule changes.
+- selinux - install ``python3-policycoreutils`` by default, which file context management requires.
+
+Breaking Changes / Porting Guide
+--------------------------------
+
+- rclone - mounts now run only as rootful podman quadlets, one container per mount in ``/etc/containers/systemd/<name>.container``. Host ``rclone mount`` services are no longer created.
+- rclone - the ``flags`` key of ``rclone_mounts`` was replaced by ``environment``, a mapping of ``RCLONE_*`` variables passed to the mount container.
+- rclone - the ``rclone_profile`` and ``rclone_sysconfig`` variables were removed along with ``/etc/profile.d/rclone.sh`` and ``/etc/sysconfig/rclone``. ``RCLONE_CONFIG_PASS`` is now provided by the ``rclone_config_pass`` podman secret.
+- rclone - the configuration file moved from ``/etc/rclone/rclone.conf`` to ``~/.config/rclone/rclone.conf`` of ``rclone_user`` (``/root/.config/rclone/rclone.conf`` by default) and the ``rclone_config_path`` variable was removed.
+
+Bugfixes
+--------
+
+- msmtpd, podman, podman_quadlet, rclone - do not fail in check mode when starting or restarting units that do not exist yet.
+
 v2.4.3
 ======
 

@@ -67,6 +67,24 @@
   when:
     - _network.name is defined
 
+- name: Ensure podman quadlet volumes are present
+  tags:
+    - podman_quadlet
+  become: true
+  become_user: "{{ podman_quadlet_user }}"
+  ansible.builtin.template:
+    dest: "{{ __podman_quadlet_dir }}/{{ _volume.name }}.volume"
+    mode: '0644'
+    src: volume.systemd.j2
+  notify:
+    - Restart podman
+  loop: "{{ podman_quadlet_volumes }}"
+  loop_control:
+    label: "{{ _volume.name | d(none) }}"
+    loop_var: _volume
+  when:
+    - _volume.name is defined
+
 - name: Ensure podman quadlet secrets are present
   tags:
     - podman_quadlet
@@ -130,4 +148,5 @@
     - podman-quadlet.target
   loop_control:
     loop_var: _service
+  ignore_errors: "{{ ansible_check_mode }}"
 ...

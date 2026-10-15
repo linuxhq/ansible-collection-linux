@@ -1,0 +1,14 @@
+---
+- name: Restart rclone
+  tags:
+    - rclone
+  become: true
+  ansible.builtin.systemd_service:
+    name: "{{ _mount.name }}.service"
+    state: restarted
+  loop: "{{ rclone_mounts }}"
+  loop_control:
+    label: "{{ _mount.name | d(none) }}"
+    loop_var: _mount
+  ignore_errors: "{{ ansible_check_mode }}"
+...

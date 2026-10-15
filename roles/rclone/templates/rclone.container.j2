@@ -1,0 +1,44 @@
+[Unit]
+Description={{ _mount.name }}
+RequiresMountsFor={{ _mount.mountpoint | dirname }}
+StartLimitIntervalSec=0
+
+[Container]
+AddCapability=SYS_ADMIN
+AddDevice=/dev/fuse
+ContainerName={{ _mount.name }}
+Environment="RCLONE_ALLOW_NON_EMPTY=true"
+Environment="RCLONE_CACHE_DIR=/root/.cache/rclone"
+{% if _mount.environment is defined %}
+{%   for key, value in _mount.environment | dictsort %}
+{%     if value is boolean %}
+Environment="{{ key }}={{ 'true' if value else 'false' }}"
+{%     else %}
+Environment="{{ key }}={{ value }}"
+{%     endif %}
+{%   endfor %}
+{% endif %}
+Exec=mount {{ _mount.remote }} {{ _mount.mountpoint }}
+HealthCmd=grep -q ' {{ _mount.mountpoint }} fuse.rclone ' /proc/mounts
+HealthInterval=10s
+HealthOnFailure=kill
+HealthRetries=30
+HealthTimeout=5s
+Image={{ rclone_image }}
+Notify=healthy
+{% if rclone_config_pass is not none %}
+Secret=rclone_config_pass,type=env,target=RCLONE_CONFIG_PASS
+{% endif %}
+Volume=/root/.cache/rclone/{{ _mount.name }}:/root/.cache/rclone:z
+Volume=%h/.config/rclone:/config/rclone:ro,z
+Volume={{ _mount.mountpoint }}:{{ _mount.mountpoint }}:rshared,z
+
+[Service]
+ExecStartPre=/usr/bin/mkdir -p {{ _mount.mountpoint }}
+ExecStopPost=-/usr/bin/sh -c 'fusermount3 -uz {{ _mount.mountpoint }}'
+Restart=always
+RestartSec=10
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target

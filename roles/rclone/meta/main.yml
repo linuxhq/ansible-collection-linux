@@ -3,6 +3,8 @@ dependencies:
   - role: epel
     tags: rclone
     when: ansible_facts.os_family == 'RedHat'
+  - role: podman
+    tags: rclone
 galaxy_info:
   role_name: rclone
   author: Taylor Kimball
@@ -13,8 +15,7 @@ galaxy_info:
   platforms:
     - name: EL
       versions:
-        - '9'
-        - '10'
+        - all
   galaxy_tags:
     - cloud
     - rclone

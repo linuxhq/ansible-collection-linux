@@ -47,4 +47,23 @@
       ansible.builtin.assert:
         that:
           - not __selinux_autorelabel.stat.exists
+
+    - name: Ensure selinux file context information is gathered
+      tags:
+        - selinux
+      ansible.builtin.command:
+        argv:
+          - stat
+          - --format
+          - '%C'
+          - /srv/molecule
+      register: __selinux_fcontext
+      changed_when: false
+
+    - name: Ensure selinux file context information is verified
+      tags:
+        - selinux
+      ansible.builtin.assert:
+        that:
+          - "'container_file_t' in __selinux_fcontext.stdout"
 ...

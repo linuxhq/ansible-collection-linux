@@ -6,8 +6,6 @@
       rclone_config: []
       rclone_config_pass: null
       rclone_mounts: []
-      rclone_profile: {}
-      rclone_sysconfig: {}
       tags:
         - molecule-idempotence-notest
 

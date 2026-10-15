@@ -12,13 +12,11 @@ driver:
 platforms:
   - name: almalinux9
     box: bento/almalinux-9.6
-    box_architecture: arm64
     cpus: 4
     memory: 4096
 
   - name: almalinux10
     box: bento/almalinux-10.0
-    box_architecture: arm64
     cpus: 4
     memory: 4096
 
@@ -35,34 +33,20 @@ provisioner:
     group_vars:
       all:
         rclone_config:
-          - name: source
-            type: local
-            nounc: true
-          - name: backup
-            type: alias
-            remote: source:/srv
-          - name: secret
-            type: crypt
-            remote: source:/srv/rclone
-            password: txj-ko0iBZ-IYEGLKgWmdUTa0SJwGGFUrPpqI7pTMQRBNy8
+          - name: molecule
+            type: http
+            url: https://downloads.rclone.org
 
         rclone_config_pass: molecule-config-pass
-        rclone_config_path: /etc/rclone/rclone.conf
 
         rclone_mounts:
-          - name: rclone-backup
-            remote: 'backup:'
-            mountpoint: /mnt/backup
-            flags:
-              - --read-only
-
-        rclone_profile:
-          rclone_progress: true
-          rclone_verbose: 1
-
-        rclone_sysconfig:
-          rclone_allow_other: true
-          rclone_read_only: true
+          - name: rclone-http
+            remote: 'molecule:'
+            mountpoint: /mnt/http
+            environment:
+              RCLONE_ALLOW_OTHER: true
+              RCLONE_READ_ONLY: true
+              RCLONE_VFS_CACHE_MODE: full
 
 scenario:
   test_sequence:

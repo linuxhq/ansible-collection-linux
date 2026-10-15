@@ -15,6 +15,7 @@ Allows users to manage quadlets
     podman_quadlet_no_log: false
     podman_quadlet_secrets: []
     podman_quadlet_user: null
+    podman_quadlet_volumes: []
 
 ## Dependencies
 
@@ -39,6 +40,7 @@ Allows users to manage quadlets
                   Network: molecule.network
                   Secret:
                     - molecule,type=env,target=MOLECULE_SECRET
+                  Volume: molecule.volume:/data
                 Service:
                   Restart: always
                 Install:
@@ -53,3 +55,8 @@ Allows users to manage quadlets
             - name: molecule
               data: molecule
           podman_quadlet_user: vagrant
+          podman_quadlet_volumes:
+            - name: molecule
+              unit:
+                Volume:
+                  VolumeName: molecule

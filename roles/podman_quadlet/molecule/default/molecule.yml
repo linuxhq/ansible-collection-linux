@@ -46,6 +46,7 @@ provisioner:
                 Network: molecule.network
                 Secret:
                   - molecule,type=env,target=MOLECULE_SECRET
+                Volume: molecule.volume:/data
               Service:
                 Restart: always
               Install:
@@ -60,6 +61,27 @@ provisioner:
           - name: molecule
             data: molecule
         podman_quadlet_user: vagrant
+        podman_quadlet_volumes:
+          - name: molecule
+            unit:
+              Volume:
+                VolumeName: molecule
+
+scenario:
+  test_sequence:
+    - dependency
+    - cleanup
+    - destroy
+    - syntax
+    - create
+    - prepare
+    - check
+    - converge
+    - check
+    - idempotence
+    - verify
+    - cleanup
+    - destroy
 
 verifier:
   name: ansible
