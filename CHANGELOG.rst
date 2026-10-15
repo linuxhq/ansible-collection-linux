@@ -4,6 +4,19 @@ linuxhq.linux Release Notes
 
 .. contents:: Topics
 
+v2.4.7
+======
+
+Release Summary
+---------------
+
+Runs the msmtpd container without an IPC namespace.
+
+Minor Changes
+-------------
+
+- msmtpd - run the container with ``--ipc=none`` so it has no ``/dev/shm`` or IPC namespace access.
+
 v2.4.6
 ======
 

@@ -16,6 +16,14 @@
       no_log: true
       register: __msmtpd_env
 
+    - name: Ensure msmtpd container information is gathered
+      tags:
+        - msmtpd
+      containers.podman.podman_container_info:
+        name: msmtpd
+      become: true
+      register: __msmtpd_info
+
     - name: Ensure msmtpd service information is gathered
       tags:
         - msmtpd
@@ -29,5 +37,6 @@
           - ansible_facts.services['msmtpd.service'].state == 'running'
           - "'SMTP_HOST=smtp.example.com' in __msmtpd_env.stdout_lines"
           - "'SMTP_PORT=587' in __msmtpd_env.stdout_lines"
+          - __msmtpd_info.containers[0].HostConfig.IpcMode == 'none'
         quiet: true
 ...

@@ -399,3 +399,12 @@ releases:
     fragments:
     - git-become-user.yml
     release_date: '2026-10-14'
+  2.4.7:
+    changes:
+      minor_changes:
+      - msmtpd - run the container with ``--ipc=none`` so it has no ``/dev/shm`` or
+        IPC namespace access.
+      release_summary: Runs the msmtpd container without an IPC namespace.
+    fragments:
+    - msmtpd-ipc-none.yml
+    release_date: '2026-10-15'
