@@ -14,6 +14,7 @@ HealthInterval=10s
 HealthOnFailure=kill
 HealthTimeout=5s
 Image={{ msmtpd_image }}
+PodmanArgs=--ipc=none
 PublishPort={{ msmtpd_publish }}
 Secret=msmtpd_from,type=env,target=SMTP_FROM
 Secret=msmtpd_host,type=env,target=SMTP_HOST
