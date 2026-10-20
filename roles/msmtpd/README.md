@@ -12,7 +12,6 @@ A minimal SMTP server
 
     msmtpd_auth: false
     msmtpd_from: null
-    msmtpd_gidmap: '0:2147483647:65536'
     msmtpd_host: null
     msmtpd_image: docker.io/crazymax/msmtpd:latest
     msmtpd_no_log: false
@@ -21,7 +20,6 @@ A minimal SMTP server
     msmtpd_publish: 127.0.0.1:25:2500
     msmtpd_starttls: true
     msmtpd_tls: false
-    msmtpd_uidmap: '0:2147483647:65536'
     msmtpd_user: null
 
 ## Dependencies
