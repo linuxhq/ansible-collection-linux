@@ -4,6 +4,19 @@ linuxhq.linux Release Notes
 
 .. contents:: Topics
 
+v2.4.8
+======
+
+Minor Changes
+-------------
+
+- msmtpd - run the msmtpd daemon as ``nobody`` (``PUID`` and ``PGID`` ``65534``) in the host user namespace.
+
+Removed Features (previously deprecated)
+----------------------------------------
+
+- msmtpd - remove the ``msmtpd_uidmap`` and ``msmtpd_gidmap`` variables and the container ``UIDMap`` and ``GIDMap`` settings.
+
 v2.4.7
 ======
 

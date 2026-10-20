@@ -408,3 +408,14 @@ releases:
     fragments:
     - msmtpd-ipc-none.yml
     release_date: '2026-10-15'
+  2.4.8:
+    changes:
+      minor_changes:
+      - msmtpd - run the msmtpd daemon as ``nobody`` (``PUID`` and ``PGID`` ``65534``)
+        in the host user namespace.
+      removed_features:
+      - msmtpd - remove the ``msmtpd_uidmap`` and ``msmtpd_gidmap`` variables and
+        the container ``UIDMap`` and ``GIDMap`` settings.
+    fragments:
+    - msmtpd-nobody.yml
+    release_date: '2026-10-20'

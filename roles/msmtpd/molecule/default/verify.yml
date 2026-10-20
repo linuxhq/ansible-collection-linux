@@ -24,6 +24,20 @@
       become: true
       register: __msmtpd_info
 
+    - name: Ensure msmtpd container processes are gathered
+      tags:
+        - msmtpd
+      ansible.builtin.command:
+        argv:
+          - podman
+          - top
+          - msmtpd
+          - huser
+          - comm
+      become: true
+      changed_when: false
+      register: __msmtpd_top
+
     - name: Ensure msmtpd service information is gathered
       tags:
         - msmtpd
@@ -35,8 +49,11 @@
       ansible.builtin.assert:
         that:
           - ansible_facts.services['msmtpd.service'].state == 'running'
+          - "'PGID=65534' in __msmtpd_env.stdout_lines"
+          - "'PUID=65534' in __msmtpd_env.stdout_lines"
           - "'SMTP_HOST=smtp.example.com' in __msmtpd_env.stdout_lines"
           - "'SMTP_PORT=587' in __msmtpd_env.stdout_lines"
           - __msmtpd_info.containers[0].HostConfig.IpcMode == 'none'
+          - __msmtpd_top.stdout_lines | select('match', '^nobody\\s+msmtpd$') | length == 1
         quiet: true
 ...
