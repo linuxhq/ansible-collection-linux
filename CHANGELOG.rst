@@ -4,6 +4,14 @@ linuxhq.linux Release Notes
 
 .. contents:: Topics
 
+v2.4.9
+======
+
+Bugfixes
+--------
+
+- template - apply the ``attributes`` item option, which a misspelled loop variable caused to be silently ignored.
+
 v2.4.8
 ======
 
