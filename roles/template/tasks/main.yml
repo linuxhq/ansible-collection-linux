@@ -4,7 +4,7 @@
     - template
   become: true
   ansible.builtin.template:
-    attributes: "{{ _tempate.attributes | d(omit) }}"
+    attributes: "{{ _template.attributes | d(omit) }}"
     backup: "{{ _template.backup | d(false) }}"
     block_end_string: "{{ _template.block_end_string | d(omit) }}"
     block_start_string: "{{ _template.block_start_string | d(omit) }}"

@@ -419,3 +419,11 @@ releases:
     fragments:
     - msmtpd-nobody.yml
     release_date: '2026-10-20'
+  2.4.9:
+    changes:
+      bugfixes:
+      - template - apply the ``attributes`` item option, which a misspelled loop variable
+        caused to be silently ignored.
+    fragments:
+    - template-attributes.yml
+    release_date: '2026-10-21'
