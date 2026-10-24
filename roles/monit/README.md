@@ -12,7 +12,7 @@ None
 
     monit_alert: []
     monit_daemon: 30
-    monit_eventqueue_basedir: /tmp
+    monit_eventqueue_basedir: /var/lib/monit/events
     monit_eventqueue_slots: 1024
     monit_exec: []
     monit_filesystem: []
@@ -56,7 +56,7 @@ None
               rules:
                 - not on { instance, action }
           monit_daemon: 60
-          monit_eventqueue_basedir: /var/tmp
+          monit_eventqueue_basedir: /var/lib/monit/events
           monit_eventqueue_slots: 2048
           monit_exec:
             - name: dev_null.sh

@@ -7,6 +7,19 @@
     name: monit
     state: present
 
+- name: Ensure monit event queue directory is present
+  tags:
+    - monit
+  become: true
+  ansible.builtin.command:
+    argv:
+      - mkdir
+      - -m
+      - '0700'
+      - -p
+      - "{{ monit_eventqueue_basedir }}"
+    creates: "{{ monit_eventqueue_basedir }}"
+
 - name: Ensure monit configuration is managed
   tags:
     - monit

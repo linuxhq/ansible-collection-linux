@@ -54,6 +54,7 @@
           - "'SMTP_HOST=smtp.example.com' in __msmtpd_env.stdout_lines"
           - "'SMTP_PORT=587' in __msmtpd_env.stdout_lines"
           - __msmtpd_info.containers[0].HostConfig.IpcMode == 'none'
+          - __msmtpd_info.containers[0].State.Health.Status == 'healthy'
           - __msmtpd_top.stdout_lines | select('match', '^nobody\\s+msmtpd$') | length == 1
         quiet: true
 ...
