@@ -4,6 +4,14 @@ linuxhq.linux Release Notes
 
 .. contents:: Topics
 
+v2.4.11
+=======
+
+Security Fixes
+--------------
+
+- msmtpd - run the container with ``NoNewPrivileges=true`` and drop all capabilities except ``CHOWN``, ``DAC_OVERRIDE``, ``FOWNER``, ``KILL``, ``SETGID`` and ``SETUID``, which the s6 init needs to set up logging and drop to ``nobody``.
+
 v2.4.10
 =======
 
