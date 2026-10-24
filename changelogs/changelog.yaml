@@ -310,6 +310,24 @@ releases:
     fragments:
     - final-collection-cleanup.yml
     release_date: '2026-09-10'
+  2.4.10:
+    changes:
+      bugfixes:
+      - msmtpd - probe the daemon with ``msmtp --serverinfo`` instead of ``nc -z``,
+        which logged a ``client did not send initial command`` error on every health
+        check.
+      minor_changes:
+      - monit - default ``monit_eventqueue_basedir`` to ``/var/lib/monit/events``
+        instead of the world-writable ``/tmp``, which ``systemd-tmpfiles`` ages out,
+        and create the directory with mode ``0700`` when it is missing, because monit
+        drops queued events when it cannot create the directory itself.
+      - msmtpd - align the health check with other quadlets (``HealthInterval=60s``,
+        ``HealthRetries=3``, ``HealthTimeout=10s``) and add a startup health check
+        with ``Notify=healthy`` and ``TimeoutStartSec=600``.
+    fragments:
+    - monit-eventqueue.yml
+    - msmtpd-healthcheck.yml
+    release_date: '2026-10-24'
   2.4.2:
     changes:
       minor_changes:

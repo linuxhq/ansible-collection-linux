@@ -12,7 +12,6 @@
           rules:
             - not on { instance, action }
       monit_daemon: 60
-      monit_eventqueue_basedir: /var/tmp
       monit_eventqueue_slots: 2048
       monit_exec:
         - name: dev_null.sh

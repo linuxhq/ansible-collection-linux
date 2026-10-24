@@ -4,6 +4,20 @@ linuxhq.linux Release Notes
 
 .. contents:: Topics
 
+v2.4.10
+=======
+
+Minor Changes
+-------------
+
+- monit - default ``monit_eventqueue_basedir`` to ``/var/lib/monit/events`` instead of the world-writable ``/tmp``, which ``systemd-tmpfiles`` ages out, and create the directory with mode ``0700`` when it is missing, because monit drops queued events when it cannot create the directory itself.
+- msmtpd - align the health check with other quadlets (``HealthInterval=60s``, ``HealthRetries=3``, ``HealthTimeout=10s``) and add a startup health check with ``Notify=healthy`` and ``TimeoutStartSec=600``.
+
+Bugfixes
+--------
+
+- msmtpd - probe the daemon with ``msmtp --serverinfo`` instead of ``nc -z``, which logged a ``client did not send initial command`` error on every health check.
+
 v2.4.9
 ======
 

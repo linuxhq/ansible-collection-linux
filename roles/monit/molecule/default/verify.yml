@@ -26,6 +26,14 @@
         loop_var: _service
       changed_when: false
 
+    - name: Ensure monit event queue directory information is gathered
+      tags:
+        - monit
+      become: true
+      ansible.builtin.stat:
+        path: /var/lib/monit/events
+      register: __monit_eventqueue
+
     - name: Ensure monit service statuses are verified
       tags:
         - monit
@@ -35,4 +43,6 @@
           - __monit_status.results.1.rc == 0
           - __monit_status.results.2.rc == 0
           - __monit_status.results.3.rc == 0
+          - __monit_eventqueue.stat.isdir
+          - __monit_eventqueue.stat.mode == '0700'
 ...
