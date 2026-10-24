@@ -328,6 +328,15 @@ releases:
     - monit-eventqueue.yml
     - msmtpd-healthcheck.yml
     release_date: '2026-10-24'
+  2.4.11:
+    changes:
+      security_fixes:
+      - msmtpd - run the container with ``NoNewPrivileges=true`` and drop all capabilities
+        except ``CHOWN``, ``DAC_OVERRIDE``, ``FOWNER``, ``KILL``, ``SETGID`` and ``SETUID``,
+        which the s6 init needs to set up logging and drop to ``nobody``.
+    fragments:
+    - msmtpd-hardening.yml
+    release_date: '2026-10-24'
   2.4.2:
     changes:
       minor_changes:

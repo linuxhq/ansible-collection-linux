@@ -2,8 +2,10 @@
 StartLimitIntervalSec=0
 
 [Container]
+AddCapability=CHOWN DAC_OVERRIDE FOWNER KILL SETGID SETUID
 AutoUpdate=registry
 ContainerName=msmtpd
+DropCapability=all
 Environment="PGID=65534"
 Environment="PUID=65534"
 Environment="SMTP_AUTH={{ 'on' if msmtpd_auth else 'off' }}"
@@ -20,6 +22,7 @@ HealthStartupRetries=30
 HealthStartupTimeout=10s
 HealthTimeout=10s
 Image={{ msmtpd_image }}
+NoNewPrivileges=true
 Notify=healthy
 PodmanArgs=--ipc=none
 PublishPort={{ msmtpd_publish }}

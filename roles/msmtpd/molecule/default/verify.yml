@@ -16,6 +16,20 @@
       no_log: true
       register: __msmtpd_env
 
+    - name: Ensure msmtpd container init status is gathered
+      tags:
+        - msmtpd
+      ansible.builtin.command:
+        argv:
+          - podman
+          - exec
+          - msmtpd
+          - cat
+          - /proc/1/status
+      become: true
+      changed_when: false
+      register: __msmtpd_status
+
     - name: Ensure msmtpd container information is gathered
       tags:
         - msmtpd
@@ -55,6 +69,8 @@
           - "'SMTP_PORT=587' in __msmtpd_env.stdout_lines"
           - __msmtpd_info.containers[0].HostConfig.IpcMode == 'none'
           - __msmtpd_info.containers[0].State.Health.Status == 'healthy'
+          - __msmtpd_status.stdout_lines | select('match', '^CapEff:\\s+00000000000000eb$') | length == 1
+          - __msmtpd_status.stdout_lines | select('match', '^NoNewPrivs:\\s+1$') | length == 1
           - __msmtpd_top.stdout_lines | select('match', '^nobody\\s+msmtpd$') | length == 1
         quiet: true
 ...
