@@ -37,7 +37,7 @@ Invoke skills rather than running commands ad hoc.
 | `collection-build`        | Build the collection tarball  |
 | `isort`                   | Sort Python imports           |
 | `molecule`                | Role tests                    |
-| `plugins-audit`           | Exhaustive plugins audit      |
+| `audit`                   | Audit plugins with reviewers  |
 | `pyenv`                   | Install pyenv + pinned Python |
 | `ruff`                    | Lint Python                   |
 | `tox`                     | Set up isolated environments  |
