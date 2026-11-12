@@ -8,9 +8,9 @@ An Ansible collection of Linux modules and roles, published to Galaxy on tag pus
 
 | Path               | Description            |
 | ------------------ | ---------------------- |
-| `plugins/modules/` | Ansible python modules |
-| `plugins/lookup/`  | Ansible lookup plugins |
 | `plugins/filter/`  | Ansible filter plugins |
+| `plugins/lookup/`  | Ansible lookup plugins |
+| `plugins/modules/` | Ansible python modules |
 | `roles/`           | Ansible roles          |
 
 ## Rules
@@ -31,13 +31,13 @@ Invoke skills rather than running commands ad hoc.
 | ------------------------- | ----------------------------- |
 | `ansible-lint`            | Lint roles & playbooks        |
 | `ansible-test`            | Module sanity                 |
+| `audit`                   | Audit and fix a module group  |
 | `black`                   | Format Python                 |
 | `blank-line-after-blocks` | Space Python blocks           |
 | `changelog`               | Changelog fragments & release |
 | `collection-build`        | Build the collection tarball  |
 | `isort`                   | Sort Python imports           |
 | `molecule`                | Role tests                    |
-| `audit`                   | Audit plugins with reviewers  |
 | `pyenv`                   | Install pyenv + pinned Python |
 | `ruff`                    | Lint Python                   |
 | `tox`                     | Set up isolated environments  |
