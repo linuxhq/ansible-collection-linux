@@ -19,6 +19,8 @@ notes:
     module does not work in a container or chroot without systemd.
 requirements:
   - dasbus
+  - systemd >= 240, the first version whose C(systemd-timedated) provides the
+    C(ListTimezones) method
 attributes:
   check_mode:
     description: This module only retrieves information and does not modify state.

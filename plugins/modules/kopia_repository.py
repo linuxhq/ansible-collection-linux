@@ -12,6 +12,8 @@ short_description: Manage the kopia repository connection
 description:
   - Connect the host to a kopia repository, creating the repository when the
     storage location has not been initialized yet.
+  - For V(filesystem) storage, a C(path) that does not exist yet is created
+    along with the repository.
   - The module is idempotent on the connection state reported by
     C(kopia repository status), so a host already connected to the repository
     is left untouched.
@@ -28,6 +30,8 @@ options:
     description:
       - Path to the kopia configuration file describing the connection.
       - Defaults to kopia's own configuration path when unset.
+      - Ansible expands a leading V(~) and environment variables in it, as for
+        any C(path) option, before it is passed to kopia.
     type: path
   options:
     description:
@@ -217,6 +221,17 @@ def storage_mismatch(module, status):
     return None
 
 
+def not_initialized(storage, stderr):
+    if storage == "from-config":
+        return False
+
+    if "repository not initialized" in stderr:
+        return True
+
+    # kopia only creates a missing filesystem path when creating the repository
+    return storage == "filesystem" and "cannot access storage path" in stderr and "no such file or directory" in stderr
+
+
 def ensure_present(module):
     if module.check_mode and not kopia_available(module):
         module.exit_json(changed=True, repository={})
@@ -243,7 +258,7 @@ def ensure_present(module):
 
     rc, _dummy, stderr = kopia_command(module, ["repository", "connect"] + target, password=password)
 
-    if rc != 0 and "repository not initialized" in stderr and module.params["storage"] != "from-config":
+    if rc != 0 and not_initialized(module.params["storage"], stderr):
         rc, _dummy, stderr = kopia_command(module, ["repository", "create"] + target, password=password)
 
         if rc != 0:

@@ -6,8 +6,8 @@ bugfixes:
     ``en_US:en``, no longer makes every later locale change fail.
   - systemd_locale - document that systemd 256 and later refuse ``:`` in
     ``locale.language``.
-known_issues:
+breaking_changes:
   - systemd_locale - requires systemd 239 or later, the first version whose
     systemd-localed merges a partial locale request instead of clearing the
-    variables left out, and the role now declares EL 8, 9 and 10 and Debian
-    10 to 13 only.
+    variables left out, and the role declares EL 9 and 10 and Debian 12
+    (bookworm) and 13 (trixie) only.

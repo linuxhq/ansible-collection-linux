@@ -47,9 +47,10 @@ options:
     description:
       - Password securing the configuration file.
       - Required when O(state=present), which needs it to encrypt.
-      - Optional when O(state=absent), where it is only needed to open a file that
-        is currently encrypted. It can be omitted when O(content) is set and the
-        file on disk is already plaintext.
+      - Optional when O(state=absent). Without O(content), it is needed to open
+        a file that is currently encrypted. With O(content), an encrypted file is
+        replaced by O(content) even without it, and it is only used to read the
+        current configuration for the comparison and the diff.
       - Whitespace is significant and is not stripped, matching rclone. A password
         that is empty or entirely whitespace is rejected, where whitespace is the
         set of Unicode space characters rclone trims.
@@ -227,7 +228,9 @@ def config_diff(module, before, after):
     if not module._diff:
         return {}
 
-    return {"diff": {"before": to_text(before or b""), "after": to_text(after or b"")}}
+    return {
+        "diff": {"before": to_text(before or b"", errors="replace"), "after": to_text(after or b"", errors="replace")}
+    }
 
 
 def ensure_present(module, path):

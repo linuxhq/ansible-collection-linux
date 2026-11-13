@@ -1,0 +1,17 @@
+---
+bugfixes:
+  - kopia_repository - create a ``filesystem`` repository whose ``path`` does
+    not exist yet, as ``kopia repository create`` does, instead of failing
+    because connecting cannot access the missing path.
+  - kopia_policy - fill a missing ``hour`` or ``min`` of a
+    ``scheduling.time_of_day`` entry with ``0``, as kopia stores it, so such a
+    policy no longer reports a change on every run.
+  - kopia_maintenance - follow kopia when every stored log retention setting
+    is zero, where kopia starts from its default log retention, and when one
+    log retention option clears them all, so check mode and the result match
+    the stored settings and a single run converges.
+  - kopia_maintenance - document that ``0`` for one ``max_retained_log_*``
+    option means no limit on it, and that all three at ``0`` means kopia's
+    default log retention applies.
+  - kopia modules - document that ``config_file`` and the ``path`` options of
+    ``kopia_snapshot`` and ``kopia_snapshot_info`` are expanded by Ansible.

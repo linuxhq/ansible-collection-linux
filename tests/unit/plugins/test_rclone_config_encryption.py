@@ -261,3 +261,13 @@ def test_content_is_kept_out_of_logs(monkeypatch, tmp_path, run_module):
     path = tmp_path / "rclone.conf"
     run_module(plugin, {"path": str(path), "password": "secret", "content": "token = sensitive"}, True)
     assert "token = sensitive" in captured["no_log_values"]
+
+
+@pytest.mark.parametrize("state", ["present", "absent"])
+def test_diff_of_non_utf8_configuration_is_valid_text(tmp_path, run_module, state):
+    path = tmp_path / "rclone.conf"
+    path.write_bytes(b"[remote]\nkey = \xff\n")
+    result = run_module(plugin, {"path": str(path), "password": "secret", "state": state, "_ansible_diff": True})
+    for side in ("before", "after"):
+        assert result["diff"][side] == "[remote]\nkey = \ufffd\n"
+        result["diff"][side].encode("utf-8")

@@ -98,6 +98,33 @@ def test_repository_connection_error_does_not_create(monkeypatch, run_module):
     assert command.call_count == 1
 
 
+MISSING_PATH = "can't connect to storage: cannot access storage path: stat /backup/kopia: no such file or directory"
+
+
+@pytest.mark.parametrize(
+    "storage,stderr,created",
+    [
+        ("filesystem", MISSING_PATH, True),
+        ("filesystem", "can't connect to storage: cannot access storage path: stat /backup: permission denied", False),
+        ("sftp", MISSING_PATH, False),
+    ],
+)
+def test_repository_missing_filesystem_path_is_created(monkeypatch, run_module, storage, stderr, created):
+    status = Mock(side_effect=[None, {"storageType": storage}])
+    monkeypatch.setattr(kopia_repository, "repository_status", status)
+    command = Mock(side_effect=[(1, "", stderr), (0, "", "")])
+    monkeypatch.setattr(kopia_repository, "kopia_command", command)
+    result = run_module(
+        kopia_repository, {"storage": storage, "password": "secret", "options": {"path": "/backup/kopia"}}
+    )
+    if created:
+        assert result["changed"] and not result.get("failed")
+        assert command.call_args_list[1].args[1] == ["repository", "create", "filesystem", "--path=/backup/kopia"]
+    else:
+        assert result["failed"] and stderr in result["msg"]
+        assert command.call_count == 1
+
+
 @pytest.mark.parametrize("status,connected", [(None, False), ({"storageType": "s3"}, True)])
 def test_repository_info(monkeypatch, run_module, status, connected):
     monkeypatch.setattr(kopia_repository_info, "repository_status", lambda module: status)
@@ -133,6 +160,73 @@ def test_maintenance_false_zero_and_unit_conversion(monkeypatch, run_module, che
             "--full-interval=2s",
             "--max-retained-log-size-mb=0",
         ]
+
+
+ZERO_RETENTION = {"maxAge": 0, "maxCount": 0, "maxTotalSize": 0}
+DAY = 86400000000000
+
+
+@pytest.mark.parametrize(
+    "stored,params,expected,flags",
+    [
+        (
+            ZERO_RETENTION,
+            {"max_retained_log_count": 5},
+            {"maxAge": 30 * DAY, "maxCount": 5, "maxTotalSize": 1073741824},
+            ["--max-retained-log-count=5"],
+        ),
+        (
+            ZERO_RETENTION,
+            {"max_retained_log_count": 0, "max_retained_log_age": 60},
+            {"maxAge": 60000000000, "maxCount": 0, "maxTotalSize": 1073741824},
+            ["--max-retained-log-count=0", "--max-retained-log-age=60s"],
+        ),
+        (
+            {"maxAge": 0, "maxCount": 5, "maxTotalSize": 0},
+            {"max_retained_log_count": 0, "max_retained_log_age": 60},
+            {"maxAge": 60000000000, "maxCount": 10000, "maxTotalSize": 1073741824},
+            ["--max-retained-log-count=0", "--max-retained-log-age=60s"],
+        ),
+        (
+            {"maxAge": 30 * DAY, "maxCount": 10, "maxTotalSize": 1073741824},
+            {"max_retained_log_count": 10, "max_retained_log_size_mb": 1},
+            {"maxAge": 30 * DAY, "maxCount": 10, "maxTotalSize": 1048576},
+            ["--max-retained-log-count=10", "--max-retained-log-size-mb=1"],
+        ),
+    ],
+)
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_maintenance_log_retention_follows_kopia(monkeypatch, run_module, stored, params, expected, flags, check_mode):
+    monkeypatch.setattr(kopia_maintenance, "kopia_available", lambda module: True)
+    info = Mock(side_effect=[{"logRetention": dict(stored)}, {"logRetention": expected}])
+    monkeypatch.setattr(kopia_maintenance, "maintenance_info", info)
+    command = Mock(return_value=(0, "", ""))
+    monkeypatch.setattr(kopia_maintenance, "kopia_command", command)
+    result = run_module(kopia_maintenance, params, check_mode)
+    assert result["changed"]
+    assert result["maintenance"]["log_retention"] == {
+        "max_age": expected["maxAge"],
+        "max_count": expected["maxCount"],
+        "max_total_size": expected["maxTotalSize"],
+    }
+    if check_mode:
+        command.assert_not_called()
+    else:
+        assert command.call_args.args[1] == ["maintenance", "set"] + flags
+
+
+@pytest.mark.parametrize(
+    "stored,params",
+    [
+        (ZERO_RETENTION, {"max_retained_log_count": 0, "max_retained_log_age": 0, "max_retained_log_size_mb": 0}),
+        ({"maxAge": 30 * DAY, "maxCount": 0, "maxTotalSize": 1073741824}, {"max_retained_log_count": 0}),
+    ],
+)
+def test_maintenance_log_retention_is_idempotent(monkeypatch, run_module, stored, params):
+    monkeypatch.setattr(kopia_maintenance, "kopia_available", lambda module: True)
+    monkeypatch.setattr(kopia_maintenance, "maintenance_info", Mock(return_value={"logRetention": stored}))
+    monkeypatch.setattr(kopia_maintenance, "kopia_command", Mock(side_effect=AssertionError("must not mutate")))
+    assert not run_module(kopia_maintenance, params)["changed"]
 
 
 def test_maintenance_no_change_and_info(monkeypatch, run_module):
@@ -289,6 +383,19 @@ def test_snapshot_failure_does_not_query_latest(monkeypatch, run_module):
 def test_latest_snapshot_unavailable(monkeypatch, module_factory, response):
     monkeypatch.setattr(kopia_snapshot, "kopia_command", Mock(return_value=response))
     assert kopia_snapshot.latest_snapshot(module_factory({"password": None}), "/data") == {}
+
+
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_policy_time_of_day_without_minute_is_idempotent(monkeypatch, run_module, check_mode):
+    monkeypatch.setattr(kopia_policy, "kopia_available", lambda module: True)
+    current = {"scheduling": {"timeOfDay": [{"hour": 2, "min": 0}]}}
+    monkeypatch.setattr(kopia_policy, "policy_export", lambda *args: current)
+    command = Mock(side_effect=AssertionError("must not mutate"))
+    monkeypatch.setattr(kopia_policy, "kopia_command", command)
+    result = run_module(
+        kopia_policy, {"target": "global", "policy": {"scheduling": {"time_of_day": [{"hour": 2}]}}}, check_mode
+    )
+    assert result == {"changed": False, "policy": {"scheduling": {"time_of_day": [{"hour": 2, "min": 0}]}}}
 
 
 def test_policy_zero_values_kopia_omits_are_idempotent(monkeypatch, run_module):

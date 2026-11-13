@@ -1,0 +1,13 @@
+---
+bugfixes:
+  - rclone_obscure, rclone_deobscure - return an empty string for empty bytes
+    input, as for an empty string, instead of empty bytes.
+  - rclone_config_encryption - replace bytes that are not valid UTF-8 in the
+    diff, as when reading the configuration, instead of returning text that
+    cannot be encoded.
+  - rclone_config_encryption - document that with ``state=absent`` and
+    ``content`` an encrypted file is replaced without ``password``, which is
+    then only used to read the current configuration.
+  - rclone_obscure, rclone_deobscure - fix the examples to obscure a backend
+    password in an rclone remote rather than the configuration encryption
+    password, which rclone reads in plaintext.
