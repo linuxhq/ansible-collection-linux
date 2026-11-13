@@ -257,8 +257,29 @@ def test_locale_applies_sorted_settings(monkeypatch, run_module):
     monkeypatch.setattr(systemd_locale, "locale_status", Mock(return_value=LOCALE))
     mutate = Mock()
     monkeypatch.setattr(systemd_locale, "systemd_call", mutate)
-    assert run_module(systemd_locale, {"locale": {"lc_time": "fr_FR.UTF-8"}})["changed"]
-    assert mutate.call_args.args[2:] == ("SetLocale", ["LANG=en_US.UTF-8", "LC_TIME=fr_FR.UTF-8"], False)
+    params = {"locale": {"lc_time": "fr_FR.UTF-8", "lc_numeric": "de_DE.UTF-8", "lc_name": ""}}
+    assert run_module(systemd_locale, params)["changed"]
+    assert mutate.call_args.args[2:] == ("SetLocale", ["LC_NUMERIC=de_DE.UTF-8", "LC_TIME=fr_FR.UTF-8"], False)
+
+
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_locale_sends_only_requested_variables(monkeypatch, run_module, check_mode):
+    configured = {**LOCALE, "locale": {"lang": "en_US.UTF-8", "language": "en_US:en"}}
+    updated = {**LOCALE, "locale": {**configured["locale"], "lc_time": "en_GB.UTF-8"}}
+    monkeypatch.setattr(systemd_locale, "HAS_DASBUS", True)
+    monkeypatch.setattr(systemd_locale, "systemd_proxy", Mock())
+    monkeypatch.setattr(systemd_locale, "locale_status", Mock(side_effect=[configured, updated]))
+    mutate = Mock()
+    monkeypatch.setattr(systemd_locale, "systemd_call", mutate)
+    result = run_module(systemd_locale, {"locale": {"lc_time": "en_GB.UTF-8"}}, check_mode)
+    assert result["changed"]
+    assert result["locale"]["locale"]["lang"] == "en_US.UTF-8"
+    assert result["locale"]["locale"]["language"] == "en_US:en"
+    assert result["locale"]["locale"]["lc_time"] == "en_GB.UTF-8"
+    if check_mode:
+        mutate.assert_not_called()
+    else:
+        assert mutate.call_args.args[2:] == ("SetLocale", ["LC_TIME=en_GB.UTF-8"], False)
 
 
 def test_vconsole_reset_toggle_when_keymap_changes(module_factory):

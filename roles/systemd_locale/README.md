@@ -6,7 +6,7 @@ Manage the systemd locale and keyboard settings
 
 ## Requirements
 
-* [systemd-localed](https://www.freedesktop.org/software/systemd/man/latest/systemd-localed.service.html)
+* [systemd-localed](https://www.freedesktop.org/software/systemd/man/latest/systemd-localed.service.html) from systemd 239 or later
 
 ## Role Variables
 
