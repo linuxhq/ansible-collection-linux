@@ -140,7 +140,7 @@ def systemd_properties(module, proxy, properties):
         except AttributeError:
             values[name] = None
             continue
-        except DBusError as error:
+        except (DBusError, GLibError, TimeoutError) as error:
             module.fail_json(msg=f"unable to read the {prop} property: {error}")
 
         values[name] = systemd_value(value)
@@ -154,7 +154,7 @@ def systemd_result(module, proxy, method, *args):
 
     try:
         return getattr(proxy, method)(*args)
-    except DBusError as error:
+    except (DBusError, GLibError, TimeoutError) as error:
         module.fail_json(msg=f"unable to call {method}: {error}")
 
 

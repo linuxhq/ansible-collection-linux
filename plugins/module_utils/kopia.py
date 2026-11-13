@@ -40,6 +40,9 @@ POLICY_OMITEMPTY = {
     "splitter": {"algorithm": ""},
 }
 
+# kopia stores both fields of each scheduling.timeOfDay entry, even when zero
+TIME_OF_DAY = {"hour": 0, "min": 0}
+
 
 def kopia_flags(options):
     flags = []
@@ -150,7 +153,15 @@ def omit_empty(value, schema):
 
 
 def policy_normalize(policy):
-    return prune_empty(omit_empty(policy, POLICY_OMITEMPTY))
+    policy = prune_empty(omit_empty(policy, POLICY_OMITEMPTY))
+    scheduling = policy.get("scheduling")
+
+    if isinstance(scheduling, dict) and isinstance(scheduling.get("timeOfDay"), list):
+        scheduling["timeOfDay"] = [
+            dict(TIME_OF_DAY, **entry) if isinstance(entry, dict) else entry for entry in scheduling["timeOfDay"]
+        ]
+
+    return policy
 
 
 def same_value(left, right):

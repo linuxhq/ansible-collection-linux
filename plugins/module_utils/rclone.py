@@ -57,7 +57,7 @@ def obscure(plaintext):
         raise TypeError(f"requires a string or bytes, got {type(plaintext).__name__}")
 
     if not plaintext:
-        return plaintext
+        return ""
 
     data = plaintext.encode("utf-8") if isinstance(plaintext, str) else plaintext
 
@@ -74,7 +74,7 @@ def deobscure(obscured):
         raise TypeError(f"requires a string or bytes, got {type(obscured).__name__}")
 
     if not obscured:
-        return obscured
+        return ""
 
     if isinstance(obscured, bytes):
         obscured = obscured.decode("utf-8")

@@ -41,6 +41,9 @@ options:
         C(systemd-timesyncd) or C(chronyd).
       - Enabling it fails when no such service is installed, which the C(can_ntp)
         return field reports.
+      - C(systemd-timedated) starts or stops the service in the background, so
+        after changing it the module waits up to 30 seconds for the change to
+        be reported before applying O(time), and fails when it is not.
     type: bool
   time:
     description:
@@ -51,6 +54,10 @@ options:
         V(2026-07-26 14:30:00.5), V(Sun 2026-07-26 14:30), V(26-07-26),
         V(2026-07-26), V(14:30:00) or V(14:30), each optionally suffixed with
         V(UTC).
+      - V(now) sets the clock to the current time read by the module, as
+        C(timedatectl set-time now) does.
+      - A weekday prefix must name the weekday of the date, otherwise the
+        module fails, as C(timedatectl) does.
       - Timestamps without a zone are read in the time zone the host ends up
         with, so one set by O(timezone) in the same task applies to them.
       - Setting the clock can never be idempotent, so this always reports a
@@ -118,7 +125,7 @@ timedate:
 import os
 import re
 from datetime import datetime, timedelta, timezone
-from time import tzset
+from time import monotonic, sleep, tzset
 
 from ansible.module_utils.basic import AnsibleModule
 
@@ -131,6 +138,8 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.systemd import (
 )
 
 MICROSECONDS = 1000000
+
+NTP_TIMEOUT = 30
 
 TIMESTAMPS = [
     "%Y-%m-%d %H:%M:%S.%f",
@@ -146,22 +155,22 @@ TIMESTAMPS = [
     "%H:%M",
 ]
 
-WEEKDAYS = [
-    "mon",
-    "monday",
-    "tue",
-    "tuesday",
-    "wed",
-    "wednesday",
-    "thu",
-    "thursday",
-    "fri",
-    "friday",
-    "sat",
-    "saturday",
-    "sun",
-    "sunday",
-]
+WEEKDAYS = {
+    "mon": 0,
+    "monday": 0,
+    "tue": 1,
+    "tuesday": 1,
+    "wed": 2,
+    "wednesday": 2,
+    "thu": 3,
+    "thursday": 3,
+    "fri": 4,
+    "friday": 4,
+    "sat": 5,
+    "saturday": 5,
+    "sun": 6,
+    "sunday": 6,
+}
 
 DAYS = {"today": 0, "tomorrow": 1, "yesterday": -1}
 
@@ -273,20 +282,26 @@ def parse_value(module, value):
         value, utc = value[:-3].strip(), True
 
     if value == "now":
-        return 0, True
+        return int(current_time().timestamp() * MICROSECONDS), False
 
     if value.lower() in DAYS:
         date = current_time(utc).date() + timedelta(days=DAYS[value.lower()])
 
         return parse_stamp(f"{date:%Y-%m-%d}", utc), False
 
-    weekday, _dummy, remainder = value.partition(" ")
-    if weekday.rstrip(",").lower() in WEEKDAYS and remainder:
-        value = remainder.strip()
+    weekday = None
+    prefix, _dummy, remainder = value.partition(" ")
+    if prefix.rstrip(",").lower() in WEEKDAYS and remainder:
+        weekday, value = WEEKDAYS[prefix.rstrip(",").lower()], remainder.strip()
 
     usec = parse_stamp(value, utc)
     if usec is None:
         module.fail_json(msg=f"unable to parse the time specification: {value}")
+
+    if weekday is not None:
+        parsed = datetime.fromtimestamp(usec / MICROSECONDS, timezone.utc if utc else None)
+        if parsed.weekday() != weekday:
+            module.fail_json(msg=f"unable to parse the time specification: {prefix} does not match the date {value}")
 
     return usec, False
 
@@ -308,6 +323,20 @@ def parse_time(module, value, zone):
                 os.environ["TZ"] = origin
 
             tzset()
+
+
+def wait_for_ntp(module, proxy, ntp):
+    # SetNTP returns once the time service job is queued, and systemd-timedated
+    # refuses other requests until that job finishes and NTP reports the change.
+    deadline = monotonic() + NTP_TIMEOUT
+
+    while systemd_properties(module, proxy, [("ntp", "NTP")])["ntp"] != ntp:
+        if monotonic() >= deadline:
+            module.fail_json(
+                msg=f"unable to set ntp to {ntp}: network time synchronization did not change within {NTP_TIMEOUT} seconds"
+            )
+
+        sleep(0.5)
 
 
 def ensure_present(module):
@@ -368,6 +397,9 @@ def ensure_present(module):
 
     for method, args in pending:
         systemd_call(module, proxy, method, *args)
+
+        if method == "SetNTP":
+            wait_for_ntp(module, proxy, args[0])
 
     current = systemd_properties(module, proxy, TIMEDATE_PROPERTIES)
 

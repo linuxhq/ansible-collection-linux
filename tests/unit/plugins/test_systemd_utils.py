@@ -42,6 +42,24 @@ def test_property_bus_error(module_factory, invoke):
     assert result["failed"] and "Hostname" in result["msg"]
 
 
+@pytest.mark.parametrize("error", [systemd.GLibError("Timeout was reached"), TimeoutError("timed out")])
+def test_property_transport_error(module_factory, invoke, error):
+    class BrokenProxy:
+        @property
+        def NTP(self):
+            raise error
+
+    result = invoke(systemd.systemd_properties, module_factory(), BrokenProxy(), [("ntp", "NTP")])
+    assert result["failed"] and result["msg"] == f"unable to read the NTP property: {error}"
+
+
+@pytest.mark.parametrize("error", [systemd.GLibError("Timeout was reached"), TimeoutError("timed out")])
+def test_method_transport_error(module_factory, invoke, error):
+    proxy = SimpleNamespace(SetNTP=Mock(side_effect=error))
+    result = invoke(systemd.systemd_call, module_factory(), proxy, "SetNTP", False, False)
+    assert result["failed"] and result["msg"] == f"unable to call SetNTP: {error}"
+
+
 def test_method_missing_and_bus_error(module_factory, invoke):
     result = invoke(systemd.systemd_result, module_factory(), SimpleNamespace(), "SetHostname", "host")
     assert result["failed"] and "not supported" in result["msg"]

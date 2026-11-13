@@ -1,0 +1,7 @@
+---
+breaking_changes:
+  - systemd_hostname, systemd_hostname_info, systemd_locale,
+    systemd_locale_info, systemd_timedate and systemd_timedate_info roles -
+    declare only EL 9 and 10 and Debian 12 (bookworm) and 13 (trixie) as
+    supported platforms.
+  - rclone role - declare only EL 9 and 10 as supported platforms.

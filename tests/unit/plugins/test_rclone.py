@@ -12,8 +12,14 @@ from ansible_collections.linuxhq.linux.plugins.module_utils import rclone
 def test_obscure_round_trip_and_determinism(plaintext):
     encoded = rclone.obscure(plaintext)
     assert encoded == rclone.obscure(plaintext)
-    expected = plaintext.decode() if isinstance(plaintext, bytes) and plaintext else plaintext
+    expected = plaintext.decode() if isinstance(plaintext, bytes) else plaintext
     assert rclone.deobscure(encoded) == expected
+
+
+@pytest.mark.parametrize("function", [rclone.obscure, rclone.deobscure])
+@pytest.mark.parametrize("value", ["", b""])
+def test_empty_input_returns_empty_string(function, value):
+    assert function(value) == "" and isinstance(function(value), str)
 
 
 @pytest.mark.parametrize("value", [None, 42, [], {}])

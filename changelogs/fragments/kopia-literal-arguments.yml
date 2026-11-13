@@ -1,10 +1,12 @@
 ---
 breaking_changes:
-  - kopia modules - pass every argument to kopia exactly as given, without
-    expanding ``~`` or environment variables, so a policy ``target``, snapshot
-    tags and description, and repository ``options`` and ``secrets`` reach
-    kopia literally and ``kopia_policy`` exports, imports and deletes the same
-    target. Expand values in the playbook instead.
+  - kopia modules - pass every string argument to kopia exactly as given,
+    without expanding ``~`` or environment variables, so a policy ``target``,
+    snapshot tags and description, and repository ``options`` and ``secrets``
+    reach kopia literally and ``kopia_policy`` exports, imports and deletes the
+    same target. Expand values in the playbook instead. Options of type
+    ``path``, that is ``config_file`` and the ``path`` of ``kopia_snapshot``
+    and ``kopia_snapshot_info``, are still expanded by Ansible.
   - kopia_repository - compare the identifying storage ``options`` with the
     connected repository literally, without expanding environment variables.
     A leading ``~`` in a ``filesystem`` ``path`` is still resolved to the home

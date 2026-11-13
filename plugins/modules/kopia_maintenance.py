@@ -15,11 +15,17 @@ description:
     with C(kopia maintenance set) when they differ, options left unset are not
     touched.
   - At least one setting option besides O(config_file) is required.
+  - When every stored log retention setting is zero, kopia starts from its
+    default log retention before applying the requested log retention
+    options, so the ones left unset take the default values. The result and
+    check mode predictions follow kopia.
 options:
   config_file:
     description:
       - Path to the kopia configuration file describing the connection.
       - Defaults to kopia's own configuration path when unset.
+      - Ansible expands a leading V(~) and environment variables in it, as for
+        any C(path) option, before it is passed to kopia.
     type: path
   enable_full:
     description: Enable or disable periodic full maintenance.
@@ -45,16 +51,28 @@ options:
     description:
       - Maximum age of retained log sessions, in seconds.
       - Must not be negative.
+      - V(0) means no age limit. When O(max_retained_log_age),
+        O(max_retained_log_count) and O(max_retained_log_size_mb) are all
+        V(0), kopia applies its default log retention instead, 30 days, 10000
+        sessions and 1024 megabytes.
     type: int
   max_retained_log_count:
     description:
       - Maximum number of log sessions to retain.
       - Must not be negative, kopia reads V(-1) as leaving it unset.
+      - V(0) means no count limit. When O(max_retained_log_age),
+        O(max_retained_log_count) and O(max_retained_log_size_mb) are all
+        V(0), kopia applies its default log retention instead, 30 days, 10000
+        sessions and 1024 megabytes.
     type: int
   max_retained_log_size_mb:
     description:
       - Maximum total size of retained log sessions, in megabytes.
       - Must not be negative, kopia reads V(-1) as leaving it unset.
+      - V(0) means no size limit. When O(max_retained_log_age),
+        O(max_retained_log_count) and O(max_retained_log_size_mb) are all
+        V(0), kopia applies its default log retention instead, 30 days, 10000
+        sessions and 1024 megabytes.
     type: int
   owner:
     description:
@@ -163,6 +181,16 @@ SETTINGS = [
     ("quick_interval", "--quick-interval", ("quick", "interval"), "duration"),
 ]
 
+# kopia applies the log retention flags in this order, each starting from its
+# defaults when every stored log retention setting is zero
+LOG_RETENTION = ["max_retained_log_count", "max_retained_log_age", "max_retained_log_size_mb"]
+
+LOG_RETENTION_DEFAULTS = {
+    "maxAge": 30 * 86400 * NANOSECONDS,
+    "maxCount": 10000,
+    "maxTotalSize": 1024 * MEGABYTES,
+}
+
 
 def normalize(kind, value):
     if kind == "duration":
@@ -182,6 +210,35 @@ def flag_value(kind, value):
         return f"{value}s"
 
     return f"{value}"
+
+
+def log_retention_or_default(retention):
+    if all(not retention.get(key) for key in LOG_RETENTION_DEFAULTS):
+        return dict(retention, **LOG_RETENTION_DEFAULTS)
+
+    return dict(retention)
+
+
+def log_retention_change(module, current):
+    settings = {setting[0]: setting for setting in SETTINGS}
+    stored = current.get("logRetention") or {}
+    expected = dict(stored)
+    flags = []
+
+    for param in LOG_RETENTION:
+        value = module.params[param]
+        if value is None:
+            continue
+
+        _dummy, flag, path, kind = settings[param]
+        expected = log_retention_or_default(expected)
+        expected[path[-1]] = normalize(kind, value)
+        flags.append(f"{flag}={flag_value(kind, value)}")
+
+    if same_value(expected, stored):
+        return None, []
+
+    return expected, flags
 
 
 def validate_settings(module):
@@ -204,7 +261,7 @@ def ensure_present(module):
 
     for param, flag, path, kind in SETTINGS:
         value = module.params[param]
-        if value is None:
+        if value is None or param in LOG_RETENTION:
             continue
 
         node = predicted
@@ -215,6 +272,11 @@ def ensure_present(module):
         if path[-1] not in node or not same_value(node[path[-1]], desired):
             node[path[-1]] = desired
             flags.append(f"{flag}={flag_value(kind, value)}")
+
+    retention, retention_flags = log_retention_change(module, current)
+    if retention_flags:
+        predicted["logRetention"] = retention
+        flags.extend(retention_flags)
 
     if not flags:
         module.exit_json(changed=False, maintenance=camel_dict_to_snake_dict(current))

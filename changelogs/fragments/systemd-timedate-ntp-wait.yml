@@ -1,0 +1,18 @@
+---
+bugfixes:
+  - systemd_timedate - wait up to 30 seconds after changing ``ntp`` until
+    systemd-timedated reports the change, and fail when it does not, before
+    setting ``time``. systemd-timedated replies before the time service has
+    stopped and refuses ``SetTime`` until it has, so ``ntp=false`` with
+    ``time`` failed with "Previous request is not finished, refusing".
+  - systemd_timedate - set ``time=now`` to the current time, as
+    ``timedatectl set-time now`` does, instead of sending a zero relative
+    offset that systemd-timedated ignores.
+  - systemd_timedate - fail when a weekday prefix in ``time`` does not match
+    the date, as systemd does, instead of ignoring it.
+  - systemd_hostname, systemd_locale, systemd_timedate and their info modules -
+    report a D-Bus timeout or another transport error while reading a property
+    or calling a method as a failure naming the property or method instead of
+    a traceback.
+  - systemd_timedate_info - document that it requires systemd 240 or later for
+    ``ListTimezones``.

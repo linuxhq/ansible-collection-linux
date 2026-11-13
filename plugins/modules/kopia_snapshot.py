@@ -20,6 +20,8 @@ options:
     description:
       - Path to the kopia configuration file describing the connection.
       - Defaults to kopia's own configuration path when unset.
+      - Ansible expands a leading V(~) and environment variables in it, as for
+        any C(path) option, before it is passed to kopia.
     type: path
   description:
     description:
@@ -35,6 +37,8 @@ options:
   path:
     description:
       - Local path to snapshot.
+      - Ansible expands a leading V(~) and environment variables in it, as for
+        any C(path) option, before it is passed to kopia.
     type: path
     required: true
   tags:

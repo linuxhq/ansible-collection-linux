@@ -31,9 +31,16 @@ requirements:
 """
 
 EXAMPLES = r"""
-- name: Ensure rclone config pass fact is generated
-  ansible.builtin.set_fact:
-    __rclone_config_pass: "{{ rclone_password | linuxhq.linux.rclone_obscure }}"
+- name: Ensure rclone is configured with an sftp remote
+  ansible.builtin.include_role:
+    name: linuxhq.linux.rclone
+  vars:
+    rclone_config:
+      - name: backup
+        type: sftp
+        host: backup.example.com
+        user: backup
+        pass: "{{ vault_sftp_password | linuxhq.linux.rclone_obscure }}"
 """
 
 RETURN = r"""

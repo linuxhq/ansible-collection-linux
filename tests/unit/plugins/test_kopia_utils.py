@@ -97,6 +97,15 @@ def test_policy_normalize_drops_only_values_kopia_omits():
     assert policy == original
 
 
+def test_policy_normalize_fills_time_of_day_fields():
+    policy = {"scheduling": {"timeOfDay": [{"hour": 2}, {"min": 30}, {"hour": 4, "min": 15}]}}
+    original = deepcopy(policy)
+    assert kopia.policy_normalize(policy) == {
+        "scheduling": {"timeOfDay": [{"hour": 2, "min": 0}, {"hour": 0, "min": 30}, {"hour": 4, "min": 15}]}
+    }
+    assert policy == original
+
+
 def test_policy_normalize_keeps_wrong_types():
     assert kopia.policy_normalize({"scheduling": {"manual": 0, "intervalSeconds": False}}) == {
         "scheduling": {"manual": 0, "intervalSeconds": False}
