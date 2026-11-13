@@ -1,0 +1,11 @@
+---
+bugfixes:
+  - kopia_snapshot - fail before running kopia when a ``tags`` key contains
+    ``:``, which kopia would split into a different key and value.
+  - kopia_snapshot_info - document that snapshots of the parent directories of
+    ``path`` are included, as ``kopia snapshot list`` reports them.
+  - kopia_policy - document that policy manifest IDs are not accepted as
+    ``target``.
+  - kopia_policy, kopia_policy_info, kopia_maintenance - document that
+    ``kopia_policy`` and ``kopia_policy_info`` require kopia 0.18.0 or later,
+    and so does ``list_parallelism`` of ``kopia_maintenance``.

@@ -24,7 +24,7 @@ options:
     type: string
     required: true
 requirements:
-  - pycryptodome or pycryptodomex
+  - pycryptodome >= 3.7.0 or pycryptodomex >= 3.7.0
 """
 
 EXAMPLES = r"""

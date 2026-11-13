@@ -61,6 +61,10 @@ options:
         synchronization would still be enabled.
       - An absolute time at or before the epoch is rejected before any setting
         is written.
+      - systemd 258 and later also refuse an absolute time before the date
+        systemd was built. Only C(systemd-timedated) knows that date, so the
+        refusal is reported after the other settings in the same task are
+        applied.
     type: str
   timezone:
     description:

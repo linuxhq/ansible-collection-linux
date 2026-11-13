@@ -76,7 +76,7 @@ def kopia_command(module, args, password=None):
     if password is not None:
         environ["KOPIA_PASSWORD"] = password
 
-    return module.run_command(command, environ_update=environ)
+    return module.run_command(command, environ_update=environ, expand_user_and_vars=False)
 
 
 def repository_status(module, password=None):

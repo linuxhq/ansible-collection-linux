@@ -69,7 +69,15 @@ def test_missing_file_without_content_fails(tmp_path, run_module):
     assert "does not exist" in result["msg"]
 
 
-@pytest.mark.parametrize("params, message", [({}, "password"), ({"password": " "}, "no characters")])
+@pytest.mark.parametrize(
+    "params, message",
+    [
+        ({}, "password"),
+        ({"password": " "}, "no characters"),
+        ({"password": "\u00a0\u3000"}, "no characters"),
+        ({"password": "\x85\u2028"}, "no characters"),
+    ],
+)
 def test_password_validation(tmp_path, run_module, params, message):
     result = run_module(plugin, {"path": str(tmp_path / "config"), **params})
     assert result["failed"]
@@ -90,8 +98,8 @@ def test_missing_crypto(monkeypatch, tmp_path, run_module, check_mode):
 def test_atomic_move_failure_removes_temporary_file(tmp_path, module_factory, invoke):
     path = tmp_path / "config"
     path.write_text("original")
-    module = module_factory({"path": str(path)})
-    module.atomic_move.side_effect = lambda *args: module.fail_json(msg="move failed")
+    module = module_factory({"path": str(path), "unsafe_writes": False})
+    module.atomic_move.side_effect = lambda *args, **kwargs: module.fail_json(msg="move failed")
     assert invoke(plugin.write_config, module, str(path), b"replacement")["failed"]
     assert path.read_text() == "original"
     assert list(tmp_path.iterdir()) == [path]
@@ -99,8 +107,8 @@ def test_atomic_move_failure_removes_temporary_file(tmp_path, module_factory, in
 
 def test_atomic_move_writes_complete_content(tmp_path, module_factory):
     path = tmp_path / "config"
-    module = module_factory({"path": str(path), "mode": None})
-    module.atomic_move.side_effect = os.replace
+    module = module_factory({"path": str(path), "mode": None, "unsafe_writes": False})
+    module.atomic_move.side_effect = lambda src, dest, **kwargs: os.replace(src, dest)
     plugin.write_config(module, str(path), b"replacement")
     assert path.read_bytes() == b"replacement"
     assert list(tmp_path.iterdir()) == [path]
@@ -163,6 +171,61 @@ def test_created_file_mode(tmp_path, run_module, state, mode, expected):
 
     assert run_module(plugin, params)["changed"]
     assert path.stat().st_mode & 0o777 == expected
+
+
+@pytest.mark.parametrize("password", ["\x1f", "\x1c\x1d\x1e"])
+def test_password_of_separator_characters_is_accepted(tmp_path, run_module, password):
+    path = tmp_path / "rclone.conf"
+    result = run_module(plugin, {"path": str(path), "password": password, "content": "config"})
+    assert result["changed"] and not result.get("failed")
+    assert rclone.decrypt_config(path.read_text(), password) == b"config"
+
+
+@pytest.fixture
+def recorded_moves(monkeypatch):
+    """Wrap the real atomic_move to record the arguments and the mode the file has right after it."""
+    moves = []
+    original = basic.AnsibleModule.atomic_move
+
+    def atomic_move(self, src, dest, *args, **kwargs):
+        result = original(self, src, dest, *args, **kwargs)
+        moves.append({"kwargs": kwargs, "mode": os.stat(dest).st_mode & 0o777})
+        return result
+
+    monkeypatch.setattr(basic.AnsibleModule, "atomic_move", atomic_move)
+    umask = os.umask(0o022)
+    yield moves
+    os.umask(umask)
+
+
+@pytest.mark.parametrize("state", ["present", "absent"])
+@pytest.mark.parametrize("mode, expected", [(None, 0o600), ("0640", 0o640)])
+def test_created_file_is_private_from_the_start(tmp_path, run_module, recorded_moves, state, mode, expected):
+    path = tmp_path / "rclone.conf"
+    params = {"path": str(path), "password": "secret", "content": "config", "state": state}
+    if mode is not None:
+        params["mode"] = mode
+
+    assert run_module(plugin, params)["changed"]
+    assert [move["mode"] for move in recorded_moves] == [0o600]
+    assert path.stat().st_mode & 0o777 == expected
+    assert os.umask(0o022) == 0o022
+
+
+def test_existing_file_keeps_its_mode_through_the_move(tmp_path, run_module, recorded_moves):
+    path = tmp_path / "rclone.conf"
+    path.write_text("config")
+    path.chmod(0o644)
+    assert run_module(plugin, {"path": str(path), "password": "secret"})["changed"]
+    assert [move["mode"] for move in recorded_moves] == [0o644]
+
+
+@pytest.mark.parametrize("unsafe_writes", [False, True])
+def test_unsafe_writes_is_passed_to_atomic_move(tmp_path, run_module, recorded_moves, unsafe_writes):
+    path = tmp_path / "rclone.conf"
+    params = {"path": str(path), "password": "secret", "content": "config", "unsafe_writes": unsafe_writes}
+    assert run_module(plugin, params)["changed"]
+    assert [move["kwargs"].get("unsafe_writes") for move in recorded_moves] == [unsafe_writes]
 
 
 def test_existing_file_keeps_mode(tmp_path, run_module):

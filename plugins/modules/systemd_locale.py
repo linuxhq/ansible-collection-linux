@@ -32,6 +32,9 @@ notes:
     overwriting the other.
   - Check mode cannot predict the converted values, so the reported counterpart
     fields can differ from the ones a real run produces.
+  - Only C(systemd-localed) can tell whether a console keymap or an X11 layout
+    exists, so one it refuses is reported after the earlier settings in the
+    same task, such as O(locale), are applied.
 options:
   locale:
     description:

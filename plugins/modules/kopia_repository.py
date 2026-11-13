@@ -20,9 +20,9 @@ description:
     from O(storage), or when one of the O(options) C(bucket), C(container),
     C(endpoint), C(folder_id), C(host), C(path), C(prefix), C(remote_path),
     C(storage_account) or C(url) differs from the connected storage
-    configuration, after expanding environment variables in the option as the
-    command line does. Disconnect it with C(kopia repository disconnect) first
-    to switch repositories.
+    configuration. A leading V(~) in the C(path) of V(filesystem) storage is
+    resolved to the home directory first, as kopia does. Disconnect it with
+    C(kopia repository disconnect) first to switch repositories.
 options:
   config_file:
     description:
@@ -39,6 +39,8 @@ options:
         C(--no-flag), and a list repeats the flag once per element.
       - Put credential-carrying flags in O(secrets) instead so they stay out of
         logs.
+      - Values are passed to kopia as given, so the module does not expand V(~)
+        or environment variables in them.
     type: dict
     default: {}
   password:
@@ -181,7 +183,6 @@ def storage_description(module):
 
 
 def storage_value(storage, option, value):
-    value = os.path.expandvars(value)
     home = os.environ.get("HOME", "")
 
     if storage == "filesystem" and option == "path" and value.startswith("~") and home:

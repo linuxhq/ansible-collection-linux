@@ -65,6 +65,15 @@ MANAGERS = [
 ]
 
 
+@pytest.fixture(autouse=True)
+def hostname_files(monkeypatch, tmp_path):
+    """Point the hostname module at files under tmp_path that do not exist until a test writes them."""
+    files = {"hostname": tmp_path / "hostname", "machine_info": tmp_path / "machine-info"}
+    monkeypatch.setattr(systemd_hostname, "HOSTNAME_FILE", str(files["hostname"]))
+    monkeypatch.setattr(systemd_hostname, "MACHINE_INFO", str(files["machine_info"]))
+    return files
+
+
 @pytest.mark.parametrize("plugin,key,reader,current,params,method,args", MANAGERS)
 @pytest.mark.parametrize("check_mode", [False, True])
 def test_manager_changes_and_check_mode(
@@ -154,7 +163,8 @@ def test_transient_hostname_cannot_override_static(monkeypatch, run_module):
     mutate.assert_not_called()
 
 
-def test_clear_static_before_setting_transient(monkeypatch, run_module):
+def test_clear_static_before_setting_transient(monkeypatch, run_module, hostname_files):
+    hostname_files["hostname"].write_text("old\n")
     monkeypatch.setattr(systemd_hostname, "HAS_DASBUS", True)
     monkeypatch.setattr(systemd_hostname, "systemd_proxy", Mock())
     monkeypatch.setattr(systemd_hostname, "systemd_properties", Mock(return_value=HOSTNAME))
@@ -283,12 +293,13 @@ def test_invalid_time_specification(module_factory, invoke, value):
     assert result["failed"] and "unable to parse" in result["msg"]
 
 
-def hostname_module(monkeypatch, tmp_path, current, machine_info=None):
-    path = tmp_path / "machine-info"
+def hostname_module(monkeypatch, tmp_path, current, machine_info=None, etc_hostname=None):
     if machine_info is not None:
-        path.write_text(machine_info)
+        (tmp_path / "machine-info").write_text(machine_info, newline="")
 
-    monkeypatch.setattr(systemd_hostname, "MACHINE_INFO", str(path), raising=False)
+    if etc_hostname is not None:
+        (tmp_path / "hostname").write_text(etc_hostname, newline="")
+
     monkeypatch.setattr(systemd_hostname, "HAS_DASBUS", True)
     monkeypatch.setattr(systemd_hostname, "systemd_proxy", Mock())
     monkeypatch.setattr(systemd_hostname, "systemd_properties", Mock(return_value=current))
@@ -344,17 +355,50 @@ def test_hostname_machine_info_values_are_compared(monkeypatch, tmp_path, run_mo
 @pytest.mark.parametrize(
     "text,expected",
     [
-        ("plain", "plain"),
-        ("  padded value  ", "padded value"),
-        ('"quoted value "', "quoted value "),
-        ("'single \\ quoted'", "single \\ quoted"),
-        ('"a\\$b\\x"', "a$b\\x"),
-        ("escaped\\ space", "escaped space"),
-        ("", ""),
+        ("KEY=plain", "plain"),
+        ("KEY=  padded value  ", "padded value"),
+        ('KEY="quoted value "', "quoted value "),
+        ("KEY='single \\ quoted'", "single \\ quoted"),
+        ('KEY="a\\$b\\x"', "a$b\\x"),
+        ("KEY=escaped\\ space", "escaped space"),
+        ("KEY=", ""),
+        ("KEY=Taylor's Laptop", "Taylor's Laptop"),
+        ('KEY=a"b c"', 'a"b c"'),
+        ('KEY="a" "b"', "ab"),
+        ("KEY='a' b  ", "ab"),
+        ("KEY=nbsp\u00a0", "nbsp\u00a0"),
+        ("KEY=tab\t \n", "tab"),
+        ("KEY=con\\\ntinued", "continued"),
+        ('KEY="con\\\ntinued"', "continued"),
+        ("KEY='multi\nline'", "multi\nline"),
+        ("KEY=crlf\r\nOTHER=x", "crlf"),
+        ("KEY=cr\rOTHER=x", "cr"),
+        ("  KEY  =spaced key", "spaced key"),
+        ("KEY=first\nKEY=second\n", "second"),
+        ("# KEY=comment\n; KEY=comment\nKEY=value", "value"),
+        ("# comment ending in a backslash \\\nKEY=value", "value"),
+        ("NOKEY\nKEY=value", "value"),
     ],
 )
-def test_machine_info_value(text, expected):
-    assert systemd_hostname.machine_info_value(text) == expected
+def test_parse_env_file(text, expected):
+    assert systemd_hostname.parse_env_file(text).get("KEY", "") == expected
+
+
+@pytest.mark.parametrize(
+    "machine_info,pretty_hostname",
+    [
+        ("PRETTY_HOSTNAME=Taylor's Laptop\n", "Taylor's Laptop"),
+        ('PRETTY_HOSTNAME=a"b c"\n', 'a"b c"'),
+        ('PRETTY_HOSTNAME="a" "b"\n', "ab"),
+        ("PRETTY_HOSTNAME=Laptop\u00a0\n", "Laptop\u00a0"),
+        ("PRETTY_HOSTNAME=Taylor\\\n Laptop\n", "Taylor Laptop"),
+        ("PRETTY_HOSTNAME=Laptop\r\n", "Laptop"),
+    ],
+)
+def test_hostname_machine_info_parsed_as_systemd(monkeypatch, tmp_path, run_module, machine_info, pretty_hostname):
+    mutate = hostname_module(monkeypatch, tmp_path, HOSTNAME, machine_info)
+    assert not run_module(systemd_hostname, {"pretty_hostname": pretty_hostname})["changed"]
+    mutate.assert_not_called()
 
 
 @pytest.mark.parametrize(
@@ -364,6 +408,12 @@ def test_machine_info_value(text, expected):
         {"chassis": "vm", "deployment": "prod/env"},
         {"chassis": "vm", "icon_name": "a/b"},
         {"chassis": "vm", "icon_name": ".."},
+        {"chassis": "vm", "icon_name": "back\\slash"},
+        {"chassis": "vm", "icon_name": "Taylor's"},
+        {"chassis": "vm", "icon_name": 'a"b'},
+        {"chassis": "vm", "icon_name": "glob*"},
+        {"chassis": "vm", "icon_name": "glob?"},
+        {"chassis": "vm", "icon_name": "glob[0]"},
         {"chassis": "vm", "location": "rack\n4"},
         {"chassis": "vm", "pretty_hostname": "bad\tname"},
         {"chassis": "vm", "static_hostname": "-bad"},
@@ -393,21 +443,48 @@ def test_hostname_valid_static_hostname(monkeypatch, tmp_path, run_module, value
 
 
 @pytest.mark.parametrize(
-    "current,value,changed",
+    "reported,etc_hostname,value,changed",
     [
-        ("web-3f0a", "web-????", False),
-        ("web-3f0a", "web-???", True),
-        ("web-3F0A", "web-????", True),
-        ("web-3g0a", "web-????", True),
-        ("web-????", "web-????", False),
-        ("db-3f0a", "web-????", True),
+        ("web-3f0a", "web-????\n", "web-????", False),
+        ("web-3f0a", "web-3f0a\n", "web-????", True),
+        ("web-3f0a", "web-????\n", "web-3f0a", True),
+        ("web", "\n# comment\n\n  web \t\r\n", "web", False),
+        ("web", "web\nother\n", "other", True),
+        ("old", "new", "new", False),
+        ("old", "old\n", "new", True),
+        ("", None, "", False),
+        ("", "# only a comment\n", "", False),
+        ("old", "old\n", "", True),
+        ("web", "  web.  \n", "web", False),
+        ("web-a.example", "-web-a..example-.\n", "web-a.example", False),
+        ("webhost", "web_host\n", "webhost", False),
+        ("", "-\n", "", False),
+        ("", "_\n", "web", True),
     ],
 )
-def test_hostname_wildcard_static_hostname(monkeypatch, tmp_path, run_module, current, value, changed):
-    status = {**HOSTNAME, "hostname": current, "static_hostname": current}
-    mutate = hostname_module(monkeypatch, tmp_path, status)
-    assert run_module(systemd_hostname, {"static_hostname": value})["changed"] is changed
-    assert mutate.called is changed
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_hostname_static_hostname_compared_with_file(
+    monkeypatch, tmp_path, run_module, reported, etc_hostname, value, changed, check_mode
+):
+    status = {**HOSTNAME, "hostname": reported, "static_hostname": reported}
+    mutate = hostname_module(monkeypatch, tmp_path, status, etc_hostname=etc_hostname)
+    result = run_module(systemd_hostname, {"static_hostname": value}, check_mode)
+    assert result["changed"] is changed
+    if changed and not check_mode:
+        assert mutate.call_args.args[2:] == ("SetStaticHostname", value, False)
+    else:
+        mutate.assert_not_called()
+
+
+def test_hostname_static_hostname_written_first(monkeypatch, tmp_path, run_module):
+    mutate = hostname_module(monkeypatch, tmp_path, HOSTNAME, etc_hostname="old\n")
+    params = {"chassis": "vm", "pretty_hostname": "New", "static_hostname": "new"}
+    assert run_module(systemd_hostname, params)["changed"]
+    assert [entry.args[2] for entry in mutate.call_args_list] == [
+        "SetStaticHostname",
+        "SetChassis",
+        "SetPrettyHostname",
+    ]
 
 
 def test_hostname_check_mode_predicts_static_over_reset_transient(monkeypatch, tmp_path, run_module):
@@ -442,7 +519,7 @@ def test_time_rejects_absolute_epoch_before_any_write(monkeypatch, run_module, v
 
 
 def test_hostname_check_mode_predicts_default_after_clearing_static(monkeypatch, tmp_path, run_module):
-    mutate = hostname_module(monkeypatch, tmp_path, HOSTNAME)
+    mutate = hostname_module(monkeypatch, tmp_path, HOSTNAME, etc_hostname="old\n")
     result = run_module(systemd_hostname, {"static_hostname": ""}, True)
     assert result["hostname"]["hostname"] == "localhost"
     assert result["hostname"]["hostname_source"] == "default"

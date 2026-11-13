@@ -20,6 +20,7 @@ def test_command_keeps_password_out_of_argv(module_factory):
     module.run_command.assert_called_once_with(
         ["/usr/bin/kopia", "--config-file=/tmp/config with spaces", "repository", "status"],
         environ_update={"KOPIA_CHECK_FOR_UPDATES": "false", "KOPIA_PASSWORD": "secret"},
+        expand_user_and_vars=False,
     )
 
 
