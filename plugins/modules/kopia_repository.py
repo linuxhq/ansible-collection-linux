@@ -20,8 +20,9 @@ description:
     from O(storage), or when one of the O(options) C(bucket), C(container),
     C(endpoint), C(folder_id), C(host), C(path), C(prefix), C(remote_path),
     C(storage_account) or C(url) differs from the connected storage
-    configuration. Disconnect it with C(kopia repository disconnect) first to
-    switch repositories.
+    configuration, after expanding environment variables in the option as the
+    command line does. Disconnect it with C(kopia repository disconnect) first
+    to switch repositories.
 options:
   config_file:
     description:
@@ -180,6 +181,7 @@ def storage_description(module):
 
 
 def storage_value(storage, option, value):
+    value = os.path.expandvars(value)
     home = os.environ.get("HOME", "")
 
     if storage == "filesystem" and option == "path" and value.startswith("~") and home:

@@ -452,6 +452,15 @@ def test_repository_home_path_matches_resolved_path(monkeypatch, run_module):
     assert run_module(kopia_repository, repository_params(options={"path": "~/backup"}))["changed"] is False
 
 
+@pytest.mark.parametrize("path", ["$BACKUP_ROOT/backup", "${BACKUP_ROOT}/backup"])
+def test_repository_variable_path_matches_expanded_path(monkeypatch, run_module, path):
+    monkeypatch.setenv("BACKUP_ROOT", "/srv")
+    storage = {"type": "filesystem", "config": {"path": "/srv/backup"}}
+    monkeypatch.setattr(kopia_repository, "repository_status", lambda module, password=None: {"storage": storage})
+    monkeypatch.setattr(kopia_repository, "kopia_command", Mock(side_effect=AssertionError("must not reconnect")))
+    assert run_module(kopia_repository, repository_params(options={"path": path}))["changed"] is False
+
+
 def test_snapshot_tags_keep_their_keys(monkeypatch, run_module):
     listing = '[{"startTime":"now","tags":{"tag:Env":"prod","tag:role_name":"db"}}]'
     monkeypatch.setattr(kopia_snapshot, "kopia_command", Mock(side_effect=[(0, "", ""), (0, listing, "")]))
