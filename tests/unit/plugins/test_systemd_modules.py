@@ -481,6 +481,7 @@ def test_hostname_valid_static_hostname(monkeypatch, tmp_path, run_module, value
         ("webhost", "web_host\n", "webhost", False),
         ("", "-\n", "", False),
         ("", "_\n", "web", True),
+        ("web-a1b2", "web-$a\n", "", True),
     ],
 )
 @pytest.mark.parametrize("check_mode", [False, True])

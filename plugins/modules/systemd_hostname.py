@@ -435,7 +435,8 @@ def read_static_hostname(module):
         if line and not line.startswith("#"):
             hostname = hostname_cleanup(line)
 
-            return hostname if hostname_valid(hostname.replace("?", "0")) else ""
+            # systemd accepts '?' wildcards and '$' tokens in a stored hostname, even where this module does not.
+            return hostname if hostname_valid(hostname.replace("?", "0").replace("$", "0")) else ""
 
     return ""
 
