@@ -34,7 +34,7 @@
       vars:
         __systemd_hostname_machine_info_lines: >-
           {{ (__systemd_hostname_machine_info.content | b64decode).splitlines()
-             | map('regex_replace', '^([A-Z_]+)="?(.*?)"?$', '\\1=\\2')
+             | map('regex_replace', '^([A-Z_]+)="?(.*?)"?$', '\1=\2')
              | list }}
       ansible.builtin.assert:
         that:
