@@ -39,6 +39,7 @@ options:
     description:
       - Override the list parallelism.
       - Must not be negative, kopia reads V(-1) as leaving it unset.
+      - Requires kopia 0.18.0 or later.
     type: int
   max_retained_log_age:
     description:

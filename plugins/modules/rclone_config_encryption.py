@@ -27,7 +27,9 @@ description:
   - A symbolic link at O(path) is followed and its target is written, as rclone
     does.
   - A file the module creates is given mode C(0600), as rclone does, unless
-    O(mode) is set. An existing file keeps its mode.
+    O(mode) is set. It is created with that mode, so it is never readable by
+    other users, even before O(mode) is applied. An existing file keeps its
+    mode.
 options:
   content:
     description:
@@ -49,7 +51,8 @@ options:
         is currently encrypted. It can be omitted when O(content) is set and the
         file on disk is already plaintext.
       - Whitespace is significant and is not stripped, matching rclone. A password
-        that is empty or entirely whitespace is rejected.
+        that is empty or entirely whitespace is rejected, where whitespace is the
+        set of Unicode space characters rclone trims.
     type: str
   path:
     description:
@@ -69,7 +72,7 @@ options:
 extends_documentation_fragment:
   - ansible.builtin.files
 requirements:
-  - pycryptodome or pycryptodomex
+  - pycryptodome >= 3.7.0 or pycryptodomex >= 3.7.0
 attributes:
   check_mode:
     description: Predicts changes without modifying the target.
@@ -132,12 +135,13 @@ from ansible.module_utils.common.text.converters import to_bytes, to_native, to_
 
 from ansible_collections.linuxhq.linux.plugins.module_utils.rclone import (
     HAS_PYCRYPTODOME,
+    check_config_password,
     decrypt_config,
     encrypt_config,
     is_encrypted,
 )
 
-CONFIG_MODE = 0o600
+CONFIG_UMASK = 0o077
 
 
 def read_config(module, path):
@@ -187,16 +191,15 @@ def write_config(module, path, content):
         except OSError as error:
             module.fail_json(msg=f"unable to write {path}: {to_native(error)}")
 
-        module.atomic_move(tmp, path)
+        umask = os.umask(CONFIG_UMASK) if creating else None
+        try:
+            module.atomic_move(tmp, path, unsafe_writes=module.params["unsafe_writes"])
+        finally:
+            if umask is not None:
+                os.umask(umask)
     finally:
         if tmp is not None:
             discard_file(tmp)
-
-    if creating and module.params["mode"] is None:
-        try:
-            os.chmod(path, CONFIG_MODE)
-        except OSError as error:
-            module.fail_json(msg=f"unable to set the mode of {path}: {to_native(error)}")
 
 
 def current_config(module, path, raw, text):
@@ -312,8 +315,11 @@ def main():
 
     password = module.params["password"]
 
-    if password is not None and not password.strip():
-        module.fail_json(msg="no characters in password")
+    if password is not None:
+        try:
+            check_config_password(password)
+        except ValueError as error:
+            module.fail_json(msg=to_native(error))
 
     path = os.path.realpath(module.params["path"])
 

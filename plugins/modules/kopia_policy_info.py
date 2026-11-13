@@ -24,9 +24,11 @@ options:
         V((global)) for the global policy.
       - When set, RV(policy) and RV(effective_policy) are returned for the
         single target instead of RV(policies).
+      - Passed to kopia as given, so V(~) and environment variables are not
+        expanded.
     type: str
 requirements:
-  - kopia
+  - kopia >= 0.18.0
 attributes:
   check_mode:
     description: This module only retrieves information and does not modify state.

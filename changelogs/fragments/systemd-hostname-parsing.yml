@@ -1,0 +1,22 @@
+---
+bugfixes:
+  - systemd_hostname - write ``static_hostname`` before the other settings, so
+    a value the running systemd refuses, such as a ``?`` wildcard before
+    systemd 258, fails before anything is changed.
+  - systemd_hostname - read ``/etc/machine-info`` exactly as systemd does, so
+    values with an apostrophe or quote inside, such as ``Taylor's Laptop``,
+    quoted parts, trailing non-breaking spaces and continuation lines no
+    longer report a change on every run.
+  - systemd_hostname - reject an ``icon_name`` containing ``\``, a quote, ``*``,
+    ``?`` or ``[``, which systemd 262 and later refuse, before writing any
+    setting.
+  - systemd_hostname - document that ``?`` wildcards and ``$`` tokens in
+    ``transient_hostname``, and ``$`` tokens in ``static_hostname``, are not
+    accepted.
+  - systemd_hostname_info, systemd_locale_info, systemd_timedate_info,
+    systemd_hostname, systemd_locale, systemd_timedate - fail with a clear
+    message instead of a GLib error when the system bus cannot be reached.
+  - systemd_locale - document that a console keymap or X11 layout refused by
+    systemd-localed is reported after the earlier settings are applied.
+  - systemd_timedate - document that systemd 258 and later refuse a ``time``
+    before the systemd build date only after the earlier settings are applied.

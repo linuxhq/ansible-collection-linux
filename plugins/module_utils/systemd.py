@@ -10,11 +10,15 @@ DASBUS_IMPORT_ERROR = None
 try:
     from dasbus.connection import SystemMessageBus
     from dasbus.error import DBusError
+    from gi.repository.GLib import Error as GLibError
 except ImportError:
     DASBUS_IMPORT_ERROR = traceback.format_exc()
     HAS_DASBUS = False
 
     class DBusError(Exception):
+        pass
+
+    class GLibError(Exception):
         pass
 
 else:
@@ -105,8 +109,11 @@ def systemd_proxy(module, interface):
     service, path = INTERFACES[interface]
 
     try:
-        return SystemMessageBus().get_proxy(service, path)
-    except DBusError as error:
+        bus = SystemMessageBus()
+        # get_proxy connects lazily, so connect here to report an unreachable bus
+        bus.connection  # noqa: B018
+        return bus.get_proxy(service, path)
+    except (DBusError, GLibError) as error:
         module.fail_json(msg=f"unable to reach {service} on the system bus: {error}")
 
 

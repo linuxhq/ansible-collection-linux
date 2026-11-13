@@ -20,10 +20,14 @@ description:
 notes:
   - Requires a running C(systemd-localed) reachable on the system D-Bus, so the
     module does not work in a container or chroot without systemd.
-  - When O(locale.lang) is written and O(locale.language) is not already
-    configured, C(systemd-localed) may derive C(LANGUAGE) from its own language
-    fallback map. Check mode cannot predict that value, so the reported
-    C(language) field can differ from the one a real run produces.
+  - Only the requested locale variables are sent to C(systemd-localed), which
+    merges them into the ones already configured, so a configured variable it
+    would now refuse, such as a C(LANGUAGE) list written by an installer, does
+    not block changes to the others.
+  - When O(locale.lang) is written without O(locale.language),
+    C(systemd-localed) may derive C(LANGUAGE) from its own language fallback
+    map. Check mode cannot predict that value, so the reported C(language)
+    field can differ from the one a real run produces.
   - C(systemd-localed) rejects a locale that is not generated on the machine, so
     generate it first with M(community.general.locale_gen).
   - The console keymap and the X11 layout are converted into each other, as
@@ -32,6 +36,9 @@ notes:
     overwriting the other.
   - Check mode cannot predict the converted values, so the reported counterpart
     fields can differ from the ones a real run produces.
+  - Only C(systemd-localed) can tell whether a console keymap or an X11 layout
+    exists, so one it refuses is reported after the earlier settings in the
+    same task, such as O(locale), are applied.
 options:
   locale:
     description:
@@ -50,7 +57,10 @@ options:
         description: Default locale, used for any category left unset.
         type: str
       language:
-        description: Colon separated list of message translation fallbacks.
+        description:
+          - Colon separated list of message translation fallbacks.
+          - systemd 256 and later refuse V(:) in locale values, so only a single
+            locale is accepted there.
         type: str
       lc_address:
         description: Locale for postal address formatting.
@@ -124,6 +134,8 @@ options:
     type: str
 requirements:
   - dasbus
+  - systemd >= 239, the first version whose C(systemd-localed) merges a partial
+    locale request into the configured variables instead of clearing the rest
 attributes:
   check_mode:
     description: Predicts changes without modifying the target.
@@ -269,7 +281,7 @@ def ensure_present(module):
         simplified = locale_simplify(locale)
 
         predicted["locale"] = {name: simplified.get(name) for name in LOCALE_VARIABLES}
-        pending.append(("SetLocale", (locale_setting(locale), False)))
+        pending.append(("SetLocale", (locale_setting(locale_present(module.params["locale"])), False)))
 
     keymap = vconsole_change(module, current)
     if keymap is not None:

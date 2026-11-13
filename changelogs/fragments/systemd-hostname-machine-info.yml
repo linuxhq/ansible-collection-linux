@@ -9,9 +9,10 @@ bugfixes:
     invalid ``deployment``, ``icon_name``, ``location``, ``pretty_hostname``,
     ``static_hostname`` or ``transient_hostname`` fails without leaving earlier
     settings applied.
-  - systemd_hostname - treat each ``?`` in ``static_hostname`` as a wildcard for
-    the hexadecimal character systemd 258 and later substitute, so a wildcard
-    hostname no longer reports a change on every run.
+  - systemd_hostname - compare ``static_hostname`` against ``/etc/hostname``
+    instead of the reported static hostname, so a hostname with ``?``
+    wildcards, which systemd 258 and later substitute, no longer reports a
+    change on every run.
   - systemd_hostname - predict the static hostname and ``hostname_source`` in
     check mode when ``static_hostname`` is set together with an empty
     ``transient_hostname``.

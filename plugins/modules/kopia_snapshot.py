@@ -42,6 +42,8 @@ options:
       - Tags to record on the snapshot.
       - Each entry becomes one C(--tags key:value) flag, with the key used as
         given.
+      - kopia splits each flag at its first V(:), so a key containing V(:) is
+        rejected before kopia runs. Values may contain V(:).
     type: dict
 requirements:
   - kopia
@@ -113,6 +115,10 @@ def latest_snapshot(module, path):
 
 def ensure_present(module):
     path = module.params["path"]
+
+    for key in module.params["tags"] or {}:
+        if ":" in key:
+            module.fail_json(msg=f"invalid tag key {key!r}: kopia splits tags at the first ':'")
 
     if module.check_mode:
         module.exit_json(changed=True, snapshot={})

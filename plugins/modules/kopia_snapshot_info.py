@@ -28,6 +28,9 @@ options:
   path:
     description:
       - Restrict the result to snapshots of this local path.
+      - C(kopia snapshot list) also includes the snapshots of every parent
+        directory of the path, since they contain it, so the result can hold
+        more than one source.
       - All sources are listed when unset.
     type: path
 requirements:
@@ -58,6 +61,8 @@ snapshots:
   description:
     - Snapshots reported by C(kopia snapshot list), grouped by source and
       oldest first within each source.
+    - With O(path), the snapshots of its parent directories are included as
+      well, each under its own C(source).
     - Keys under C(tags) are returned as kopia reports them, such as
       C(tag:role).
   returned: always

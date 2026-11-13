@@ -21,10 +21,15 @@ description:
     computed fallback for a setting that is not stored, such as a chassis
     detected from the firmware or an icon name derived from the chassis. A
     missing file means no setting is stored.
-  - O(static_hostname) is compared against the static hostname reported by
-    C(systemd-hostnamed).
+  - O(static_hostname) is compared against C(/etc/hostname), the file
+    C(systemd-hostnamed) stores it in, read as systemd reads it, from the first
+    line that is neither empty nor a comment, with surrounding whitespace and
+    invalid characters removed. A missing file, or one without a valid
+    hostname, means no static hostname is stored.
   - Every option is validated before any setting is written, so an invalid
-    value fails without leaving earlier settings applied.
+    value fails without leaving earlier settings applied. O(static_hostname) is
+    written first, so a value the running systemd refuses also fails before
+    anything is changed.
   - With no options set the module reads the current settings and reports no
     change.
 notes:
@@ -60,6 +65,8 @@ options:
       - Icon name of the machine, following the XDG icon naming specification.
       - Must be a valid file name, so it cannot contain V(/) or control
         characters and cannot be V(.) or V(..).
+      - Must not contain V(\\), V('), V("), V(*), V(?) or V([), which
+        systemd 262 and later refuse.
       - Written to C(/etc/machine-info).
       - An empty string removes it from C(/etc/machine-info).
     type: str
@@ -87,18 +94,22 @@ options:
       - Must be a valid hostname of at most 64 characters, made of labels of
         letters, digits and V(-) separated by V(.), where no label is empty or
         starts or ends with V(-).
-      - Each V(?) is a wildcard that systemd 258 and later replace with a
-        hexadecimal character derived from the machine ID. A static hostname
-        reported with a lowercase hexadecimal character in place of each V(?)
-        matches, so it is not rewritten. In check mode the predicted
-        RV(hostname) keeps the V(?) characters.
+      - Each V(?) is a wildcard that C(systemd-hostnamed) replaces with a
+        hexadecimal character derived from the machine ID. It requires systemd
+        258 or later, and older versions refuse it. C(/etc/hostname) keeps the
+        V(?) characters, so the option is compared as written. In check mode
+        the predicted RV(hostname) keeps the V(?) characters.
+      - Labels starting with V($), which systemd 262 and later accept as
+        tokens, are not accepted by this module.
       - An empty string removes C(/etc/hostname).
     type: str
   transient_hostname:
     description:
       - Transient hostname, as C(hostnamectl hostname --transient) sets.
       - Must be a valid hostname, following the same rules as
-        O(static_hostname) without the V(?) wildcard.
+        O(static_hostname).
+      - The V(?) wildcard and V($) tokens, which systemd 258 and later accept
+        in some hostnames, are not accepted by this module.
       - C(/etc/hostname) takes the highest preference in C(systemd-hostnamed), so
         a transient hostname cannot take effect while a static one is configured.
       - Nothing is done when RV(hostname) already matches, whatever the source.
@@ -184,6 +195,7 @@ hostname:
 """
 
 import re
+import string
 
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.common.text.converters import to_native
@@ -196,6 +208,7 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.systemd import (
     systemd_proxy,
 )
 
+HOSTNAME_FILE = "/etc/hostname"
 MACHINE_INFO = "/etc/machine-info"
 
 MACHINE_INFO_KEYS = {
@@ -207,21 +220,27 @@ MACHINE_INFO_KEYS = {
 }
 
 SETTINGS = [
+    ("static_hostname", "SetStaticHostname"),
     ("chassis", "SetChassis"),
     ("deployment", "SetDeployment"),
     ("icon_name", "SetIconName"),
     ("location", "SetLocation"),
     ("pretty_hostname", "SetPrettyHostname"),
-    ("static_hostname", "SetStaticHostname"),
 ]
 
 CONTROL_CHARACTERS = re.compile(r"[\x00-\x1f\x7f]")
 DEPLOYMENT = re.compile(r"[A-Za-z0-9.:-]+\Z")
 HOSTNAME_LABEL = r"[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?"
 HOSTNAME = re.compile(rf"{HOSTNAME_LABEL}(?:\.{HOSTNAME_LABEL})*\Z")
+HOSTNAME_CHARACTERS = frozenset(string.ascii_letters + string.digits + "?$")
 HOSTNAME_MAX = 64
-HOSTNAME_WILDCARD_CHARACTERS = "0123456789abcdef"
+ICON_NAME_UNSAFE = re.compile(r"[\x00-\x1f\x7f\\'\"*?\[/]")
 NAME_MAX = 255
+
+ENV_COMMENTS = "#;"
+ENV_NEWLINE = "\n\r"
+ENV_SHELL_NEED_ESCAPE = '"\\`$'
+ENV_WHITESPACE = " \t\n\r"
 
 
 def hostname_valid(value):
@@ -229,12 +248,7 @@ def hostname_valid(value):
 
 
 def icon_name_valid(value):
-    return (
-        value not in (".", "..")
-        and "/" not in value
-        and len(value.encode("utf-8")) <= NAME_MAX
-        and not CONTROL_CHARACTERS.search(value)
-    )
+    return value not in (".", "..") and len(value.encode("utf-8")) <= NAME_MAX and not ICON_NAME_UNSAFE.search(value)
 
 
 def validate_settings(module):
@@ -250,7 +264,9 @@ def validate_settings(module):
         )
 
     if params["icon_name"] and not icon_name_valid(params["icon_name"]):
-        module.fail_json(msg=f"invalid icon_name {params['icon_name']!r}: it must be a valid file name")
+        module.fail_json(
+            msg=f"invalid icon_name {params['icon_name']!r}: it must be a valid file name without backslashes, quotes or glob characters"
+        )
 
     if params["static_hostname"] and not hostname_valid(params["static_hostname"].replace("?", "0")):
         module.fail_json(msg=f"invalid static_hostname {params['static_hostname']!r}: it is not a valid hostname")
@@ -259,68 +275,170 @@ def validate_settings(module):
         module.fail_json(msg=f"invalid transient_hostname {params['transient_hostname']!r}: it is not a valid hostname")
 
 
-def machine_info_value(text):
-    characters = iter(text.lstrip())
-    value = []
-    keep = 0
-    quote = None
+def parse_env_file(text):
+    """Parse an environment file as systemd's parse_env_file_internal() does, the last assignment winning."""
+    entries = {}
+    state = "pre_key"
+    key = value = ""
+    key_space = value_space = None
 
-    for character in characters:
-        if quote is None and character in "\"'":
-            quote = character
-            continue
+    def push():
+        name = key if key_space is None else key[:key_space]
+        entries[name] = value if state != "value" or value_space is None else value[:value_space]
 
-        if character == quote:
-            quote = None
-            continue
+    for character in text:
+        if state == "pre_key":
+            if character in ENV_COMMENTS:
+                state = "comment"
+            elif character not in ENV_WHITESPACE:
+                state = "key"
+                key = character
+                key_space = None
 
-        if character == "\\" and quote != "'":
-            escaped = next(characters, "")
-            if quote == '"' and escaped not in '"\\`$':
-                value.append("\\")
+        elif state == "key":
+            if character in ENV_NEWLINE:
+                state = "pre_key"
+            elif character == "=":
+                state = "pre_value"
+                value = ""
+                value_space = None
+            else:
+                if character not in ENV_WHITESPACE:
+                    key_space = None
+                elif key_space is None:
+                    key_space = len(key)
 
-            character = escaped
-        elif quote is None and character.isspace():
-            value.append(character)
-            continue
+                key += character
 
-        value.append(character)
-        keep = len(value)
+        elif state == "pre_value":
+            if character in ENV_NEWLINE:
+                push()
+                state = "pre_key"
+            elif character == "'":
+                state = "single_quote"
+            elif character == '"':
+                state = "double_quote"
+            elif character == "\\":
+                state = "value_escape"
+            elif character not in ENV_WHITESPACE:
+                state = "value"
+                value += character
 
-    return "".join(value[:keep])
+        elif state == "value":
+            if character in ENV_NEWLINE:
+                push()
+                state = "pre_key"
+            elif character == "\\":
+                state = "value_escape"
+                value_space = None
+            else:
+                if character not in ENV_WHITESPACE:
+                    value_space = None
+                elif value_space is None:
+                    value_space = len(value)
+
+                value += character
+
+        elif state == "value_escape":
+            state = "value"
+            if character not in ENV_NEWLINE:
+                value += character
+
+        elif state == "single_quote":
+            if character == "'":
+                state = "pre_value"
+            else:
+                value += character
+
+        elif state == "double_quote":
+            if character == '"':
+                state = "pre_value"
+            elif character == "\\":
+                state = "double_quote_escape"
+            else:
+                value += character
+
+        elif state == "double_quote_escape":
+            state = "double_quote"
+            if character in ENV_SHELL_NEED_ESCAPE:
+                value += character
+            elif character != "\n":
+                value += "\\" + character
+
+        elif state == "comment":
+            if character == "\\":
+                state = "comment_escape"
+            elif character in ENV_NEWLINE:
+                state = "pre_key"
+
+        elif state == "comment_escape":
+            state = "pre_key" if character in ENV_NEWLINE else "comment"
+
+    if state not in ("pre_key", "key", "comment", "comment_escape"):
+        push()
+
+    return entries
+
+
+def read_text(module, path):
+    try:
+        with open(path, encoding="utf-8", errors="replace", newline="") as handle:
+            return handle.read()
+    except FileNotFoundError:
+        return None
+    except OSError as error:
+        module.fail_json(msg=f"unable to read {path}: {to_native(error)}")
 
 
 def read_machine_info(module):
-    values = dict.fromkeys(MACHINE_INFO_KEYS.values(), "")
+    entries = parse_env_file(read_text(module, MACHINE_INFO) or "")
 
-    try:
-        with open(MACHINE_INFO, encoding="utf-8", errors="replace") as handle:
-            lines = handle.read().splitlines()
-    except FileNotFoundError:
-        return values
-    except OSError as error:
-        module.fail_json(msg=f"unable to read {MACHINE_INFO}: {to_native(error)}")
-
-    for line in lines:
-        key, separator, value = line.strip().partition("=")
-        param = MACHINE_INFO_KEYS.get(key.strip())
-
-        if separator and param:
-            values[param] = machine_info_value(value)
-
-    return values
+    return {param: entries.get(key, "") for key, param in MACHINE_INFO_KEYS.items()}
 
 
-def hostname_matches(current, desired):
-    current = current or ""
+def hostname_cleanup(value):
+    """Normalize a hostname as systemd's hostname_cleanup() does, keeping the '?' and '$' it allows."""
+    result = []
+    dot = hyphen = True
 
-    if len(current) != len(desired):
-        return False
+    for character in value:
+        if len(result) >= HOSTNAME_MAX:
+            break
 
-    return all(
-        actual == wanted or (wanted == "?" and actual in HOSTNAME_WILDCARD_CHARACTERS)
-        for actual, wanted in zip(current, desired)
-    )
+        if character == ".":
+            if dot or hyphen:
+                continue
+
+            result.append(character)
+            dot, hyphen = True, False
+        elif character == "-":
+            if dot:
+                continue
+
+            result.append(character)
+            dot, hyphen = False, True
+        elif character in HOSTNAME_CHARACTERS:
+            result.append(character)
+            dot = hyphen = False
+
+    while result and result[-1] in "-.":
+        result.pop()
+
+    return "".join(result)
+
+
+def read_static_hostname(module):
+    """Read the static hostname as systemd's read_etc_hostname() does, an unusable one reading as unset."""
+    for line in re.split(r"\r\n|[\r\n\x00]", read_text(module, HOSTNAME_FILE) or ""):
+        line = line.strip(ENV_WHITESPACE)
+
+        if line and not line.startswith("#"):
+            hostname = hostname_cleanup(line)
+
+            # systemd accepts '?' wildcards and '$' tokens in a stored hostname, even where this module does not.
+            return hostname if hostname_valid(hostname.replace("?", "0").replace("$", "0")) else ""
+
+    return ""
 
 
 def ensure_present(module):
@@ -342,6 +460,9 @@ def ensure_present(module):
     if any(module.params[param] is not None for param in MACHINE_INFO_KEYS.values()):
         stored = read_machine_info(module)
 
+    if module.params["static_hostname"] is not None:
+        stored["static_hostname"] = read_static_hostname(module)
+
     default = current["default_hostname"] or ""
     predicted = dict(current)
     pending = []
@@ -351,14 +472,12 @@ def ensure_present(module):
         if value is None:
             continue
 
-        if param == "static_hostname":
-            if hostname_matches(current[param], value):
-                continue
+        if stored[param] == value:
+            continue
 
+        if param == "static_hostname":
             predicted["hostname"] = value or default or current["hostname"]
             predicted["hostname_source"] = "static" if value else "default"
-        elif stored[param] == value:
-            continue
 
         predicted[param] = value
         pending.append((method, (value, False)))

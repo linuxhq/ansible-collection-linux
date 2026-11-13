@@ -10,10 +10,15 @@ galaxy_info:
   platforms:
     - name: Debian
       versions:
-        - all
+        - buster
+        - bullseye
+        - bookworm
+        - trixie
     - name: EL
       versions:
-        - all
+        - '8'
+        - '9'
+        - '10'
   galaxy_tags:
     - keyboard
     - linux

@@ -51,10 +51,14 @@ options:
       - Policy target, a directory path, C(user@host), C(user@host:/path), or
         V((global)) for the global policy.
       - Use absolute paths, kopia canonicalizes them into the policy target.
+      - Policy manifest IDs are not accepted, because C(kopia policy import)
+        reads every target as a path.
+      - Passed to kopia as given, so V(~) and environment variables are not
+        expanded.
     type: str
     required: true
 requirements:
-  - kopia
+  - kopia >= 0.18.0
 attributes:
   check_mode:
     description: Predicts changes without modifying the target.

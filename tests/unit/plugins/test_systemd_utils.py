@@ -59,6 +59,24 @@ def test_system_bus_connection(monkeypatch, module_factory):
     bus.get_proxy.assert_called_once_with("org.freedesktop.hostname1", "/org/freedesktop/hostname1")
 
 
+def test_unreachable_system_bus(monkeypatch, module_factory, invoke):
+    class LazyBus:
+        @property
+        def connection(self):
+            raise systemd.GLibError("Could not connect: No such file or directory")
+
+        def get_proxy(self, *args):
+            return Mock()
+
+    monkeypatch.setattr(systemd, "HAS_DASBUS", True)
+    monkeypatch.setattr(systemd, "SystemMessageBus", LazyBus, raising=False)
+    result = invoke(systemd.systemd_proxy, module_factory(), "hostname1")
+    assert result["failed"]
+    assert result["msg"] == (
+        "unable to reach org.freedesktop.hostname1 on the system bus: Could not connect: No such file or directory"
+    )
+
+
 def test_missing_dasbus(monkeypatch, module_factory, invoke):
     monkeypatch.setattr(systemd, "HAS_DASBUS", False)
     result = invoke(systemd.systemd_proxy, module_factory(), "hostname1")

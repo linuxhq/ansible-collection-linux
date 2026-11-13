@@ -36,6 +36,7 @@
           - show
       register: __rclone_config_show
       changed_when: false
+      no_log: true
 
     - name: Ensure rclone is verified
       tags:

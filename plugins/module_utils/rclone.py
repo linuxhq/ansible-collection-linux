@@ -34,6 +34,9 @@ CONFIG_MARKER = "RCLONE_ENCRYPT_V0:"
 CONFIG_NONCE_SIZE = 24
 CONFIG_TAG_SIZE = 16
 
+# Unicode White_Space, which Go's strings.TrimSpace removes. str.strip() also removes U+001C to U+001F.
+GO_WHITESPACE = "\t\n\v\f\r \x85\xa0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000"
+
 
 def base64_urlsafe_encode(data):
     return base64.urlsafe_b64encode(data).decode("utf-8").rstrip("=")
@@ -192,7 +195,7 @@ def config_key(password):
 
 
 def check_config_password(password):
-    if not password or not password.strip():
+    if not password or not password.strip(GO_WHITESPACE):
         raise ValueError("no characters in password")
 
     return password
@@ -202,7 +205,7 @@ def config_body(text):
     lines = text.split("\n")
 
     for index, line in enumerate(lines):
-        stripped = line.strip()
+        stripped = line.strip(GO_WHITESPACE)
 
         if not stripped or stripped.startswith(("#", ";")):
             continue

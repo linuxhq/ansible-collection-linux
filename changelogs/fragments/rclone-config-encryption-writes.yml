@@ -1,0 +1,14 @@
+---
+security_fixes:
+  - rclone_config_encryption - create a new configuration file with mode
+    ``0600`` from the start, instead of leaving it readable by other users
+    between the move into place and setting its mode.
+bugfixes:
+  - rclone_config_encryption - honor ``unsafe_writes`` when writing the
+    configuration file.
+  - rclone_config_encryption - treat only the whitespace Go trims, as rclone
+    does, as whitespace when checking the password and reading the encryption
+    header, so a password of control characters such as ``\x1f`` is no longer
+    rejected.
+  - rclone_config_encryption, rclone_obscure, rclone_deobscure - document the
+    minimum pycryptodome or pycryptodomex version, 3.7.0.

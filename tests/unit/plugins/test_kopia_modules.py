@@ -3,6 +3,8 @@ from unittest.mock import Mock
 
 import pytest
 
+from ansible.module_utils import basic
+
 from ansible_collections.linuxhq.linux.plugins.modules import (
     kopia_maintenance,
     kopia_maintenance_info,
@@ -13,6 +15,19 @@ from ansible_collections.linuxhq.linux.plugins.modules import (
     kopia_snapshot,
     kopia_snapshot_info,
 )
+
+RUN_COMMAND = basic.AnsibleModule.run_command
+
+FAKE_KOPIA = """#!/bin/sh
+for arg in "$@"; do printf '%s\\n' "$arg" >> "$KOPIA_FAKE_DIR/argv"; done
+case "$2" in
+  export)
+    if [ -f "$KOPIA_FAKE_DIR/policy.json" ]; then cat "$KOPIA_FAKE_DIR/policy.json"; else echo "policy not found" >&2; exit 1; fi
+    ;;
+  import) cp "$4" "$KOPIA_FAKE_DIR/policy.json" ;;
+  delete) rm "$KOPIA_FAKE_DIR/policy.json" ;;
+esac
+"""
 
 
 @pytest.mark.parametrize(
@@ -186,6 +201,13 @@ def test_policy_list(monkeypatch, run_module):
 
 def test_snapshot_check_mode_never_executes(run_module):
     assert run_module(kopia_snapshot, {"path": "/data"}, True) == {"changed": True, "snapshot": {}}
+
+
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_snapshot_rejects_tag_key_with_colon(monkeypatch, run_module, check_mode):
+    monkeypatch.setattr(kopia_snapshot, "kopia_command", Mock(side_effect=AssertionError("must not run kopia")))
+    result = run_module(kopia_snapshot, {"path": "/data", "tags": {"app:tier": "web", "role": "db"}}, check_mode)
+    assert result["failed"] and "'app:tier'" in result["msg"]
 
 
 def test_snapshot_creates_with_tags_and_returns_latest(monkeypatch, run_module):
@@ -453,12 +475,37 @@ def test_repository_home_path_matches_resolved_path(monkeypatch, run_module):
 
 
 @pytest.mark.parametrize("path", ["$BACKUP_ROOT/backup", "${BACKUP_ROOT}/backup"])
-def test_repository_variable_path_matches_expanded_path(monkeypatch, run_module, path):
+def test_repository_variable_path_is_compared_literally(monkeypatch, run_module, path):
     monkeypatch.setenv("BACKUP_ROOT", "/srv")
     storage = {"type": "filesystem", "config": {"path": "/srv/backup"}}
     monkeypatch.setattr(kopia_repository, "repository_status", lambda module, password=None: {"storage": storage})
     monkeypatch.setattr(kopia_repository, "kopia_command", Mock(side_effect=AssertionError("must not reconnect")))
-    assert run_module(kopia_repository, repository_params(options={"path": path}))["changed"] is False
+    result = run_module(kopia_repository, repository_params(options={"path": path}))
+    assert result["failed"] and f"path is /srv/backup, not {path}" in result["msg"]
+
+
+@pytest.mark.parametrize("target", ["$KOPIA_FAKE_ROOT/data", "~/data"])
+def test_policy_commands_use_identical_target(monkeypatch, run_module, tmp_path, target):
+    """Run the real run_command against a fake kopia so its argument handling reaches the recorded argv."""
+    kopia = tmp_path / "kopia"
+    kopia.write_text(FAKE_KOPIA)
+    kopia.chmod(0o755)
+    monkeypatch.setenv("KOPIA_FAKE_DIR", str(tmp_path))
+    monkeypatch.setenv("KOPIA_FAKE_ROOT", "/expanded")
+    monkeypatch.setattr(basic.AnsibleModule, "run_command", RUN_COMMAND)
+    monkeypatch.setattr(basic.AnsibleModule, "get_bin_path", lambda self, name, required=False: str(kopia))
+    policy = {"retention": {"keep_latest": 2}}
+
+    present = run_module(kopia_policy, {"target": target, "policy": policy})
+    assert present["changed"] and present["policy"] == policy
+    assert list(json.loads((tmp_path / "policy.json").read_text())) == [target]
+    assert not run_module(kopia_policy, {"target": target, "policy": policy})["changed"]
+    assert run_module(kopia_policy, {"target": target, "state": "absent"})["changed"]
+    assert not (tmp_path / "policy.json").exists()
+
+    argv = (tmp_path / "argv").read_text().splitlines()
+    targets = [argv[index + 1] for index, arg in enumerate(argv) if arg in ("export", "delete")]
+    assert targets and set(targets) == {target}
 
 
 def test_snapshot_tags_keep_their_keys(monkeypatch, run_module):
