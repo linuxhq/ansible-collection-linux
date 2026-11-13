@@ -7,7 +7,7 @@ DOCUMENTATION = r"""
 module: kopia_maintenance_info
 author:
   - Taylor Kimball (@tkimball83)
-version_added: 2.3.0
+version_added: "2.3.0"
 short_description: Gather kopia repository maintenance settings
 description:
   - Gather the maintenance settings and schedule of the connected kopia

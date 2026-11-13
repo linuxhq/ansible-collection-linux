@@ -7,7 +7,7 @@ DOCUMENTATION = r"""
 module: kopia_policy
 author:
   - Taylor Kimball (@tkimball83)
-version_added: 2.3.0
+version_added: "2.3.0"
 short_description: Manage a kopia snapshot policy
 description:
   - Define, replace, or delete the snapshot policy for a kopia target.
@@ -29,6 +29,12 @@ options:
         C(keepLatest).
       - Fields left out are removed from the defined policy and fall back to
         inherited values.
+      - kopia does not store V(false), V(0), an empty string or an empty list
+        for fields such as C(scheduling.manual), C(scheduling.interval_seconds),
+        C(files.max_file_size), C(files.ignore), C(compression.compressor_name)
+        or C(no_parent), so these values are treated as left out, the same as
+        kopia treats them. Fields kopia stores as optional values, such as the
+        C(retention) counts, keep V(0) and V(false).
       - Required when O(state=present).
     type: dict
   state:
@@ -118,7 +124,9 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
     kopia_available,
     kopia_command,
     policy_export,
+    policy_normalize,
     prune_empty,
+    same_value,
 )
 
 
@@ -127,10 +135,10 @@ def ensure_present(module):
         module.exit_json(changed=True, policy={})
 
     target = module.params["target"]
-    desired = prune_empty(snake_dict_to_camel_dict(module.params["policy"]))
+    desired = policy_normalize(snake_dict_to_camel_dict(module.params["policy"]))
     current = policy_export(module, target)
 
-    if current is not None and prune_empty(current) == desired:
+    if current is not None and same_value(policy_normalize(current), desired):
         module.exit_json(changed=False, policy=camel_dict_to_snake_dict(prune_empty(current)))
 
     if module.check_mode:

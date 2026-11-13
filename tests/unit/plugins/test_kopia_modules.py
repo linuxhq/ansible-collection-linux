@@ -24,11 +24,16 @@ from ansible_collections.linuxhq.linux.plugins.modules import (
         (kopia_maintenance_info, {}, "maintenance"),
         (kopia_policy, {"target": "global", "policy": {}}, "policy"),
         (kopia_policy_info, {"target": "global"}, "effective_policy"),
+        (kopia_policy_info, {"target": "global"}, "policy"),
+        (kopia_policy_info, {}, "policies"),
         (kopia_snapshot_info, {}, "snapshots"),
     ],
 )
 def test_check_mode_without_kopia(monkeypatch, run_module, plugin, params, key):
     monkeypatch.setattr(plugin, "kopia_available", lambda module: False)
+    if hasattr(plugin, "kopia_command"):
+        monkeypatch.setattr(plugin, "kopia_command", Mock(side_effect=AssertionError("must not run kopia")))
+
     result = run_module(plugin, params, check_mode=True)
     assert key in result
     assert not result.get("failed")
@@ -38,11 +43,13 @@ def test_check_mode_without_kopia(monkeypatch, run_module, plugin, params, key):
 @pytest.mark.parametrize("check_mode", [False, True])
 def test_connected_repository_is_idempotent(monkeypatch, run_module, check_mode):
     monkeypatch.setattr(kopia_repository, "kopia_available", lambda module: True)
-    monkeypatch.setattr(kopia_repository, "repository_status", lambda module: {"storageType": "filesystem"})
+    status = {"storage": {"type": "filesystem", "config": {"path": "/backup"}}}
+    monkeypatch.setattr(kopia_repository, "repository_status", lambda module, password=None: status)
     command = Mock(side_effect=AssertionError("must not connect again"))
     monkeypatch.setattr(kopia_repository, "kopia_command", command)
-    result = run_module(kopia_repository, {"storage": "filesystem", "password": "secret"}, check_mode)
-    assert result == {"changed": False, "repository": {"storage_type": "filesystem"}}
+    params = {"storage": "filesystem", "password": "secret", "options": {"path": "/backup"}}
+    result = run_module(kopia_repository, params, check_mode)
+    assert result == {"changed": False, "repository": status}
     command.assert_not_called()
 
 
@@ -68,7 +75,7 @@ def test_repository_connect_or_create(monkeypatch, run_module, create):
 
 
 def test_repository_connection_error_does_not_create(monkeypatch, run_module):
-    monkeypatch.setattr(kopia_repository, "repository_status", lambda module: None)
+    monkeypatch.setattr(kopia_repository, "repository_status", lambda module, password=None: None)
     command = Mock(return_value=(1, "", "permission denied"))
     monkeypatch.setattr(kopia_repository, "kopia_command", command)
     result = run_module(kopia_repository, {"storage": "filesystem", "password": "secret"})
@@ -260,3 +267,196 @@ def test_snapshot_failure_does_not_query_latest(monkeypatch, run_module):
 def test_latest_snapshot_unavailable(monkeypatch, module_factory, response):
     monkeypatch.setattr(kopia_snapshot, "kopia_command", Mock(return_value=response))
     assert kopia_snapshot.latest_snapshot(module_factory({"password": None}), "/data") == {}
+
+
+def test_policy_zero_values_kopia_omits_are_idempotent(monkeypatch, run_module):
+    monkeypatch.setattr(kopia_policy, "kopia_available", lambda module: True)
+    current = {"retention": {"keepLatest": 0}, "scheduling": {"intervalSeconds": 3600}, "files": {}}
+    monkeypatch.setattr(kopia_policy, "policy_export", lambda *args: current)
+    command = Mock(side_effect=AssertionError("must not mutate"))
+    monkeypatch.setattr(kopia_policy, "kopia_command", command)
+    policy = {
+        "no_parent": False,
+        "retention": {"keep_latest": 0},
+        "scheduling": {"interval_seconds": 3600, "manual": False, "time_of_day": [], "no_parent_time_of_day": False},
+        "files": {"ignore": [], "max_file_size": 0, "no_parent_ignore": False},
+        "compression": {"compressor_name": "", "min_size": 0, "max_size": 0},
+        "actions": {"before_folder": {"script": "", "timeout": 0}},
+    }
+    result = run_module(kopia_policy, {"target": "global", "policy": policy})
+    assert result == {
+        "changed": False,
+        "policy": {"retention": {"keep_latest": 0}, "scheduling": {"interval_seconds": 3600}},
+    }
+
+
+@pytest.mark.parametrize(
+    "policy",
+    [
+        {"retention": {"keep_latest": 0}},
+        {"files": {"ignore_cache_dirs": False}},
+        {"scheduling": {"manual": True}},
+        {"scheduling": {"manual": 0}},
+    ],
+)
+def test_policy_optional_values_are_compared(monkeypatch, run_module, policy):
+    monkeypatch.setattr(kopia_policy, "kopia_available", lambda module: True)
+    monkeypatch.setattr(kopia_policy, "policy_export", lambda *args: {})
+    result = run_module(kopia_policy, {"target": "global", "policy": policy}, True)
+    assert result["changed"]
+
+
+@pytest.mark.parametrize("desired,current", [(True, 1), (1, True), (False, 0), (0, False)])
+def test_policy_compare_does_not_treat_booleans_as_numbers(monkeypatch, run_module, desired, current):
+    monkeypatch.setattr(kopia_policy, "kopia_available", lambda module: True)
+    monkeypatch.setattr(kopia_policy, "policy_export", lambda *args: {"retention": {"keepLatest": current}})
+    result = run_module(kopia_policy, {"target": "global", "policy": {"retention": {"keep_latest": desired}}}, True)
+    assert result["changed"]
+
+
+def test_maintenance_compare_does_not_treat_booleans_as_numbers(monkeypatch, run_module):
+    monkeypatch.setattr(kopia_maintenance, "kopia_available", lambda module: True)
+    monkeypatch.setattr(kopia_maintenance, "maintenance_info", lambda module: {"listParallelism": True})
+    result = run_module(kopia_maintenance, {"list_parallelism": 1}, True)
+    assert result["changed"]
+
+
+@pytest.mark.parametrize(
+    "param",
+    [
+        "full_interval",
+        "list_parallelism",
+        "max_retained_log_age",
+        "max_retained_log_count",
+        "max_retained_log_size_mb",
+        "quick_interval",
+    ],
+)
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_maintenance_rejects_negative_values(monkeypatch, run_module, param, check_mode):
+    monkeypatch.setattr(kopia_maintenance, "kopia_available", lambda module: True)
+    monkeypatch.setattr(kopia_maintenance, "maintenance_info", Mock(side_effect=AssertionError("must not query")))
+    command = Mock(side_effect=AssertionError("must not run kopia"))
+    monkeypatch.setattr(kopia_maintenance, "kopia_command", command)
+    result = run_module(kopia_maintenance, {"enable_full": True, param: -1}, check_mode)
+    assert result["failed"] and param in result["msg"]
+
+
+def repository_params(**params):
+    return {"storage": "filesystem", "password": "secret", "options": {"path": "/backup"}, **params}
+
+
+@pytest.mark.parametrize(
+    "replies,message",
+    [
+        ([(1, "", "permission denied")], "unable to connect to the kopia repository in filesystem path=/backup"),
+        (
+            [(1, "", "repository not initialized"), (1, "", "disk full")],
+            "unable to create the kopia repository in filesystem path=/backup",
+        ),
+        (
+            [(1, "", "repository not initialized"), (0, "", ""), (1, "", "listing failed")],
+            "created the kopia repository in filesystem path=/backup, but validating the provider failed",
+        ),
+    ],
+)
+def test_repository_failure_names_operation_and_storage(monkeypatch, run_module, replies, message):
+    monkeypatch.setattr(kopia_repository, "repository_status", lambda module, password=None: None)
+    command = Mock(side_effect=replies)
+    monkeypatch.setattr(kopia_repository, "kopia_command", command)
+    result = run_module(kopia_repository, repository_params(validate_provider=True))
+    assert result["failed"] and result["msg"].startswith(message)
+    assert replies[-1][2] in result["msg"]
+    assert command.call_count == len(replies)
+
+
+def test_repository_from_config_never_creates(monkeypatch, run_module):
+    monkeypatch.setattr(kopia_repository, "repository_status", lambda module, password=None: None)
+    command = Mock(return_value=(1, "", "repository not initialized"))
+    monkeypatch.setattr(kopia_repository, "kopia_command", command)
+    result = run_module(kopia_repository, {"storage": "from-config", "password": "secret", "options": {"file": "/c"}})
+    assert result["failed"] and "unable to connect" in result["msg"]
+    assert command.call_count == 1
+
+
+def test_repository_status_uses_password(monkeypatch, run_module):
+    status = Mock(side_effect=[None, {"storage": {"type": "filesystem", "config": {"path": "/backup"}}}])
+    monkeypatch.setattr(kopia_repository, "repository_status", status)
+    monkeypatch.setattr(kopia_repository, "kopia_command", Mock(return_value=(0, "", "")))
+    params = repository_params(options={"path": "/backup", "persist_credentials": False})
+    assert run_module(kopia_repository, params)["changed"]
+    assert [entry.kwargs for entry in status.call_args_list] == [{"password": "secret"}, {"password": "secret"}]
+
+
+@pytest.mark.parametrize(
+    "params,storage,message",
+    [
+        (repository_params(), {"type": "s3", "config": {"bucket": "b"}}, "storage type is s3, not filesystem"),
+        (repository_params(), {"type": "filesystem", "config": {"path": "/other"}}, "path is /other, not /backup"),
+        (
+            {"storage": "s3", "password": "secret", "options": {"bucket": "new", "prefix": "a/"}},
+            {"type": "s3", "config": {"bucket": "new", "prefix": "b/"}},
+            "prefix is b/, not a/",
+        ),
+        (
+            {"storage": "azure", "password": "secret", "options": {"container": "new"}},
+            {"type": "azureBlob", "config": {"container": "old"}},
+            "container is old, not new",
+        ),
+        (
+            {"storage": "s3", "password": "secret", "options": {"bucket": "b", "prefix": "a/"}},
+            {"type": "s3", "config": {"bucket": "b"}},
+            "prefix is , not a/",
+        ),
+    ],
+)
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_repository_connected_elsewhere_fails(monkeypatch, run_module, params, storage, message, check_mode):
+    monkeypatch.setattr(kopia_repository, "kopia_available", lambda module: True)
+    monkeypatch.setattr(kopia_repository, "repository_status", lambda module, password=None: {"storage": storage})
+    command = Mock(side_effect=AssertionError("must not reconnect"))
+    monkeypatch.setattr(kopia_repository, "kopia_command", command)
+    result = run_module(kopia_repository, params, check_mode)
+    assert result["failed"] and "connected to a different repository" in result["msg"] and message in result["msg"]
+
+
+@pytest.mark.parametrize(
+    "params,storage",
+    [
+        (
+            {"storage": "azure", "password": "secret", "options": {"container": "c", "storage_account": "a"}},
+            {"type": "azureBlob", "config": {"container": "c", "storageAccount": "a"}},
+        ),
+        (
+            {"storage": "s3", "password": "secret", "options": {"bucket": "b", "region": "elsewhere", "prefix": ""}},
+            {"type": "s3", "config": {"bucket": "b", "region": "us-west-1"}},
+        ),
+        ({"storage": "from-config", "password": "secret", "options": {"file": "/c"}}, {"type": "s3", "config": {}}),
+        (
+            {"storage": "rclone", "password": "secret", "options": {"remote_path": "remote:kopia"}},
+            {"type": "rclone", "config": {"remotePath": "remote:kopia"}},
+        ),
+    ],
+)
+def test_repository_connected_same_storage(monkeypatch, run_module, params, storage):
+    monkeypatch.setattr(kopia_repository, "repository_status", lambda module, password=None: {"storage": storage})
+    monkeypatch.setattr(kopia_repository, "kopia_command", Mock(side_effect=AssertionError("must not reconnect")))
+    assert run_module(kopia_repository, params)["changed"] is False
+
+
+def test_repository_home_path_matches_resolved_path(monkeypatch, run_module):
+    monkeypatch.setenv("HOME", "/home/user")
+    storage = {"type": "filesystem", "config": {"path": "/home/user/backup"}}
+    monkeypatch.setattr(kopia_repository, "repository_status", lambda module, password=None: {"storage": storage})
+    monkeypatch.setattr(kopia_repository, "kopia_command", Mock(side_effect=AssertionError("must not reconnect")))
+    assert run_module(kopia_repository, repository_params(options={"path": "~/backup"}))["changed"] is False
+
+
+def test_snapshot_tags_keep_their_keys(monkeypatch, run_module):
+    listing = '[{"startTime":"now","tags":{"tag:Env":"prod","tag:role_name":"db"}}]'
+    monkeypatch.setattr(kopia_snapshot, "kopia_command", Mock(side_effect=[(0, "", ""), (0, listing, "")]))
+    result = run_module(kopia_snapshot, {"path": "/data", "tags": {"Env": "prod", "role_name": "db"}})
+    assert result["snapshot"] == {"start_time": "now", "tags": {"tag:Env": "prod", "tag:role_name": "db"}}
+    monkeypatch.setattr(kopia_snapshot_info, "kopia_command", Mock(return_value=(0, listing, "")))
+    result = run_module(kopia_snapshot_info)
+    assert result["snapshots"] == [{"start_time": "now", "tags": {"tag:Env": "prod", "tag:role_name": "db"}}]

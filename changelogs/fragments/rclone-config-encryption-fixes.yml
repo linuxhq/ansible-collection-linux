@@ -1,0 +1,22 @@
+---
+bugfixes:
+  - rclone_config_encryption - treat a damaged encrypted payload as a file that
+    cannot be opened, so ``content`` replaces it and a run without ``content``
+    fails clearly instead of with a traceback.
+  - rclone_config_encryption - read the encrypted payload as rclone does,
+    ignoring only carriage returns and line feeds and splitting lines on line
+    feeds only.
+  - rclone_config_encryption - create a new configuration file with mode
+    ``0600``, as rclone does, unless ``mode`` is set.
+  - rclone_config_encryption - follow a symbolic link at ``path`` and write its
+    target, as rclone does, instead of replacing the link with a regular file.
+  - rclone_config_encryption - include the path in every failure message.
+  - rclone_config_encryption - document diff mode support, which returns the
+    decrypted configuration in the diff.
+  - rclone_obscure, rclone_deobscure - accept vault encrypted values on
+    ansible-core 2.18.
+  - rclone_obscure, rclone_deobscure - document that an empty string is
+    returned unchanged.
+security_fixes:
+  - rclone_config_encryption - mark ``content`` as ``no_log`` so the
+    configuration body is kept out of logs.

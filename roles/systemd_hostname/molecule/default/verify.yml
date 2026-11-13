@@ -19,4 +19,29 @@
             inventory_hostname ~ '.example.com'
           - _systemd_hostname_info_dict.hostname ==
             _systemd_hostname_info_dict.static_hostname
+
+    - name: Ensure systemd machine information file is read
+      tags:
+        - systemd_hostname
+      become: true
+      ansible.builtin.slurp:
+        src: /etc/machine-info
+      register: __systemd_hostname_machine_info
+
+    - name: Ensure systemd machine information file is verified
+      tags:
+        - systemd_hostname
+      vars:
+        __systemd_hostname_machine_info_lines: >-
+          {{ (__systemd_hostname_machine_info.content | b64decode).splitlines()
+             | map('regex_replace', '^([A-Z_]+)="?(.*?)"?$', '\\1=\\2')
+             | list }}
+      ansible.builtin.assert:
+        that:
+          - "'CHASSIS=vm' in __systemd_hostname_machine_info_lines"
+          - "'DEPLOYMENT=production' in __systemd_hostname_machine_info_lines"
+          - "'ICON_NAME=computer-vm' in __systemd_hostname_machine_info_lines"
+          - "'LOCATION=molecule' in __systemd_hostname_machine_info_lines"
+          - "'PRETTY_HOSTNAME=Molecule Test' in
+            __systemd_hostname_machine_info_lines"
 ...

@@ -1,0 +1,6 @@
+---
+bugfixes:
+  - systemd_timedate - fail before writing any setting when ``time`` is set while
+    network time synchronization would stay enabled, or when an absolute
+    ``time`` is at or before the epoch, instead of failing after earlier
+    settings were applied.

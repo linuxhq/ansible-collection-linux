@@ -7,14 +7,24 @@ DOCUMENTATION = r"""
 module: systemd_hostname
 author:
   - Taylor Kimball (@tkimball83)
-version_added: 2.4.0
+version_added: "2.4.0"
 short_description: Manage the systemd hostname
 description:
   - Manage the hostname settings owned by C(systemd-hostnamed), the same ones
     C(hostnamectl set-*) writes, by calling the C(org.freedesktop.hostname1)
     interface on the system bus directly.
-  - Settings are compared against the current properties and only the ones that
+  - Settings are compared against their stored values and only the ones that
     differ are written, options left unset are not touched.
+  - O(chassis), O(deployment), O(icon_name), O(location) and O(pretty_hostname)
+    are compared against C(/etc/machine-info), the file C(systemd-hostnamed)
+    stores them in, rather than the properties it reports, because it reports a
+    computed fallback for a setting that is not stored, such as a chassis
+    detected from the firmware or an icon name derived from the chassis. A
+    missing file means no setting is stored.
+  - O(static_hostname) is compared against the static hostname reported by
+    C(systemd-hostnamed).
+  - Every option is validated before any setting is written, so an invalid
+    value fails without leaving earlier settings applied.
   - With no options set the module reads the current settings and reports no
     change.
 notes:
@@ -41,18 +51,22 @@ options:
     description:
       - Deployment environment of the machine, such as V(development) or
         V(production).
+      - Only letters, digits, V(-), V(.) and V(:) are allowed.
       - Written to C(/etc/machine-info).
       - An empty string removes it from C(/etc/machine-info).
     type: str
   icon_name:
     description:
       - Icon name of the machine, following the XDG icon naming specification.
+      - Must be a valid file name, so it cannot contain V(/) or control
+        characters and cannot be V(.) or V(..).
       - Written to C(/etc/machine-info).
       - An empty string removes it from C(/etc/machine-info).
     type: str
   location:
     description:
       - Physical location of the machine, such as a rack or room name.
+      - Control characters are not allowed.
       - Written to C(/etc/machine-info).
       - An empty string removes it from C(/etc/machine-info).
     type: str
@@ -60,6 +74,7 @@ options:
     description:
       - Free-form UTF-8 hostname for presentation, such as V(Taylor's Laptop), as
         C(hostnamectl hostname --pretty) sets.
+      - Control characters are not allowed.
       - Written to C(/etc/machine-info).
       - An empty string removes it from C(/etc/machine-info).
     type: str
@@ -69,11 +84,21 @@ options:
         C(hostnamectl hostname --static) sets.
       - C(systemd-hostnamed) applies it as the transient hostname as well, so
         RV(hostname) follows it.
+      - Must be a valid hostname of at most 64 characters, made of labels of
+        letters, digits and V(-) separated by V(.), where no label is empty or
+        starts or ends with V(-).
+      - Each V(?) is a wildcard that systemd 258 and later replace with a
+        hexadecimal character derived from the machine ID. A static hostname
+        reported with a lowercase hexadecimal character in place of each V(?)
+        matches, so it is not rewritten. In check mode the predicted
+        RV(hostname) keeps the V(?) characters.
       - An empty string removes C(/etc/hostname).
     type: str
   transient_hostname:
     description:
       - Transient hostname, as C(hostnamectl hostname --transient) sets.
+      - Must be a valid hostname, following the same rules as
+        O(static_hostname) without the V(?) wildcard.
       - C(/etc/hostname) takes the highest preference in C(systemd-hostnamed), so
         a transient hostname cannot take effect while a static one is configured.
       - Nothing is done when RV(hostname) already matches, whatever the source.
@@ -116,6 +141,10 @@ hostname:
   description:
     - Hostname settings reported by C(systemd-hostnamed).
     - Properties the running systemd does not implement are returned as V(none).
+    - In check mode, the settings that would change are predicted from the
+      options, so a setting being removed is predicted as an empty string
+      even when C(systemd-hostnamed) then reports a computed fallback.
+    - Empty when dasbus is unavailable in check mode.
   returned: always
   type: dict
   sample:
@@ -154,7 +183,10 @@ hostname:
       - web
 """
 
+import re
+
 from ansible.module_utils.basic import AnsibleModule
+from ansible.module_utils.common.text.converters import to_native
 
 from ansible_collections.linuxhq.linux.plugins.module_utils.systemd import (
     HAS_DASBUS,
@@ -163,6 +195,16 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.systemd import (
     systemd_properties,
     systemd_proxy,
 )
+
+MACHINE_INFO = "/etc/machine-info"
+
+MACHINE_INFO_KEYS = {
+    "CHASSIS": "chassis",
+    "DEPLOYMENT": "deployment",
+    "ICON_NAME": "icon_name",
+    "LOCATION": "location",
+    "PRETTY_HOSTNAME": "pretty_hostname",
+}
 
 SETTINGS = [
     ("chassis", "SetChassis"),
@@ -173,8 +215,117 @@ SETTINGS = [
     ("static_hostname", "SetStaticHostname"),
 ]
 
+CONTROL_CHARACTERS = re.compile(r"[\x00-\x1f\x7f]")
+DEPLOYMENT = re.compile(r"[A-Za-z0-9.:-]+\Z")
+HOSTNAME_LABEL = r"[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?"
+HOSTNAME = re.compile(rf"{HOSTNAME_LABEL}(?:\.{HOSTNAME_LABEL})*\Z")
+HOSTNAME_MAX = 64
+HOSTNAME_WILDCARD_CHARACTERS = "0123456789abcdef"
+NAME_MAX = 255
+
+
+def hostname_valid(value):
+    return len(value) <= HOSTNAME_MAX and HOSTNAME.match(value) is not None
+
+
+def icon_name_valid(value):
+    return (
+        value not in (".", "..")
+        and "/" not in value
+        and len(value.encode("utf-8")) <= NAME_MAX
+        and not CONTROL_CHARACTERS.search(value)
+    )
+
+
+def validate_settings(module):
+    params = module.params
+
+    for param in ("location", "pretty_hostname"):
+        if params[param] and CONTROL_CHARACTERS.search(params[param]):
+            module.fail_json(msg=f"invalid {param}: control characters are not allowed")
+
+    if params["deployment"] and not DEPLOYMENT.match(params["deployment"]):
+        module.fail_json(
+            msg=f"invalid deployment {params['deployment']!r}: only letters, digits, '-', '.' and ':' are allowed"
+        )
+
+    if params["icon_name"] and not icon_name_valid(params["icon_name"]):
+        module.fail_json(msg=f"invalid icon_name {params['icon_name']!r}: it must be a valid file name")
+
+    if params["static_hostname"] and not hostname_valid(params["static_hostname"].replace("?", "0")):
+        module.fail_json(msg=f"invalid static_hostname {params['static_hostname']!r}: it is not a valid hostname")
+
+    if params["transient_hostname"] and not hostname_valid(params["transient_hostname"]):
+        module.fail_json(msg=f"invalid transient_hostname {params['transient_hostname']!r}: it is not a valid hostname")
+
+
+def machine_info_value(text):
+    characters = iter(text.lstrip())
+    value = []
+    keep = 0
+    quote = None
+
+    for character in characters:
+        if quote is None and character in "\"'":
+            quote = character
+            continue
+
+        if character == quote:
+            quote = None
+            continue
+
+        if character == "\\" and quote != "'":
+            escaped = next(characters, "")
+            if quote == '"' and escaped not in '"\\`$':
+                value.append("\\")
+
+            character = escaped
+        elif quote is None and character.isspace():
+            value.append(character)
+            continue
+
+        value.append(character)
+        keep = len(value)
+
+    return "".join(value[:keep])
+
+
+def read_machine_info(module):
+    values = dict.fromkeys(MACHINE_INFO_KEYS.values(), "")
+
+    try:
+        with open(MACHINE_INFO, encoding="utf-8", errors="replace") as handle:
+            lines = handle.read().splitlines()
+    except FileNotFoundError:
+        return values
+    except OSError as error:
+        module.fail_json(msg=f"unable to read {MACHINE_INFO}: {to_native(error)}")
+
+    for line in lines:
+        key, separator, value = line.strip().partition("=")
+        param = MACHINE_INFO_KEYS.get(key.strip())
+
+        if separator and param:
+            values[param] = machine_info_value(value)
+
+    return values
+
+
+def hostname_matches(current, desired):
+    current = current or ""
+
+    if len(current) != len(desired):
+        return False
+
+    return all(
+        actual == wanted or (wanted == "?" and actual in HOSTNAME_WILDCARD_CHARACTERS)
+        for actual, wanted in zip(current, desired)
+    )
+
 
 def ensure_present(module):
+    validate_settings(module)
+
     if module.check_mode and not HAS_DASBUS:
         module.exit_json(
             changed=any(
@@ -187,19 +338,29 @@ def ensure_present(module):
     proxy = systemd_proxy(module, "hostname1")
 
     current = systemd_properties(module, proxy, HOSTNAME_PROPERTIES)
+    stored = {}
+    if any(module.params[param] is not None for param in MACHINE_INFO_KEYS.values()):
+        stored = read_machine_info(module)
+
     default = current["default_hostname"] or ""
     predicted = dict(current)
     pending = []
 
     for param, method in SETTINGS:
         value = module.params[param]
-        if value is None or current[param] == value:
+        if value is None:
+            continue
+
+        if param == "static_hostname":
+            if hostname_matches(current[param], value):
+                continue
+
+            predicted["hostname"] = value or default or current["hostname"]
+            predicted["hostname_source"] = "static" if value else "default"
+        elif stored[param] == value:
             continue
 
         predicted[param] = value
-        if param == "static_hostname":
-            predicted["hostname"] = value or default or current["hostname"]
-
         pending.append((method, (value, False)))
 
     transient = module.params["transient_hostname"]
@@ -207,24 +368,24 @@ def ensure_present(module):
     if transient and predicted["hostname"] != transient:
         if predicted["static_hostname"]:
             module.fail_json(
-                msg="unable to set the transient hostname: the static hostname "
-                f"{predicted['static_hostname']} takes precedence"
+                msg=f"unable to set the transient hostname: the static hostname {predicted['static_hostname']} takes precedence"
             )
 
         predicted["hostname"] = transient
+        predicted["hostname_source"] = "transient"
         pending.append(("SetHostname", (transient, False)))
 
     if transient == "":
         if current["hostname_source"] is None:
             module.fail_json(
-                msg="unable to clear the transient hostname: HostnameSource is not "
-                "supported by this version of systemd"
+                msg="unable to clear the transient hostname: HostnameSource is not supported by this version of systemd"
             )
 
         cleared = current["static_hostname"] and not predicted["static_hostname"]
 
         if current["hostname_source"] == "transient" or cleared:
-            predicted["hostname"] = default or current["hostname"]
+            predicted["hostname"] = predicted["static_hostname"] or default or current["hostname"]
+            predicted["hostname_source"] = "static" if predicted["static_hostname"] else "default"
             pending.append(("SetHostname", ("", False)))
 
     if not pending:

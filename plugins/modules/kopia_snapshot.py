@@ -7,7 +7,7 @@ DOCUMENTATION = r"""
 module: kopia_snapshot
 author:
   - Taylor Kimball (@tkimball83)
-version_added: 2.3.0
+version_added: "2.3.0"
 short_description: Create a kopia snapshot
 description:
   - Create a snapshot of a local path in the connected kopia repository.
@@ -39,8 +39,9 @@ options:
     required: true
   tags:
     description:
-      - Tags to record on the snapshot, given as snake_case keys.
-      - Each entry becomes one C(--tags key:value) flag.
+      - Tags to record on the snapshot.
+      - Each entry becomes one C(--tags key:value) flag, with the key used as
+        given.
     type: dict
 requirements:
   - kopia
@@ -69,8 +70,12 @@ EXAMPLES = r"""
 
 RETURN = r"""
 snapshot:
-  description: Newest snapshot for the path, reported by C(kopia snapshot list).
-  returned: when the snapshot manifest can be read back
+  description:
+    - Newest snapshot for the path, reported by C(kopia snapshot list).
+    - Keys under C(tags) are returned as kopia reports them, such as
+      C(tag:role).
+    - Empty in check mode and when the snapshot manifest cannot be read back.
+  returned: always
   type: dict
   sample:
     id: k9c8f0b1c2d3e4f5
@@ -103,7 +108,7 @@ def latest_snapshot(module, path):
     if not snapshots:
         return {}
 
-    return camel_dict_to_snake_dict(snapshots[-1])
+    return camel_dict_to_snake_dict(snapshots[-1], ignore_list=["tags"])
 
 
 def ensure_present(module):

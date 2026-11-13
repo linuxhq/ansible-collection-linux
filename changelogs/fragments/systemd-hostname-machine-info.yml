@@ -1,0 +1,17 @@
+---
+bugfixes:
+  - systemd_hostname - compare ``chassis``, ``deployment``, ``icon_name``,
+    ``location`` and ``pretty_hostname`` against ``/etc/machine-info`` instead
+    of the computed D-Bus properties, so an empty ``icon_name`` no longer
+    reports a change on every run and a ``chassis`` that matches the detected
+    fallback is written to the file.
+  - systemd_hostname - validate every option before writing any setting, so an
+    invalid ``deployment``, ``icon_name``, ``location``, ``pretty_hostname``,
+    ``static_hostname`` or ``transient_hostname`` fails without leaving earlier
+    settings applied.
+  - systemd_hostname - treat each ``?`` in ``static_hostname`` as a wildcard for
+    the hexadecimal character systemd 258 and later substitute, so a wildcard
+    hostname no longer reports a change on every run.
+  - systemd_hostname - predict the static hostname and ``hostname_source`` in
+    check mode when ``static_hostname`` is set together with an empty
+    ``transient_hostname``.

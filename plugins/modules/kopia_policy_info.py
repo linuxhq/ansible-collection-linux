@@ -7,7 +7,7 @@ DOCUMENTATION = r"""
 module: kopia_policy_info
 author:
   - Taylor Kimball (@tkimball83)
-version_added: 2.3.0
+version_added: "2.3.0"
 short_description: Gather kopia snapshot policies
 description:
   - List the policies defined in the kopia repository, or look up a single
@@ -105,7 +105,7 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
 
 def info(module):
     if module.check_mode and not kopia_available(module):
-        module.exit_json(changed=False, defined=False, effective_policy={})
+        module.exit_json(changed=False, defined=False, effective_policy={}, policy={})
 
     target = module.params["target"]
     defined = policy_export(module, target)
@@ -129,6 +129,9 @@ def info(module):
 
 
 def list_policies(module):
+    if module.check_mode and not kopia_available(module):
+        module.exit_json(changed=False, policies=[])
+
     rc, stdout, stderr = kopia_command(module, ["policy", "list", "--json"])
 
     if rc != 0:

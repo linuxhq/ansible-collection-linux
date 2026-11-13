@@ -82,9 +82,71 @@ def test_plaintext_is_not_encrypted(text):
 
 
 def test_config_header_and_wrapped_payload():
-    assert rclone.config_body("# comment\n; comment\n\n RCLONE_ENCRYPT_V0: \n abcd\n efgh ") == "abcdefgh"
+    assert rclone.config_body("# comment\n; comment\n\n RCLONE_ENCRYPT_V0: \nabcd\r\nefgh\n") == "abcdefgh"
     with pytest.raises(ValueError, match="unsupported"):
         rclone.config_body("RCLONE_ENCRYPT_V1:\nAAAA")
 
     with pytest.raises(ValueError, match="too short"):
         rclone.decrypt_config("RCLONE_ENCRYPT_V0:\nAAAA", "secret")
+
+
+RCLONE_OBSCURED = "rBC881X_mHbsCyx3DSUR8DhvJ6EaxsNN68rbOveoFA"
+RCLONE_CONFIG_PASSWORD = "vector-config-pass"
+RCLONE_CONFIG = (
+    "# Encrypted rclone configuration File\n\n"
+    "RCLONE_ENCRYPT_V0:\n"
+    "G8SDbQkHqQM2prjC2y1CdVERxlam3EJFe2BFSg1NO64uzmahBcvcL9gH0biZIXjtztDGYv2z0OHDT9QIAmv1"
+)
+
+
+def test_rclone_obscure_vector():
+    assert rclone.deobscure(RCLONE_OBSCURED) == "vector-password"
+
+
+def test_rclone_config_vector():
+    assert rclone.decrypt_config(RCLONE_CONFIG, RCLONE_CONFIG_PASSWORD) == b"[vector]\ntype = local\n\n"
+    assert rclone.decrypt_config(RCLONE_CONFIG, "wrong") is None
+
+
+def test_config_payload_line_endings_match_rclone():
+    header, payload = RCLONE_CONFIG.rsplit("\n", 1)
+    wrapped = f"{header}\r\n{payload[:40]}\r\n{payload[40:]}\r\n"
+    assert rclone.decrypt_config(wrapped, RCLONE_CONFIG_PASSWORD) == b"[vector]\ntype = local\n\n"
+
+
+@pytest.mark.parametrize("separator", [" ", "\t", "\x0b"])
+def test_config_payload_rejects_other_whitespace(separator):
+    header, payload = RCLONE_CONFIG.rsplit("\n", 1)
+    with pytest.raises(ValueError):
+        rclone.decrypt_config(f"{header}\n{payload[:40]}{separator}{payload[40:]}", RCLONE_CONFIG_PASSWORD)
+
+
+def test_config_lines_split_on_newline_only():
+    assert not rclone.is_encrypted("# comment\x0bRCLONE_ENCRYPT_V0:\nAAAA")
+
+
+@pytest.mark.parametrize(
+    "plugin, value, expected", [(rclone_obscure, "secret", None), (rclone_deobscure, None, "secret")]
+)
+def test_filter_accepts_vault_encrypted_value(monkeypatch, plugin, value, expected):
+    class VaultValue:
+        def __init__(self, data):
+            self.data = data
+
+        def __str__(self):
+            return self.data
+
+    monkeypatch.setattr(plugin, "AnsibleVaultEncryptedUnicode", VaultValue)
+    function = next(iter(plugin.FilterModule().filters().values()))
+    data = value if value is not None else rclone.obscure("secret")
+    result = function(VaultValue(data))
+    if expected is None:
+        assert rclone.deobscure(result) == "secret"
+    else:
+        assert result == expected
+
+
+@pytest.mark.parametrize("plugin", [rclone_obscure, rclone_deobscure])
+def test_filter_empty_string_passes_through(plugin):
+    function = next(iter(plugin.FilterModule().filters().values()))
+    assert function("") == ""

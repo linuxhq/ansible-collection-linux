@@ -281,3 +281,169 @@ def test_timedate_setter_order_and_arguments(monkeypatch, run_module):
 def test_invalid_time_specification(module_factory, invoke, value):
     result = invoke(systemd_timedate.parse_value, module_factory(), value)
     assert result["failed"] and "unable to parse" in result["msg"]
+
+
+def hostname_module(monkeypatch, tmp_path, current, machine_info=None):
+    path = tmp_path / "machine-info"
+    if machine_info is not None:
+        path.write_text(machine_info)
+
+    monkeypatch.setattr(systemd_hostname, "MACHINE_INFO", str(path), raising=False)
+    monkeypatch.setattr(systemd_hostname, "HAS_DASBUS", True)
+    monkeypatch.setattr(systemd_hostname, "systemd_proxy", Mock())
+    monkeypatch.setattr(systemd_hostname, "systemd_properties", Mock(return_value=current))
+    mutate = Mock()
+    monkeypatch.setattr(systemd_hostname, "systemd_call", mutate)
+    return mutate
+
+
+def test_hostname_empty_setting_matches_missing_machine_info(monkeypatch, tmp_path, run_module):
+    current = {**HOSTNAME, "chassis": "vm", "icon_name": "computer-vm"}
+    mutate = hostname_module(monkeypatch, tmp_path, current)
+    params = {"icon_name": "", "deployment": "", "location": "", "pretty_hostname": ""}
+    assert run_module(systemd_hostname, params) == {"changed": False, "hostname": current}
+    mutate.assert_not_called()
+
+
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_hostname_fallback_chassis_is_persisted(monkeypatch, tmp_path, run_module, check_mode):
+    current = {**HOSTNAME, "chassis": "vm", "icon_name": "computer-vm"}
+    mutate = hostname_module(monkeypatch, tmp_path, current, "PRETTY_HOSTNAME=Old\n")
+    result = run_module(systemd_hostname, {"chassis": "vm", "icon_name": "computer-vm"}, check_mode)
+    assert result["changed"]
+    if check_mode:
+        mutate.assert_not_called()
+    else:
+        assert [entry.args[2:] for entry in mutate.call_args_list] == [
+            ("SetChassis", "vm", False),
+            ("SetIconName", "computer-vm", False),
+        ]
+
+
+def test_hostname_machine_info_values_are_compared(monkeypatch, tmp_path, run_module):
+    machine_info = (
+        "# comment\n"
+        "CHASSIS=vm\n"
+        "DEPLOYMENT=production  \n"
+        "ICON_NAME='computer-vm'\n"
+        'LOCATION="rack \\"4\\""\n'
+        'PRETTY_HOSTNAME="Molecule Test"\n'
+    )
+    mutate = hostname_module(monkeypatch, tmp_path, HOSTNAME, machine_info)
+    params = {
+        "chassis": "vm",
+        "deployment": "production",
+        "icon_name": "computer-vm",
+        "location": 'rack "4"',
+        "pretty_hostname": "Molecule Test",
+    }
+    assert not run_module(systemd_hostname, params)["changed"]
+    mutate.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        ("plain", "plain"),
+        ("  padded value  ", "padded value"),
+        ('"quoted value "', "quoted value "),
+        ("'single \\ quoted'", "single \\ quoted"),
+        ('"a\\$b\\x"', "a$b\\x"),
+        ("escaped\\ space", "escaped space"),
+        ("", ""),
+    ],
+)
+def test_machine_info_value(text, expected):
+    assert systemd_hostname.machine_info_value(text) == expected
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"chassis": "vm", "deployment": "prod env"},
+        {"chassis": "vm", "deployment": "prod/env"},
+        {"chassis": "vm", "icon_name": "a/b"},
+        {"chassis": "vm", "icon_name": ".."},
+        {"chassis": "vm", "location": "rack\n4"},
+        {"chassis": "vm", "pretty_hostname": "bad\tname"},
+        {"chassis": "vm", "static_hostname": "-bad"},
+        {"chassis": "vm", "static_hostname": "bad-"},
+        {"chassis": "vm", "static_hostname": "a..b"},
+        {"chassis": "vm", "static_hostname": "a.-b"},
+        {"chassis": "vm", "static_hostname": "trailing."},
+        {"chassis": "vm", "static_hostname": "under_score"},
+        {"chassis": "vm", "static_hostname": "a" * 65},
+        {"chassis": "vm", "transient_hostname": "web-????"},
+    ],
+)
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_hostname_invalid_settings_fail_before_any_write(monkeypatch, tmp_path, run_module, params, check_mode):
+    mutate = hostname_module(monkeypatch, tmp_path, HOSTNAME)
+    result = run_module(systemd_hostname, params, check_mode)
+    option = next(name for name in params if name != "chassis")
+    assert result["failed"] and option in result["msg"]
+    mutate.assert_not_called()
+
+
+@pytest.mark.parametrize("value", ["a" * 64, "web-????", "a--b.example.com", "1", "Server"])
+def test_hostname_valid_static_hostname(monkeypatch, tmp_path, run_module, value):
+    mutate = hostname_module(monkeypatch, tmp_path, HOSTNAME)
+    assert run_module(systemd_hostname, {"static_hostname": value})["changed"]
+    assert mutate.call_args.args[2:] == ("SetStaticHostname", value, False)
+
+
+@pytest.mark.parametrize(
+    "current,value,changed",
+    [
+        ("web-3f0a", "web-????", False),
+        ("web-3f0a", "web-???", True),
+        ("web-3F0A", "web-????", True),
+        ("web-3g0a", "web-????", True),
+        ("web-????", "web-????", False),
+        ("db-3f0a", "web-????", True),
+    ],
+)
+def test_hostname_wildcard_static_hostname(monkeypatch, tmp_path, run_module, current, value, changed):
+    status = {**HOSTNAME, "hostname": current, "static_hostname": current}
+    mutate = hostname_module(monkeypatch, tmp_path, status)
+    assert run_module(systemd_hostname, {"static_hostname": value})["changed"] is changed
+    assert mutate.called is changed
+
+
+def test_hostname_check_mode_predicts_static_over_reset_transient(monkeypatch, tmp_path, run_module):
+    status = {**HOSTNAME, "hostname": "transient", "hostname_source": "transient", "static_hostname": ""}
+    mutate = hostname_module(monkeypatch, tmp_path, status)
+    result = run_module(systemd_hostname, {"static_hostname": "new", "transient_hostname": ""}, True)
+    assert result["changed"]
+    assert result["hostname"]["hostname"] == "new"
+    assert result["hostname"]["hostname_source"] == "static"
+    mutate.assert_not_called()
+
+
+def test_time_requires_ntp_disabled_before_any_write(monkeypatch, run_module):
+    monkeypatch.setattr(systemd_timedate, "systemd_proxy", Mock())
+    monkeypatch.setattr(systemd_timedate, "systemd_properties", Mock(return_value={**TIMEDATE, "ntp": True}))
+    mutate = Mock()
+    monkeypatch.setattr(systemd_timedate, "systemd_call", mutate)
+    result = run_module(systemd_timedate, {"timezone": "Europe/Berlin", "time": "@1"})
+    assert result["failed"] and "time" in result["msg"] and "ntp" in result["msg"]
+    mutate.assert_not_called()
+
+
+@pytest.mark.parametrize("value", ["@0", "@-5", "1970-01-01 00:00:00 UTC"])
+def test_time_rejects_absolute_epoch_before_any_write(monkeypatch, run_module, value):
+    monkeypatch.setattr(systemd_timedate, "systemd_proxy", Mock())
+    monkeypatch.setattr(systemd_timedate, "systemd_properties", Mock(return_value=TIMEDATE))
+    mutate = Mock()
+    monkeypatch.setattr(systemd_timedate, "systemd_call", mutate)
+    result = run_module(systemd_timedate, {"timezone": "Europe/Berlin", "time": value})
+    assert result["failed"] and "invalid absolute time" in result["msg"]
+    mutate.assert_not_called()
+
+
+def test_hostname_check_mode_predicts_default_after_clearing_static(monkeypatch, tmp_path, run_module):
+    mutate = hostname_module(monkeypatch, tmp_path, HOSTNAME)
+    result = run_module(systemd_hostname, {"static_hostname": ""}, True)
+    assert result["hostname"]["hostname"] == "localhost"
+    assert result["hostname"]["hostname_source"] == "default"
+    mutate.assert_not_called()

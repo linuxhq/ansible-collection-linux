@@ -1,3 +1,4 @@
+from copy import deepcopy
 from unittest.mock import Mock
 
 import pytest
@@ -62,3 +63,58 @@ def test_prune_empty_preserves_false_zero_and_lists():
     original = {"empty": {"nested": None}, "keep": {"false": False, "zero": 0, "list": [], "text": ""}}
     assert kopia.prune_empty(original) == {"keep": {"false": False, "zero": 0, "list": [], "text": ""}}
     assert original["empty"] == {"nested": None}
+
+
+def test_repository_status_passes_password(monkeypatch, module_factory):
+    command = Mock(return_value=(0, "{}", ""))
+    monkeypatch.setattr(kopia, "kopia_command", command)
+    assert kopia.repository_status(module_factory(), password="secret") == {}
+    assert command.call_args.kwargs == {"password": "secret"}
+
+
+def test_policy_normalize_drops_only_values_kopia_omits():
+    policy = {
+        "noParent": False,
+        "retention": {"keepLatest": 0, "ignoreIdenticalSnapshots": False},
+        "scheduling": {"manual": False, "intervalSeconds": 0, "cron": [], "timeOfDay": [{"hour": 0, "min": 0}]},
+        "files": {"ignore": [], "maxFileSize": 0, "oneFileSystem": False},
+        "compression": {"compressorName": "", "minSize": 0, "neverCompress": ["*.zip"]},
+        "metadataCompression": {"compressorName": ""},
+        "splitter": {"algorithm": ""},
+        "actions": {"beforeSnapshotRoot": {"script": "", "timeout": 0, "mode": "essential"}},
+        "unknown": {"value": 0},
+    }
+    original = deepcopy(policy)
+    assert kopia.policy_normalize(policy) == {
+        "retention": {"keepLatest": 0, "ignoreIdenticalSnapshots": False},
+        "scheduling": {"timeOfDay": [{"hour": 0, "min": 0}]},
+        "files": {"oneFileSystem": False},
+        "compression": {"neverCompress": ["*.zip"]},
+        "actions": {"beforeSnapshotRoot": {"mode": "essential"}},
+        "unknown": {"value": 0},
+    }
+    assert policy == original
+
+
+def test_policy_normalize_keeps_wrong_types():
+    assert kopia.policy_normalize({"scheduling": {"manual": 0, "intervalSeconds": False}}) == {
+        "scheduling": {"manual": 0, "intervalSeconds": False}
+    }
+
+
+@pytest.mark.parametrize(
+    "left,right,expected",
+    [
+        (True, 1, False),
+        (0, False, False),
+        (1, 1.0, True),
+        ({"a": [True]}, {"a": [1]}, False),
+        ({"a": [1, {"b": "c"}]}, {"a": [1, {"b": "c"}]}, True),
+        ({"a": 1}, {"a": 1, "b": 2}, False),
+        ([1], [1, 2], False),
+        ([], {}, False),
+        ("", None, False),
+    ],
+)
+def test_same_value(left, right, expected):
+    assert kopia.same_value(left, right) is expected

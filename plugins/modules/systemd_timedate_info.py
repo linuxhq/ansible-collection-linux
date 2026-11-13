@@ -7,7 +7,7 @@ DOCUMENTATION = r"""
 module: systemd_timedate_info
 author:
   - Taylor Kimball (@tkimball83)
-version_added: 2.4.0
+version_added: "2.4.0"
 short_description: Gather the systemd time and date settings
 description:
   - Gather the time zone, hardware clock and network time settings reported by
