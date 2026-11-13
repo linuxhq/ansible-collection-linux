@@ -7,7 +7,7 @@ DOCUMENTATION = r"""
 module: systemd_locale_info
 author:
   - Taylor Kimball (@tkimball83)
-version_added: 2.4.0
+version_added: "2.4.0"
 short_description: Gather the systemd locale and keyboard settings
 description:
   - Gather the system locale, virtual console keymap and X11 keyboard layout

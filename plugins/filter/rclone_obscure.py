@@ -6,7 +6,7 @@ DOCUMENTATION = r"""
 name: rclone_obscure
 author:
   - Taylor Kimball (@tkimball83)
-version_added: 2.2.6
+version_added: "2.2.0"
 short_description: Obscure a password for an rclone configuration
 description:
   - Encrypts a plaintext value with rclone's published static key and
@@ -16,6 +16,10 @@ description:
     produce identical output and stay idempotent.
   - Obscuring is reversible encoding, not secure encryption; treat
     obscured values as secrets.
+  - An empty string is returned unchanged rather than obscured, unlike
+    C(rclone obscure), which returns a non-empty value for it.
+  - A vault encrypted value is decrypted before it is obscured.
+  - Values that are not strings or bytes raise an error.
 positional: _input
 options:
   _input:
@@ -23,7 +27,7 @@ options:
     type: string
     required: true
 requirements:
-  - pycryptodome
+  - pycryptodome or pycryptodomex
 """
 
 EXAMPLES = r"""
@@ -39,6 +43,8 @@ _value:
 """
 
 from ansible.errors import AnsibleFilterError
+from ansible.module_utils.common.text.converters import to_text
+from ansible.parsing.yaml.objects import AnsibleVaultEncryptedUnicode
 
 from ansible_collections.linuxhq.linux.plugins.module_utils.rclone import (
     HAS_PYCRYPTODOME,
@@ -49,6 +55,9 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.rclone import (
 def rclone_obscure(plaintext):
     if not HAS_PYCRYPTODOME:
         raise AnsibleFilterError("rclone_obscure requires the pycryptodome library")
+
+    if isinstance(plaintext, AnsibleVaultEncryptedUnicode):
+        plaintext = to_text(plaintext)
 
     try:
         return obscure(plaintext)

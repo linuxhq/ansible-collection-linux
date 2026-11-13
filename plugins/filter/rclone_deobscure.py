@@ -6,14 +6,17 @@ DOCUMENTATION = r"""
 name: rclone_deobscure
 author:
   - Taylor Kimball (@tkimball83)
-version_added: 2.2.6
+version_added: "2.2.0"
 short_description: Reveal a password from an obscured rclone value
 description:
   - Decodes a value obscured with rclone's published static key, as
     produced by C(rclone obscure) or P(linuxhq.linux.rclone_obscure#filter),
     back to plaintext.
-  - Values that rclone would reject, such as those containing characters
-    outside the unpadded base64url alphabet, raise an error.
+  - An empty string is returned unchanged, unlike C(rclone reveal), which
+    rejects it.
+  - Other values that rclone would reject, such as those containing
+    characters outside the unpadded base64url alphabet, raise an error.
+  - A vault encrypted value is decrypted before it is revealed.
 positional: _input
 options:
   _input:
@@ -21,7 +24,7 @@ options:
     type: string
     required: true
 requirements:
-  - pycryptodome
+  - pycryptodome or pycryptodomex
 """
 
 EXAMPLES = r"""
@@ -37,6 +40,8 @@ _value:
 """
 
 from ansible.errors import AnsibleFilterError
+from ansible.module_utils.common.text.converters import to_text
+from ansible.parsing.yaml.objects import AnsibleVaultEncryptedUnicode
 
 from ansible_collections.linuxhq.linux.plugins.module_utils.rclone import (
     HAS_PYCRYPTODOME,
@@ -47,6 +52,9 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.rclone import (
 def rclone_deobscure(obscured):
     if not HAS_PYCRYPTODOME:
         raise AnsibleFilterError("rclone_deobscure requires the pycryptodome library")
+
+    if isinstance(obscured, AnsibleVaultEncryptedUnicode):
+        obscured = to_text(obscured)
 
     try:
         return deobscure(obscured)

@@ -1,0 +1,4 @@
+---
+trivial:
+  - Quote ``version_added`` in every plugin and use the release series that
+    introduced it, and join split failure message strings.

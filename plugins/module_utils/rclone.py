@@ -199,7 +199,7 @@ def check_config_password(password):
 
 
 def config_body(text):
-    lines = text.splitlines()
+    lines = text.split("\n")
 
     for index, line in enumerate(lines):
         stripped = line.strip()
@@ -208,7 +208,7 @@ def config_body(text):
             continue
 
         if stripped == CONFIG_MARKER:
-            return "".join(item.strip() for item in lines[index + 1 :])
+            return "".join(lines[index + 1 :]).replace("\r", "")
 
         if stripped.startswith("RCLONE_ENCRYPT_V"):
             raise ValueError("unsupported configuration encryption, update rclone for support")
@@ -242,7 +242,7 @@ def decrypt_config(text, password):
     if body is None:
         raise ValueError("configuration is not encrypted")
 
-    raw = base64.b64decode(body)
+    raw = base64.b64decode(body, validate=True)
 
     if len(raw) < CONFIG_NONCE_SIZE + CONFIG_TAG_SIZE:
         raise ValueError("configuration data too short")

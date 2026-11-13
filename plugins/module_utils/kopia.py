@@ -3,6 +3,43 @@
 
 import json
 
+ACTION_COMMAND_OMITEMPTY = {"args": [], "mode": "", "path": "", "script": "", "timeout": 0}
+
+POLICY_OMITEMPTY = {
+    "actions": {
+        "afterFolder": ACTION_COMMAND_OMITEMPTY,
+        "afterSnapshotRoot": ACTION_COMMAND_OMITEMPTY,
+        "beforeFolder": ACTION_COMMAND_OMITEMPTY,
+        "beforeSnapshotRoot": ACTION_COMMAND_OMITEMPTY,
+    },
+    "compression": {
+        "compressorName": "",
+        "maxSize": 0,
+        "minSize": 0,
+        "neverCompress": [],
+        "noParentNeverCompress": False,
+        "noParentOnlyCompress": False,
+        "onlyCompress": [],
+    },
+    "files": {
+        "ignore": [],
+        "ignoreDotFiles": [],
+        "maxFileSize": 0,
+        "noParentDotFiles": False,
+        "noParentIgnore": False,
+    },
+    "metadataCompression": {"compressorName": ""},
+    "noParent": False,
+    "scheduling": {
+        "cron": [],
+        "intervalSeconds": 0,
+        "manual": False,
+        "noParentTimeOfDay": False,
+        "timeOfDay": [],
+    },
+    "splitter": {"algorithm": ""},
+}
+
 
 def kopia_flags(options):
     flags = []
@@ -42,8 +79,8 @@ def kopia_command(module, args, password=None):
     return module.run_command(command, environ_update=environ)
 
 
-def repository_status(module):
-    rc, stdout, stderr = kopia_command(module, ["repository", "status", "--json"])
+def repository_status(module, password=None):
+    rc, stdout, stderr = kopia_command(module, ["repository", "status", "--json"], password=password)
 
     if rc == 0:
         try:
@@ -93,3 +130,40 @@ def prune_empty(value):
     pruned = {key: prune_empty(item) for key, item in value.items() if item is not None}
 
     return {key: item for key, item in pruned.items() if item != {}}
+
+
+def omit_empty(value, schema):
+    if not isinstance(value, dict) or not isinstance(schema, dict):
+        return value
+
+    result = {}
+
+    for key, item in value.items():
+        zero = schema.get(key)
+
+        if isinstance(zero, dict):
+            result[key] = omit_empty(item, zero)
+        elif key not in schema or not same_value(item, zero):
+            result[key] = item
+
+    return result
+
+
+def policy_normalize(policy):
+    return prune_empty(omit_empty(policy, POLICY_OMITEMPTY))
+
+
+def same_value(left, right):
+    if isinstance(left, bool) or isinstance(right, bool):
+        return type(left) is type(right) and left == right
+
+    if isinstance(left, dict) and isinstance(right, dict):
+        return left.keys() == right.keys() and all(same_value(left[key], right[key]) for key in left)
+
+    if isinstance(left, list) and isinstance(right, list):
+        return len(left) == len(right) and all(same_value(a, b) for a, b in zip(left, right))
+
+    if isinstance(left, (dict, list)) or isinstance(right, (dict, list)):
+        return False
+
+    return left == right

@@ -7,7 +7,7 @@ DOCUMENTATION = r"""
 module: kopia_maintenance
 author:
   - Taylor Kimball (@tkimball83)
-version_added: 2.3.0
+version_added: "2.3.0"
 short_description: Manage kopia repository maintenance settings
 description:
   - Manage the maintenance settings of the connected kopia repository.
@@ -31,19 +31,29 @@ options:
     description: Extend the retention period of locked objects as needed.
     type: bool
   full_interval:
-    description: Interval between full maintenance runs, in seconds.
+    description:
+      - Interval between full maintenance runs, in seconds.
+      - Must not be negative.
     type: int
   list_parallelism:
-    description: Override the list parallelism.
+    description:
+      - Override the list parallelism.
+      - Must not be negative, kopia reads V(-1) as leaving it unset.
     type: int
   max_retained_log_age:
-    description: Maximum age of retained log sessions, in seconds.
+    description:
+      - Maximum age of retained log sessions, in seconds.
+      - Must not be negative.
     type: int
   max_retained_log_count:
-    description: Maximum number of log sessions to retain.
+    description:
+      - Maximum number of log sessions to retain.
+      - Must not be negative, kopia reads V(-1) as leaving it unset.
     type: int
   max_retained_log_size_mb:
-    description: Maximum total size of retained log sessions, in megabytes.
+    description:
+      - Maximum total size of retained log sessions, in megabytes.
+      - Must not be negative, kopia reads V(-1) as leaving it unset.
     type: int
   owner:
     description:
@@ -52,7 +62,9 @@ options:
         set time, so V(me) always reports a change, prefer the explicit form.
     type: str
   quick_interval:
-    description: Interval between quick maintenance runs, in seconds.
+    description:
+      - Interval between quick maintenance runs, in seconds.
+      - Must not be negative.
     type: int
 requirements:
   - kopia
@@ -115,8 +127,10 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
     kopia_available,
     kopia_command,
     maintenance_info,
+    same_value,
 )
 
+INTEGER_KINDS = ("duration", "int", "megabytes")
 MEGABYTES = 1048576
 NANOSECONDS = 1000000000
 
@@ -169,7 +183,17 @@ def flag_value(kind, value):
     return f"{value}"
 
 
+def validate_settings(module):
+    for param, _dummy, _dummy, kind in SETTINGS:
+        value = module.params[param]
+
+        if kind in INTEGER_KINDS and value is not None and value < 0:
+            module.fail_json(msg=f"invalid {param} {value}: it must not be negative")
+
+
 def ensure_present(module):
+    validate_settings(module)
+
     if module.check_mode and not kopia_available(module):
         module.exit_json(changed=True, maintenance={})
 
@@ -187,7 +211,7 @@ def ensure_present(module):
             node = node.setdefault(key, {})
 
         desired = normalize(kind, value)
-        if node.get(path[-1]) != desired:
+        if path[-1] not in node or not same_value(node[path[-1]], desired):
             node[path[-1]] = desired
             flags.append(f"{flag}={flag_value(kind, value)}")
 

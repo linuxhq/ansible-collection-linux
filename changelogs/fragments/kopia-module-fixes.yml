@@ -1,0 +1,29 @@
+---
+bugfixes:
+  - kopia_policy - treat ``false``, ``0``, empty strings and empty lists for
+    fields kopia does not store, such as ``scheduling.manual`` or
+    ``files.max_file_size``, as left out, so such a policy no longer reports a
+    change on every run.
+  - kopia_policy, kopia_maintenance - compare Booleans and numbers strictly, so
+    ``true`` no longer matches ``1``.
+  - kopia_policy_info - return an empty ``policies`` in check mode when kopia is
+    unavailable, and always return ``policy`` when ``target`` is set.
+  - kopia_repository - report distinct failures for connecting, creating and
+    validating the provider, naming the storage, and say when the repository
+    was created but validating the provider failed.
+  - kopia_repository - read the connection status with ``password``, so a
+    connection made with ``persist_credentials`` set to ``false`` is
+    recognized.
+  - kopia_repository - never try to create a repository for ``from-config``
+    storage.
+  - kopia_snapshot, kopia_snapshot_info - return snapshot tag keys as kopia
+    reports them instead of converting them to snake_case.
+  - kopia_maintenance - reject negative values for integer settings before
+    running kopia, since kopia reads ``-1`` as unset and the setting never
+    converges.
+  - kopia_repository, kopia_snapshot, kopia_snapshot_info - correct the
+    documented return conditions and snapshot ordering.
+minor_changes:
+  - kopia_repository - fail when the host is already connected to a different
+    repository, by storage type or identifying storage option, instead of
+    reporting no change. Disconnect first to switch repositories.

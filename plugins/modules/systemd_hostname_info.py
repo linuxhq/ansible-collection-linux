@@ -7,7 +7,7 @@ DOCUMENTATION = r"""
 module: systemd_hostname_info
 author:
   - Taylor Kimball (@tkimball83)
-version_added: 2.4.0
+version_added: "2.4.0"
 short_description: Gather the systemd hostname settings
 description:
   - Gather the hostname, machine information and kernel identity reported by

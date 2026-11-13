@@ -7,7 +7,7 @@ DOCUMENTATION = r"""
 module: kopia_repository_info
 author:
   - Taylor Kimball (@tkimball83)
-version_added: 2.3.0
+version_added: "2.3.0"
 short_description: Gather kopia repository status
 description:
   - Gather the repository connection status from C(kopia repository status).

@@ -7,13 +7,22 @@ DOCUMENTATION = r"""
 module: kopia_repository
 author:
   - Taylor Kimball (@tkimball83)
-version_added: 2.3.0
+version_added: "2.3.0"
 short_description: Manage the kopia repository connection
 description:
   - Connect the host to a kopia repository, creating the repository when the
     storage location has not been initialized yet.
   - The module is idempotent on the connection state reported by
-    C(kopia repository status), so an already connected host is left untouched.
+    C(kopia repository status), so a host already connected to the repository
+    is left untouched.
+  - A host connected to a different repository fails rather than being
+    reconnected. The connection is different when its storage type differs
+    from O(storage), or when one of the O(options) C(bucket), C(container),
+    C(endpoint), C(folder_id), C(host), C(path), C(prefix), C(remote_path),
+    C(storage_account) or C(url) differs from the connected storage
+    configuration, after expanding environment variables in the option as the
+    command line does. Disconnect it with C(kopia repository disconnect) first
+    to switch repositories.
 options:
   config_file:
     description:
@@ -37,6 +46,8 @@ options:
       - Password securing the kopia repository.
       - Exported to the kopia CLI as E(KOPIA_PASSWORD), never on the command
         line.
+      - Also used to read the connection status, so a connection made with
+        V(persist_credentials) set to V(false) in O(options) is recognized.
     type: str
     required: true
   secrets:
@@ -49,6 +60,8 @@ options:
   storage:
     description:
       - Storage provider backing the repository.
+      - V(from-config) only connects to an existing repository described by a
+        configuration file or token, it cannot create one.
     type: str
     required: true
     choices:
@@ -65,7 +78,9 @@ options:
   validate_provider:
     description:
       - Run C(kopia repository validate-provider) after creating a repository.
-      - Only runs on creation, never for an existing repository.
+      - Only runs in the run that creates the repository, never for an existing
+        repository. When it fails, the repository has already been created and
+        a later run does not retry the validation.
     type: bool
     default: false
 requirements:
@@ -105,8 +120,11 @@ EXAMPLES = r"""
 
 RETURN = r"""
 repository:
-  description: Repository status reported by C(kopia repository status).
-  returned: when connected
+  description:
+    - Repository status reported by C(kopia repository status).
+    - Empty in check mode when a connection would be made, and when kopia is
+      unavailable in check mode.
+  returned: always
   type: dict
   sample:
     config_file: /root/.config/kopia/repository.config
@@ -127,6 +145,8 @@ repository:
     unique_id_hex: 557e318faad94ead
 """
 
+import os
+
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.common.dict_transformations import camel_dict_to_snake_dict
 
@@ -137,14 +157,79 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
     repository_status,
 )
 
+STORAGE_KEYS = {
+    "bucket": "bucket",
+    "container": "container",
+    "endpoint": "endpoint",
+    "folder_id": "folderID",
+    "host": "host",
+    "path": "path",
+    "prefix": "prefix",
+    "remote_path": "remotePath",
+    "storage_account": "storageAccount",
+    "url": "url",
+}
+
+STORAGE_TYPES = {"azure": "azureBlob"}
+
+
+def storage_description(module):
+    options = module.params["options"]
+    details = [f"{option}={options[option]}" for option in sorted(STORAGE_KEYS) if options.get(option) is not None]
+
+    return " ".join([module.params["storage"]] + details)
+
+
+def storage_value(storage, option, value):
+    value = os.path.expandvars(value)
+    home = os.environ.get("HOME", "")
+
+    if storage == "filesystem" and option == "path" and value.startswith("~") and home:
+        return home + value[1:]
+
+    return value
+
+
+def storage_mismatch(module, status):
+    storage = module.params["storage"]
+
+    if storage == "from-config":
+        return None
+
+    connected = status.get("storage") or {}
+    expected = STORAGE_TYPES.get(storage, storage)
+
+    if connected.get("type") != expected:
+        return f"storage type is {connected.get('type')}, not {expected}"
+
+    config = connected.get("config") or {}
+
+    for option, key in sorted(STORAGE_KEYS.items()):
+        value = module.params["options"].get(option)
+        if not isinstance(value, str):
+            continue
+
+        value = storage_value(storage, option, value)
+        if config.get(key, "") != value:
+            return f"{option} is {config.get(key, '')}, not {value}"
+
+    return None
+
 
 def ensure_present(module):
     if module.check_mode and not kopia_available(module):
         module.exit_json(changed=True, repository={})
 
-    status = repository_status(module)
+    password = module.params["password"]
+    status = repository_status(module, password=password)
 
     if status is not None:
+        mismatch = storage_mismatch(module, status)
+        if mismatch:
+            module.fail_json(
+                msg=f"already connected to a different repository than {storage_description(module)}: {mismatch}"
+            )
+
         module.exit_json(changed=False, repository=camel_dict_to_snake_dict(status))
 
     if module.check_mode:
@@ -153,19 +238,28 @@ def ensure_present(module):
     options = dict(module.params["options"])
     options.update(module.params["secrets"])
     target = [module.params["storage"]] + kopia_flags(options)
-    password = module.params["password"]
+    description = storage_description(module)
 
     rc, _dummy, stderr = kopia_command(module, ["repository", "connect"] + target, password=password)
 
-    if rc != 0 and "repository not initialized" in stderr:
+    if rc != 0 and "repository not initialized" in stderr and module.params["storage"] != "from-config":
         rc, _dummy, stderr = kopia_command(module, ["repository", "create"] + target, password=password)
-        if rc == 0 and module.params["validate_provider"]:
+
+        if rc != 0:
+            module.fail_json(msg=f"unable to create the kopia repository in {description}: {stderr.strip()}")
+
+        if module.params["validate_provider"]:
             rc, _dummy, stderr = kopia_command(module, ["repository", "validate-provider"], password=password)
 
-    if rc != 0:
-        module.fail_json(msg=f"unable to connect to kopia repository: {stderr.strip()}")
+            if rc != 0:
+                module.fail_json(
+                    msg=f"created the kopia repository in {description}, but validating the provider failed and is not retried on a later run: {stderr.strip()}"
+                )
 
-    status = repository_status(module)
+    if rc != 0:
+        module.fail_json(msg=f"unable to connect to the kopia repository in {description}: {stderr.strip()}")
+
+    status = repository_status(module, password=password)
 
     module.exit_json(changed=True, repository=camel_dict_to_snake_dict(status or {}))
 

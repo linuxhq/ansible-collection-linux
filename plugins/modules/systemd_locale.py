@@ -7,7 +7,7 @@ DOCUMENTATION = r"""
 module: systemd_locale
 author:
   - Taylor Kimball (@tkimball83)
-version_added: 2.4.0
+version_added: "2.4.0"
 short_description: Manage the systemd locale and keyboard settings
 description:
   - Manage the system locale, virtual console keymap and X11 keyboard layout

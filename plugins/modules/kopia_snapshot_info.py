@@ -7,7 +7,7 @@ DOCUMENTATION = r"""
 module: kopia_snapshot_info
 author:
   - Taylor Kimball (@tkimball83)
-version_added: 2.3.0
+version_added: "2.3.0"
 short_description: Gather information about kopia snapshots
 description:
   - Gather the snapshots held in the connected kopia repository, as reported by
@@ -55,7 +55,11 @@ EXAMPLES = r"""
 
 RETURN = r"""
 snapshots:
-  description: Snapshots reported by C(kopia snapshot list), oldest first.
+  description:
+    - Snapshots reported by C(kopia snapshot list), grouped by source and
+      oldest first within each source.
+    - Keys under C(tags) are returned as kopia reports them, such as
+      C(tag:role).
   returned: always
   type: list
   elements: dict
@@ -100,7 +104,7 @@ def list_snapshots(module):
     except ValueError:
         module.fail_json(msg=f"unable to parse kopia snapshot list output: {stdout.strip()}")
 
-    return [camel_dict_to_snake_dict(snapshot) for snapshot in snapshots or []]
+    return [camel_dict_to_snake_dict(snapshot, ignore_list=["tags"]) for snapshot in snapshots or []]
 
 
 def main():

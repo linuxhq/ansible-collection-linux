@@ -7,7 +7,7 @@ DOCUMENTATION = r"""
 module: systemd_timedate
 author:
   - Taylor Kimball (@tkimball83)
-version_added: 2.4.0
+version_added: "2.4.0"
 short_description: Manage the systemd time and date settings
 description:
   - Manage the time zone, hardware clock and network time settings owned by
@@ -56,7 +56,11 @@ options:
       - Setting the clock can never be idempotent, so this always reports a
         change. Prefer O(ntp) for keeping the clock correct.
       - C(systemd-timedated) refuses it while network time synchronization is
-        enabled, so pair it with O(ntp=false) on a host that has it on.
+        enabled, so pair it with O(ntp=false) on a host that has it on. The
+        module fails before writing any setting when network time
+        synchronization would still be enabled.
+      - An absolute time at or before the epoch is rejected before any setting
+        is written.
     type: str
   timezone:
     description:
@@ -333,16 +337,20 @@ def ensure_present(module):
     ntp = module.params["ntp"]
     if ntp is not None and current["ntp"] != ntp:
         if ntp and not current["can_ntp"]:
-            module.fail_json(
-                msg="unable to enable network time synchronization: " "no network time service is installed"
-            )
+            module.fail_json(msg="unable to enable network time synchronization: no network time service is installed")
 
         predicted["ntp"] = ntp
         pending.append(("SetNTP", (ntp, False)))
 
     value = module.params["time"]
     if value is not None:
+        if predicted["ntp"]:
+            module.fail_json(msg="unable to set time: network time synchronization is enabled, set ntp to false")
+
         usec, relative = parse_time(module, value, predicted["timezone"])
+
+        if not relative and usec <= 0:
+            module.fail_json(msg=f"unable to set time: invalid absolute time {value}")
 
         now = int(current_time().timestamp() * MICROSECONDS)
         predicted["time_usec"] = now + usec if relative else usec
