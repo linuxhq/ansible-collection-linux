@@ -307,14 +307,14 @@ def test_vconsole_reset_toggle_when_keymap_changes(module_factory):
             {"vconsole_keymap": "de", "x11_options": "grp:alt_shift_toggle"},
             "terminate:ctrl_alt_bksp",
             "terminate:ctrl_alt_bksp",
-            ("de", "pc105+inet", "", "grp:alt_shift_toggle", True, False),
+            ("de", "pc105+inet", "", "grp:alt_shift_toggle", False, False),
         ),
         # a requested X11 value that matched before the conversion is written again
         (
             {"vconsole_keymap": "de", "x11_options": "grp:alt_shift_toggle"},
             "grp:alt_shift_toggle",
             "terminate:ctrl_alt_bksp",
-            ("de", "pc105+inet", "", "grp:alt_shift_toggle", True, False),
+            ("de", "pc105+inet", "", "grp:alt_shift_toggle", False, False),
         ),
         # nothing requested still differs after the conversion
         (
@@ -341,6 +341,27 @@ def test_x11_keyboard_compares_against_converted_settings(
     calls = [entry.args[2:] for entry in mutate.call_args_list]
     assert calls[0] == ("SetVConsoleKeyboard", "de", "", True, False)
     assert calls[1:] == ([("SetX11Keyboard", *x11_args)] if x11_args else [])
+
+
+@pytest.mark.parametrize(
+    "params,convert",
+    [
+        ({"x11_options": "grp:alt_shift_toggle"}, True),
+        ({"x11_layout": "de", "x11_options": "grp:alt_shift_toggle"}, True),
+        ({"vconsole_keymap": "us", "vconsole_keymap_toggle": "ru", "x11_options": "grp:alt_shift_toggle"}, False),
+        ({"vconsole_keymap": "us", "x11_options": "grp:alt_shift_toggle"}, False),
+        ({"vconsole_keymap_toggle": "", "x11_options": "grp:alt_shift_toggle"}, False),
+    ],
+)
+def test_x11_keyboard_converts_only_without_console_settings(monkeypatch, run_module, params, convert):
+    monkeypatch.setattr(systemd_locale, "HAS_DASBUS", True)
+    monkeypatch.setattr(systemd_locale, "systemd_proxy", Mock())
+    monkeypatch.setattr(systemd_locale, "locale_status", Mock(return_value=LOCALE))
+    mutate = Mock()
+    monkeypatch.setattr(systemd_locale, "systemd_call", mutate)
+    assert run_module(systemd_locale, params)["changed"]
+    calls = [entry.args[2:] for entry in mutate.call_args_list]
+    assert calls[-1][0] == "SetX11Keyboard" and calls[-1][-2:] == (convert, False)
 
 
 def test_timedate_setter_order_and_arguments(monkeypatch, run_module):

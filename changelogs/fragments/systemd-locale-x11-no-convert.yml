@@ -1,0 +1,8 @@
+---
+bugfixes:
+  - systemd_locale - write the X11 keyboard settings without converting them
+    back into the console keymap when ``vconsole_keymap`` or
+    ``vconsole_keymap_toggle`` is also set, so systemd 257 no longer clears
+    the requested ``vconsole_keymap_toggle``, a ``vconsole_keymap`` and an
+    ``x11_layout`` that do not correspond no longer overwrite each other, and
+    the task converges instead of reporting a change on every run.

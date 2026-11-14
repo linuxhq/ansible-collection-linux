@@ -202,6 +202,14 @@ def check_config_password(password):
     if not password or not password.strip(GO_WHITESPACE):
         raise ValueError("no characters in password")
 
+    # NFKC of a code point unknown to this Python may differ from rclone's newer tables
+    for character in password:
+        if unicodedata.category(character) == "Cn":
+            raise ValueError(
+                f"character U+{ord(character):04X} is unassigned in Unicode {unicodedata.unidata_version},"
+                " the version of this Python, so its normalization may differ from rclone's"
+            )
+
     return password
 
 
