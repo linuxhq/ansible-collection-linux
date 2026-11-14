@@ -49,11 +49,12 @@ options:
     description:
       - System time to set, as C(timedatectl set-time) accepts.
       - Understood forms match C(systemd.time(7)), that is V(now), V(today),
-        V(yesterday), V(tomorrow), V(@) followed by seconds since the epoch,
-        relative spans such as V(+3h30min) or V(-1w), and timestamps such as
-        V(2026-07-26 14:30:00.5), V(Sun 2026-07-26 14:30), V(26-07-26),
-        V(2026-07-26), V(14:30:00) or V(14:30), each optionally suffixed with
-        V(UTC).
+        V(yesterday), V(tomorrow), V(@) followed by a span since the epoch
+        such as V(@1784083200) or V(@20434d), relative spans such as
+        V(+3h30min), V(-1w), V(+.5s), V(5min ago) or V(5min left), and
+        timestamps such as V(2026-07-26 14:30:00.5), V(Sun 2026-07-26 14:30),
+        V(26-07-26), V(2026-07-26), V(14:30:00) or V(14:30), each optionally
+        suffixed with V(UTC).
       - V(now) sets the clock to the current time read by the module right
         before it sets the clock, after the other settings in the same task are
         applied, as C(timedatectl set-time now) does.
@@ -215,7 +216,7 @@ UNITS = [
     ("y", 31557600 * MICROSECONDS),
 ]
 
-SPAN = re.compile(r"\s*(\d+(?:\.\d+)?)\s*([^\W\d_]*)", re.UNICODE)
+SPAN = re.compile(r"[ \t\n\r]*([0-9]+(?:\.[0-9]+)?|\.[0-9]+)[ \t\n\r]*([^\W\d_]*)")
 
 SETTINGS = ["local_rtc", "ntp", "time", "timezone"]
 
@@ -229,6 +230,7 @@ def current_time(utc=False):
 def parse_span(value):
     total = 0.0
     position = 0
+    value = value.rstrip(" \t\n\r")
 
     while position < len(value):
         match = SPAN.match(value, position)
@@ -272,17 +274,22 @@ def parse_stamp(value, utc):
 
 def parse_value(module, value):
     if value.startswith("@"):
-        try:
-            return int(float(value[1:]) * MICROSECONDS), False
-        except (OverflowError, ValueError):
-            module.fail_json(msg=f"unable to parse the time specification: {value}")
-
-    if value.startswith(("+", "-")):
         span = parse_span(value[1:])
         if span is None:
             module.fail_json(msg=f"unable to parse the time specification: {value}")
 
-        sign = -1 if value.startswith("-") else 1
+        return span, False
+
+    sign = None
+    if value.startswith(("+", "-")):
+        sign, span = (-1 if value.startswith("-") else 1), value[1:]
+    elif value.endswith((" ago", " left")):
+        sign, span = (-1 if value.endswith(" ago") else 1), value.rpartition(" ")[0]
+
+    if sign is not None:
+        span = parse_span(span)
+        if span is None:
+            module.fail_json(msg=f"unable to parse the time specification: {value}")
 
         return sign * span, True
 

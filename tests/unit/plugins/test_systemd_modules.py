@@ -201,10 +201,19 @@ def test_ntp_requires_available_service(monkeypatch, run_module):
         ("3us", 3),
         ("500\u00b5s", 500),
         ("500\u03bcs", 500),
+        (".5s", 500000),
+        ("12.34s.56", 12900000),
+        ("1min 30s ", 90000000),
         ("0", 0),
         ("", None),
         ("1fortnight", None),
         ("bad", None),
+        # systemd accepts only ASCII digits, an optional fraction and no exponent or separators
+        ("\u0663h", None),
+        ("\u0661\u0660", None),
+        ("1e9", None),
+        ("1_000", None),
+        ("5.", None),
     ],
 )
 def test_parse_duration(value, expected):
@@ -215,8 +224,13 @@ def test_parse_duration(value, expected):
     "value,expected",
     [
         ("@1.5", (1500000, False)),
+        ("@1h", (3600000000, False)),
+        ("@1min 30s", (90000000, False)),
         ("+2min", (120000000, True)),
+        ("+.5s", (500000, True)),
         ("-1h", (-3600000000, True)),
+        ("5min ago", (-300000000, True)),
+        ("5min left", (300000000, True)),
         ("now", (1784084400000000, False)),
         ("now UTC", (1784084400000000, False)),
         ("1970-01-01 00:00:01 UTC", (1000000, False)),
@@ -460,7 +474,25 @@ def test_timedate_setter_order_and_arguments(monkeypatch, run_module):
     assert systemd_timedate.parse_time.call_args.args[1:] == ("+1.5s", "Europe/Berlin")
 
 
-@pytest.mark.parametrize("value", ["@invalid", "+bad", "-bad", "never", "Fri, 1970-01-01 UTC", "Sun 2026-07-27"])
+@pytest.mark.parametrize(
+    "value",
+    [
+        "@invalid",
+        "@-5",
+        "@1e9",
+        "@1_000",
+        "@\u0661\u0660",
+        "+bad",
+        "-bad",
+        "+\u0663h",
+        "ago",
+        "+5min ago",
+        "5min ago UTC",
+        "never",
+        "Fri, 1970-01-01 UTC",
+        "Sun 2026-07-27",
+    ],
+)
 def test_invalid_time_specification(module_factory, invoke, value):
     result = invoke(systemd_timedate.parse_value, module_factory(), value)
     assert result["failed"] and "unable to parse" in result["msg"]
@@ -835,7 +867,7 @@ def test_time_requires_ntp_disabled_before_any_write(monkeypatch, run_module):
 
 @pytest.mark.parametrize(
     "value",
-    ["@0", "@-5", "1970-01-01 00:00:00 UTC", "-60y", "-100y", "@1e13", "+300000y", "-300000y"],
+    ["@0", "1970-01-01 00:00:00 UTC", "-60y", "-100y", "60y ago", "@10000000000000", "+300000y", "-300000y"],
 )
 @pytest.mark.parametrize("check_mode", [False, True])
 def test_time_rejects_invalid_time_before_any_write(monkeypatch, run_module, value, check_mode):
@@ -849,7 +881,7 @@ def test_time_rejects_invalid_time_before_any_write(monkeypatch, run_module, val
     mutate.assert_not_called()
 
 
-@pytest.mark.parametrize("value", ["@1e400", "+" + "9" * 400])
+@pytest.mark.parametrize("value", ["@" + "9" * 400, "+" + "9" * 400])
 def test_time_rejects_infinite_time_before_any_write(monkeypatch, run_module, value):
     monkeypatch.setattr(systemd_timedate, "systemd_proxy", Mock())
     monkeypatch.setattr(systemd_timedate, "systemd_properties", Mock(return_value=TIMEDATE))

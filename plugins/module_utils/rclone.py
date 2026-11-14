@@ -22,6 +22,8 @@ except ImportError:
     except ImportError:
         HAS_PYCRYPTODOME = False
 
+from ansible.module_utils.common.text.converters import to_bytes, to_text
+
 SECRET_KEY = (
     b"\x9c\x93\x5b\x48\x73\x0a\x55\x4d\x6b\xfd\x7c\x63\xc8\x86\xa9\x2b"
     b"\xd3\x90\x19\x8e\xb8\x12\x8a\xfb\xf4\xde\x16\x2b\x8b\x95\xf6\x38"
@@ -33,6 +35,9 @@ CONFIG_HEADER = "# Encrypted rclone configuration File"
 CONFIG_MARKER = "RCLONE_ENCRYPT_V0:"
 CONFIG_NONCE_SIZE = 24
 CONFIG_TAG_SIZE = 16
+
+# rclone reads the configuration header with bufio.Reader.ReadLine, which returns a longer line in pieces.
+CONFIG_READ_SIZE = 4096
 
 # Go's norm package inserts U+034F after this many consecutive non-starters (UAX #15 Stream-Safe Text Format).
 MAX_NON_STARTERS = 30
@@ -258,17 +263,39 @@ def check_config_password(password):
     return password
 
 
-def config_body(text):
-    lines = text.split("\n")
+def config_lines(data):
+    # Yield each line as Go's bufio.Reader.ReadLine returns it, with the offset of the rest of the data.
+    position = 0
 
-    for index, line in enumerate(lines):
-        stripped = line.strip(GO_WHITESPACE)
+    while position < len(data):
+        window = data[position : position + CONFIG_READ_SIZE]
+        end = window.find(b"\n")
+
+        if end != -1:
+            line, position = window[:end], position + end + 1
+            line = line[:-1] if line.endswith(b"\r") else line
+        elif len(window) == CONFIG_READ_SIZE:
+            # a full buffer is returned as a piece of the line, keeping a final "\r" for the next piece
+            line = window[:-1] if window.endswith(b"\r") else window
+            position += len(line)
+        else:
+            line, position = window, len(data)
+
+        yield line, position
+
+
+def config_body(text):
+    data = to_bytes(text, errors="surrogate_or_strict")
+
+    for line, position in config_lines(data):
+        stripped = to_text(line, errors="surrogate_or_strict").strip(GO_WHITESPACE)
 
         if not stripped or stripped.startswith(("#", ";")):
             continue
 
         if stripped == CONFIG_MARKER:
-            return "".join(lines[index + 1 :]).replace("\r", "")
+            # Go's base64 decoder skips "\r" and "\n", including those left in the rest of the marker line
+            return data[position:].replace(b"\r", b"").replace(b"\n", b"")
 
         if stripped.startswith("RCLONE_ENCRYPT_V"):
             raise ValueError("unsupported configuration encryption, update rclone for support")

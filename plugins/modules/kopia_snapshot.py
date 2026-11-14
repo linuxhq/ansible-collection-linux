@@ -20,6 +20,15 @@ description:
     a new snapshot. The module then reports RV(ignore:changed) as V(false) and
     returns the existing newest snapshot. Otherwise it reports
     RV(ignore:changed) as V(true).
+  - When kopia saves the snapshot but reports fatal errors found while
+    snapshotting, such as a file it cannot read, the module fails, reports
+    RV(ignore:changed) as V(true) and returns the saved snapshot in
+    RV(snapshot).
+notes:
+  - A failure reported by kopia after it saved the snapshot without printing
+    it, such as applying the retention policy or pinning, cannot be told apart
+    from a snapshot that was not saved. The module then fails without reporting
+    a change.
 options:
   config_file:
     description:
@@ -91,6 +100,8 @@ snapshot:
       it saves it, or the existing newest snapshot when kopia skipped an
       identical snapshot. When the printed ID cannot be read or is not listed,
       the newest snapshot is returned.
+    - Also returned when the module fails because kopia reported errors after
+      saving the snapshot.
     - Keys under C(tags) are returned as kopia reports them, such as
       C(tag:role).
     - Empty in check mode and when the snapshot manifest cannot be read back.
@@ -161,6 +172,16 @@ def ensure_present(module):
         command.append(f"--tags={key}:{value}")
 
     rc, stdout, stderr = kopia_command(module, command, password=module.params["password"])
+    snapshot_id = created_snapshot_id(stdout)
+
+    if rc != 0 and snapshot_id:
+        # kopia prints the manifest once the snapshot is saved, then fails when
+        # it found fatal errors, such as an unreadable file, while snapshotting
+        module.fail_json(
+            msg=f"created kopia snapshot {snapshot_id} of {path}, but kopia reported errors: {stderr.strip()}",
+            changed=True,
+            snapshot=latest_snapshot(module, path, snapshot_id),
+        )
 
     if rc != 0:
         module.fail_json(msg=f"unable to create kopia snapshot of {path}: {stderr.strip()}")
@@ -170,7 +191,7 @@ def ensure_present(module):
     if not stdout.strip():
         module.exit_json(changed=False, snapshot=latest_snapshot(module, path))
 
-    module.exit_json(changed=True, snapshot=latest_snapshot(module, path, created_snapshot_id(stdout)))
+    module.exit_json(changed=True, snapshot=latest_snapshot(module, path, snapshot_id))
 
 
 def main():

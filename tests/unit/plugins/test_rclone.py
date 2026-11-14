@@ -73,7 +73,7 @@ def test_config_password_trims_go_whitespace_only(password):
 
 
 def test_config_header_trims_go_whitespace_only():
-    assert rclone.config_body("\u00a0RCLONE_ENCRYPT_V0:\u3000\nabcd") == "abcd"
+    assert rclone.config_body("\u00a0RCLONE_ENCRYPT_V0:\u3000\nabcd") == b"abcd"
     assert not rclone.is_encrypted("\x1fRCLONE_ENCRYPT_V0:\nAAAA")
     assert not rclone.is_encrypted("\x1c# comment\nRCLONE_ENCRYPT_V0:\nAAAA")
 
@@ -106,7 +106,7 @@ def test_plaintext_is_not_encrypted(text):
 
 
 def test_config_header_and_wrapped_payload():
-    assert rclone.config_body("# comment\n; comment\n\n RCLONE_ENCRYPT_V0: \nabcd\r\nefgh\n") == "abcdefgh"
+    assert rclone.config_body("# comment\n; comment\n\n RCLONE_ENCRYPT_V0: \nabcd\r\nefgh\n") == b"abcdefgh"
     with pytest.raises(ValueError, match="unsupported"):
         rclone.config_body("RCLONE_ENCRYPT_V1:\nAAAA")
 
@@ -147,6 +147,29 @@ def test_config_payload_rejects_other_whitespace(separator):
 
 def test_config_lines_split_on_newline_only():
     assert not rclone.is_encrypted("# comment\x0bRCLONE_ENCRYPT_V0:\nAAAA")
+
+
+@pytest.mark.parametrize(
+    "header,encrypted",
+    [
+        # rclone reads header lines in 4096-byte pieces, so the rest of a longer comment is not a comment
+        ("#" + "x" * 4095 + "\n", True),
+        ("#" + "x" * 4096 + "\n", False),
+        ("#" + "x" * 4094 + "\r\n", True),
+        # a "\r" ending a piece moves to the next one
+        ("#" + "x" * 4094 + "\r" + " " * 4095 + "#comment\n", True),
+        (" " * 5000 + "\n", True),
+        ("\u3000" * 2000 + "\n", False),
+    ],
+)
+def test_config_header_lines_are_read_in_pieces(header, encrypted):
+    assert rclone.is_encrypted(header + RCLONE_CONFIG) is encrypted
+
+
+def test_config_marker_line_rest_is_payload():
+    payload = RCLONE_CONFIG.rsplit("\n", 1)[1]
+    marker = "RCLONE_ENCRYPT_V0:" + " " * (4096 - len("RCLONE_ENCRYPT_V0:"))
+    assert rclone.decrypt_config(f"{marker}{payload}", RCLONE_CONFIG_PASSWORD) == b"[vector]\ntype = local\n\n"
 
 
 @pytest.mark.parametrize(

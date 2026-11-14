@@ -8,3 +8,7 @@ bugfixes:
     ID kopia prints when it saves it. The module returned the newest snapshot
     listed for the path, which could be one created by a scheduled snapshot or
     another run in between.
+  - kopia_snapshot - report a change and return the saved snapshot when kopia
+    saves the snapshot but then fails because it found fatal errors while
+    snapshotting, such as a file it cannot read. The module failed without a
+    change or snapshot, so a retry took another snapshot.

@@ -214,6 +214,39 @@ def test_surrogate_password_character_is_rejected(monkeypatch, tmp_path, run_mod
     )
 
 
+@pytest.mark.parametrize("character", [chr(0xD800), chr(0xDBFF), chr(0xDC00), chr(0xDC7F)])
+@pytest.mark.parametrize("state", ["present", "absent"])
+@pytest.mark.parametrize("crypto", [True, False])
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_surrogate_content_character_is_rejected(
+    monkeypatch, tmp_path, run_module, character, state, crypto, check_mode
+):
+    monkeypatch.setattr(plugin, "HAS_PYCRYPTODOME", crypto)
+    path = tmp_path / "config"
+    params = {"path": str(path), "password": "secret", "state": state, "content": f"[remote]{character}\n"}
+    result = run_module(plugin, params, check_mode)
+    assert not path.exists()
+    assert result["failed"] and result["msg"] == (
+        f"invalid content for configuration file {path}: character U+{ord(character):04X} is a surrogate,"
+        " which is not valid UTF-8"
+    )
+
+
+@pytest.mark.parametrize("state", ["present", "absent"])
+def test_escaped_content_bytes_are_written(tmp_path, run_module, state):
+    # Ansible passes bytes that are not valid UTF-8 as U+DC80 to U+DCFF
+    path = tmp_path / "config"
+    result = run_module(plugin, {"path": str(path), "password": "secret", "state": state, "content": "a\udcff\udc80"})
+    assert result["changed"]
+    written = path.read_bytes()
+    assert (rclone.decrypt_config(written, "secret") if state == "present" else written) == b"a\xff\x80"
+
+
+def test_backward_combining_letter_is_a_non_starter():
+    # U+16D67 is unassigned on Pythons before Unicode 16, so it must be counted without the Unicode tables
+    assert rclone.is_non_starter("\U00016d67")
+
+
 @pytest.mark.parametrize(
     "password",
     [
