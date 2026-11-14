@@ -39,12 +39,18 @@ notes:
     into C(/etc/vconsole.conf). Debian 12 writes O(locale) to
     C(/etc/default/locale) unless C(/etc/locale.conf) exists, and the X11
     keyboard settings to C(/etc/default/keyboard).
-  - The console keymap and the X11 layout are converted into each other, as
-    C(localectl) does by default, so managing both O(vconsole_keymap) and the
-    O(x11_layout) options with values that do not correspond leaves each run
-    overwriting the other.
+  - A written console keymap is converted into the X11 keyboard settings, as
+    C(localectl set-keymap) does by default, and the C(x11_*) options that are
+    set are then applied over the converted values without converting them back,
+    so O(vconsole_keymap) and O(x11_layout) can be managed together with values
+    that do not correspond.
+  - When only C(x11_*) options are set, the X11 keyboard settings are converted
+    into the console keymap, as C(localectl set-x11-keymap) does by default.
+    On systemd 257, as on EL 10 and Debian 13, that conversion also clears the
+    console toggle keymap, as C(localectl set-x11-keymap) does there.
   - Check mode cannot predict the converted values, so the reported counterpart
-    fields can differ from the ones a real run produces.
+    fields, including a toggle keymap cleared by that conversion, can differ
+    from the ones a real run produces.
   - Only C(systemd-localed) can tell whether a console keymap or an X11 layout
     exists, so one it refuses is reported after the earlier settings in the
     same task, such as O(locale), are applied.
@@ -320,7 +326,10 @@ def ensure_present(module):
         keyboard = keyboard_change(module, locale_status(module, proxy), X11_SETTINGS)
 
     if keyboard is not None:
-        systemd_call(module, proxy, "SetX11Keyboard", *(keyboard[name] for name in X11_SETTINGS), True, False)
+        # Converting back would replace the requested console settings, systemd 257 drops the toggle keymap
+        convert = all(module.params[name] is None for name in VCONSOLE_SETTINGS)
+
+        systemd_call(module, proxy, "SetX11Keyboard", *(keyboard[name] for name in X11_SETTINGS), convert, False)
 
     current = locale_status(module, proxy)
 
