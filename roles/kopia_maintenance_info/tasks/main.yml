@@ -4,7 +4,7 @@
     - kopia_maintenance_info
   become: true
   linuxhq.linux.kopia_maintenance_info:
-    config_file: "{{ kopia_maintenance_info_config_file | d(omit) }}"
+    config_file: "{{ kopia_maintenance_info_config_file if kopia_maintenance_info_config_file is not none else omit }}"
   register: __kopia_maintenance_info_query
 
 - name: Ensure kopia maintenance facts are generated

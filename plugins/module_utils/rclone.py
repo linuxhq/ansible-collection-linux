@@ -34,6 +34,9 @@ CONFIG_MARKER = "RCLONE_ENCRYPT_V0:"
 CONFIG_NONCE_SIZE = 24
 CONFIG_TAG_SIZE = 16
 
+# Go's norm package inserts U+034F after this many consecutive non-starters (UAX #15 Stream-Safe Text Format).
+MAX_NON_STARTERS = 30
+
 # Unicode White_Space, which Go's strings.TrimSpace removes. str.strip() also removes U+001C to U+001F.
 GO_WHITESPACE = "\t\n\v\f\r \x85\xa0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000"
 
@@ -198,16 +201,33 @@ def config_key(password):
     return hashlib.sha256(seed.encode("utf-8")).digest()
 
 
+def is_noncharacter(character):
+    codepoint = ord(character)
+
+    return 0xFDD0 <= codepoint <= 0xFDEF or codepoint & 0xFFFE == 0xFFFE
+
+
 def check_config_password(password):
     if not password or not password.strip(GO_WHITESPACE):
         raise ValueError("no characters in password")
 
     # NFKC of a code point unknown to this Python may differ from rclone's newer tables
     for character in password:
-        if unicodedata.category(character) == "Cn":
+        if unicodedata.category(character) == "Cn" and not is_noncharacter(character):
             raise ValueError(
                 f"character U+{ord(character):04X} is unassigned in Unicode {unicodedata.unidata_version},"
                 " the version of this Python, so its normalization may differ from rclone's"
+            )
+
+    # Python does not insert U+034F into a long run of non-starters, as rclone does
+    run = 0
+    for character in unicodedata.normalize("NFKD", password):
+        run = run + 1 if unicodedata.combining(character) else 0
+
+        if run > MAX_NON_STARTERS:
+            raise ValueError(
+                f"password has more than {MAX_NON_STARTERS} consecutive combining characters,"
+                " which rclone normalizes differently"
             )
 
     return password

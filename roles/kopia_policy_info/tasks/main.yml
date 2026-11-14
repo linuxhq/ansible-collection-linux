@@ -4,8 +4,8 @@
     - kopia_policy_info
   become: true
   linuxhq.linux.kopia_policy_info:
-    config_file: "{{ kopia_policy_info_config_file | d(omit) }}"
-    target: "{{ kopia_policy_info_target | d(omit) }}"
+    config_file: "{{ kopia_policy_info_config_file if kopia_policy_info_config_file is not none else omit }}"
+    target: "{{ kopia_policy_info_target if kopia_policy_info_target is not none else omit }}"
   register: __kopia_policy_info_query
 
 - name: Ensure kopia policy facts are generated

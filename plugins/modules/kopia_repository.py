@@ -27,6 +27,8 @@ description:
     compared as a normalized path, so V(/srv/kopia/) and V(//srv/kopia) match
     V(/srv/kopia). Disconnect it with
     C(kopia repository disconnect) first to switch repositories.
+  - With O(storage=from-config), the existing connection is not compared, so
+    a host already connected to any repository is left untouched.
 options:
   config_file:
     description:
