@@ -305,14 +305,8 @@ def ensure_present(module):
     keyboard = keyboard_change(module, current, X11_SETTINGS)
     if keyboard is not None:
         predicted.update(keyboard)
-        pending.append(
-            (
-                "SetX11Keyboard",
-                tuple(keyboard[name] for name in X11_SETTINGS) + (True, False),
-            )
-        )
 
-    if not pending:
+    if not pending and keyboard is None:
         module.exit_json(changed=False, locale=current)
 
     if module.check_mode:
@@ -320,6 +314,13 @@ def ensure_present(module):
 
     for method, args in pending:
         systemd_call(module, proxy, method, *args)
+
+    if keymap is not None and any(module.params[name] is not None for name in X11_SETTINGS):
+        # SetVConsoleKeyboard converts the keymap into the X11 settings, so compare against those
+        keyboard = keyboard_change(module, locale_status(module, proxy), X11_SETTINGS)
+
+    if keyboard is not None:
+        systemd_call(module, proxy, "SetX11Keyboard", *(keyboard[name] for name in X11_SETTINGS), True, False)
 
     current = locale_status(module, proxy)
 

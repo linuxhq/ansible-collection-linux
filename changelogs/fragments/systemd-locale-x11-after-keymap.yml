@@ -1,0 +1,6 @@
+---
+bugfixes:
+  - systemd_locale - compare the X11 keyboard settings against the values
+    systemd-localed converted from a new ``vconsole_keymap`` before writing
+    them, so X11 options left unset no longer write back the old layout and
+    revert the console keymap, and the task converges in one run.
