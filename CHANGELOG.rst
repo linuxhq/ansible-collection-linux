@@ -4,6 +4,14 @@ linuxhq.linux Release Notes
 
 .. contents:: Topics
 
+v2.4.12
+=======
+
+Bugfixes
+--------
+
+- post_transaction_actions role - write action files with the ``.action`` extension, which the dnf plugin requires; ``.conf`` files were ignored (https://github.com/linuxhq/ansible-collection-linux/pull/68).
+
 v2.4.11
 =======
 
