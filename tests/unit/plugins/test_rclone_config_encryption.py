@@ -141,8 +141,43 @@ def test_unassigned_password_character_is_rejected(monkeypatch, tmp_path, run_mo
     )
 
 
-@pytest.mark.parametrize("password", ["pāss🔑", "e\u0301", "\uff21\u2460"])
-def test_assigned_non_ascii_password_is_accepted(tmp_path, run_module, password):
+@pytest.mark.parametrize(
+    "password",
+    ["a" + "\u0301" * 31, "\u00e9" + "\u0301" * 30, "a" + "\u0344" * 16, "a" + "\u0301" * 30 + "b" + "\u0301" * 31],
+)
+@pytest.mark.parametrize("state", ["present", "absent"])
+@pytest.mark.parametrize("crypto", [True, False])
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_long_combining_run_password_is_rejected(
+    monkeypatch, tmp_path, run_module, password, state, crypto, check_mode
+):
+    monkeypatch.setattr(plugin, "HAS_PYCRYPTODOME", crypto)
+    path = tmp_path / "config"
+    params = {"path": str(path), "password": password, "state": state, "content": "config"}
+    result = run_module(plugin, params, check_mode)
+    assert not path.exists()
+    assert result["failed"] and result["msg"] == (
+        f"invalid password for configuration file {path}: password has more than 30 consecutive combining "
+        "characters, which rclone normalizes differently"
+    )
+
+
+@pytest.mark.parametrize(
+    "password",
+    [
+        "pāss🔑",
+        "e\u0301",
+        "\uff21\u2460",
+        "a" + "\u0301" * 30,
+        "\u00e9" + "\u0301" * 29,
+        "a" + "\u0344" * 15,
+        "a" + "\u0301" * 30 + "b" + "\u0301" * 30,
+        "pw\uffff",
+        "pw\ufdd0",
+        "pw\U0010fffe",
+    ],
+)
+def test_non_ascii_password_is_accepted(tmp_path, run_module, password):
     path = tmp_path / "rclone.conf"
     result = run_module(plugin, {"path": str(path), "password": password, "content": "config"})
     assert result["changed"] and not result.get("failed")

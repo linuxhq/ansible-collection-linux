@@ -1,0 +1,8 @@
+---
+bugfixes:
+  - systemd_locale - correct the note on converting X11-only changes, which
+    clear the console toggle keymap on systemd 252 when the converted keymap
+    differs from the current one and on systemd 253 and later even when it
+    does not, not only on systemd 257.
+  - kopia_repository - document that with ``storage=from-config`` an existing
+    connection is not compared and is left untouched.

@@ -57,9 +57,13 @@ options:
       - The password is NFKC normalized with the Unicode tables of the Python
         on the managed node, which can be older than the ones rclone is built
         with. A password containing a character that is unassigned in those
-        tables is rejected, because rclone may normalize it differently. A
-        character that this Python normalizes but an older rclone build does
-        not cannot be detected.
+        tables is rejected, because rclone may normalize it differently.
+        Unicode noncharacters, such as U+FFFF, are permanently unassigned and
+        are accepted. A character that this Python normalizes but an older
+        rclone build does not cannot be detected.
+      - A password whose compatibility decomposition has a run of more than 30
+        consecutive combining characters is rejected, because rclone inserts
+        U+034F into such a run while normalizing and this Python does not.
     type: str
   path:
     description:

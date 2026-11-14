@@ -32,7 +32,7 @@
     content:
       "{{ lookup('ansible.builtin.template', 'rclone.conf.j2') | d('', true) }}"
     mode: '0600'
-    password: "{{ rclone_config_pass | d(omit) }}"
+    password: "{{ rclone_config_pass if rclone_config_pass is not none else omit }}"
     path: ~/.config/rclone/rclone.conf
     state: "{{ 'present' if rclone_config_pass is not none else 'absent' }}"
 ...

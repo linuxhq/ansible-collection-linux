@@ -46,8 +46,11 @@ notes:
     that do not correspond.
   - When only C(x11_*) options are set, the X11 keyboard settings are converted
     into the console keymap, as C(localectl set-x11-keymap) does by default.
-    On systemd 257, as on EL 10 and Debian 13, that conversion also clears the
-    console toggle keymap, as C(localectl set-x11-keymap) does there.
+    That conversion also clears the console toggle keymap, as
+    C(localectl set-x11-keymap) does. On systemd 252, as on EL 9 and Debian 12,
+    it clears the toggle keymap only when the converted console keymap differs
+    from the current one. On systemd 253 and later, as on EL 10 and Debian 13,
+    it clears the toggle keymap even when the console keymap stays the same.
   - Check mode cannot predict the converted values, so the reported counterpart
     fields, including a toggle keymap cleared by that conversion, can differ
     from the ones a real run produces.
@@ -326,7 +329,7 @@ def ensure_present(module):
         keyboard = keyboard_change(module, locale_status(module, proxy), X11_SETTINGS)
 
     if keyboard is not None:
-        # Converting back would replace the requested console settings, systemd 257 drops the toggle keymap
+        # Converting back would replace the requested console settings and can drop the toggle keymap
         convert = all(module.params[name] is None for name in VCONSOLE_SETTINGS)
 
         systemd_call(module, proxy, "SetX11Keyboard", *(keyboard[name] for name in X11_SETTINGS), convert, False)
