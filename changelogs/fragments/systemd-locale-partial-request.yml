@@ -9,5 +9,4 @@ bugfixes:
 breaking_changes:
   - systemd_locale - requires systemd 239 or later, the first version whose
     systemd-localed merges a partial locale request instead of clearing the
-    variables left out, and the role declares EL 9 and 10 and Debian 12
-    (bookworm) and 13 (trixie) only.
+    variables left out.

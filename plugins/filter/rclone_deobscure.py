@@ -16,6 +16,8 @@ description:
     rejects it.
   - Other values that rclone would reject, such as those containing
     characters outside the unpadded base64url alphabet, raise an error.
+  - A value that reveals bytes which are not valid UTF-8 raises an error, as
+    the result must be a string.
   - A vault encrypted value is decrypted before it is revealed.
 positional: _input
 options:

@@ -138,7 +138,7 @@ def ensure_present(module):
     rc, _dummy, stderr = kopia_command(module, command, password=module.params["password"])
 
     if rc != 0:
-        module.fail_json(msg=f"unable to create kopia snapshot: {stderr.strip()}")
+        module.fail_json(msg=f"unable to create kopia snapshot of {path}: {stderr.strip()}")
 
     module.exit_json(changed=True, snapshot=latest_snapshot(module, path))
 

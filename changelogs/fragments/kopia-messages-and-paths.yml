@@ -1,0 +1,11 @@
+---
+bugfixes:
+  - kopia_maintenance - reject an empty ``owner`` before querying kopia, which
+    ignores an empty ``--owner``, so later runs failed with no changes
+    specified.
+  - kopia_policy, kopia_policy_info - name the target in failure messages.
+  - kopia_snapshot, kopia_snapshot_info - name the path in failure messages.
+  - kopia_repository - compare the ``path`` of ``filesystem`` storage as a
+    normalized path, so a connection made with ``/srv/kopia/`` or
+    ``//srv/kopia`` matches ``/srv/kopia`` instead of failing as a different
+    repository.

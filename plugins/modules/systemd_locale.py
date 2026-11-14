@@ -28,8 +28,17 @@ notes:
     C(systemd-localed) may derive C(LANGUAGE) from its own language fallback
     map. Check mode cannot predict that value, so the reported C(language)
     field can differ from the one a real run produces.
-  - C(systemd-localed) rejects a locale that is not generated on the machine, so
-    generate it first with M(community.general.locale_gen).
+  - On EL, C(systemd-localed) rejects a locale that is not installed on the
+    machine, so install it first. On Debian, it enables a missing locale in
+    C(/etc/locale.gen) and runs C(locale-gen) before it returns, which can take
+    a while when many locales are enabled.
+  - C(systemd-localed) chooses the files it writes. On EL 9 and 10 and Debian
+    13 it writes O(locale) to C(/etc/locale.conf), O(vconsole_keymap) to
+    C(/etc/vconsole.conf) and the X11 keyboard settings to
+    C(/etc/X11/xorg.conf.d/00-keyboard.conf), which systemd 257 also copies
+    into C(/etc/vconsole.conf). Debian 12 writes O(locale) to
+    C(/etc/default/locale) unless C(/etc/locale.conf) exists, and the X11
+    keyboard settings to C(/etc/default/keyboard).
   - The console keymap and the X11 layout are converted into each other, as
     C(localectl) does by default, so managing both O(vconsole_keymap) and the
     O(x11_layout) options with values that do not correspond leaves each run
@@ -42,7 +51,7 @@ notes:
 options:
   locale:
     description:
-      - Locale variables written to C(/etc/locale.conf).
+      - Locale variables of the system locale.
       - Variables left unset are not touched. C(systemd-localed) merges a partial
         request into the variables already configured and offers no way to clear
         one, so an empty value is ignored rather than unsetting the variable.
@@ -100,8 +109,8 @@ options:
         type: str
   vconsole_keymap:
     description:
-      - Virtual console keymap written to C(/etc/vconsole.conf), such as V(us),
-        the first argument of C(localectl set-keymap).
+      - Virtual console keymap, such as V(us), the first argument of
+        C(localectl set-keymap).
       - An empty string clears it.
     type: str
   vconsole_keymap_toggle:
@@ -113,8 +122,8 @@ options:
     type: str
   x11_layout:
     description:
-      - X11 keyboard layout written to C(/etc/X11/xorg.conf.d), such as V(us) or
-        a comma separated list such as V(us,de).
+      - X11 keyboard layout, such as V(us) or a comma separated list such as
+        V(us,de).
       - An empty string clears it.
     type: str
   x11_model:

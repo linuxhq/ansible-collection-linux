@@ -60,6 +60,13 @@ def test_missing_resource(monkeypatch, module_factory, function, args, error):
     assert function(module_factory(), *args) is None
 
 
+@pytest.mark.parametrize("response", [(0, "not json", ""), (1, "", "denied")])
+def test_policy_export_failure_names_target(monkeypatch, module_factory, invoke, response):
+    monkeypatch.setattr(kopia, "kopia_command", Mock(return_value=response))
+    result = invoke(kopia.policy_export, module_factory(), "root@host:/data")
+    assert result["failed"] and "root@host:/data" in result["msg"]
+
+
 def test_prune_empty_preserves_false_zero_and_lists():
     original = {"empty": {"nested": None}, "keep": {"false": False, "zero": 0, "list": [], "text": ""}}
     assert kopia.prune_empty(original) == {"keep": {"false": False, "zero": 0, "list": [], "text": ""}}

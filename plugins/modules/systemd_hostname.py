@@ -20,12 +20,14 @@ description:
     stores them in, rather than the properties it reports, because it reports a
     computed fallback for a setting that is not stored, such as a chassis
     detected from the firmware or an icon name derived from the chassis. A
-    missing file means no setting is stored.
+    missing file means no setting is stored. The file is parsed as the running
+    systemd version parses it.
   - O(static_hostname) is compared against C(/etc/hostname), the file
     C(systemd-hostnamed) stores it in, read as systemd reads it, from the first
     line that is neither empty nor a comment, with surrounding whitespace and
-    invalid characters removed. A missing file, or one without a valid
-    hostname, means no static hostname is stored.
+    invalid characters removed as the running systemd version removes them. A
+    missing file, or one without a valid hostname, means no static hostname is
+    stored.
   - Every option is validated before any setting is written, so an invalid
     value fails without leaving earlier settings applied. O(static_hostname) is
     written first, so a value the running systemd refuses also fails before
@@ -35,13 +37,17 @@ description:
 notes:
   - Requires a running C(systemd-hostnamed) reachable on the system D-Bus, so the
     module does not work in a container or chroot without systemd.
+  - Reads the running systemd version from the C(Version) property of
+    C(org.freedesktop.systemd1) when it compares a setting.
 options:
   chassis:
     description:
       - Chassis type of the machine.
       - Written to C(/etc/machine-info).
+      - An empty string removes it from C(/etc/machine-info).
     type: str
     choices:
+      - ""
       - container
       - convertible
       - desktop
@@ -206,6 +212,7 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.systemd import (
     systemd_call,
     systemd_properties,
     systemd_proxy,
+    systemd_version,
 )
 
 HOSTNAME_FILE = "/etc/hostname"
@@ -232,7 +239,7 @@ CONTROL_CHARACTERS = re.compile(r"[\x00-\x1f\x7f]")
 DEPLOYMENT = re.compile(r"[A-Za-z0-9.:-]+\Z")
 HOSTNAME_LABEL = r"[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?"
 HOSTNAME = re.compile(rf"{HOSTNAME_LABEL}(?:\.{HOSTNAME_LABEL})*\Z")
-HOSTNAME_CHARACTERS = frozenset(string.ascii_letters + string.digits + "?$")
+HOSTNAME_CHARACTERS = frozenset(string.ascii_letters + string.digits)
 HOSTNAME_MAX = 64
 ICON_NAME_UNSAFE = re.compile(r"[\x00-\x1f\x7f\\'\"*?\[/]")
 NAME_MAX = 255
@@ -275,7 +282,7 @@ def validate_settings(module):
         module.fail_json(msg=f"invalid transient_hostname {params['transient_hostname']!r}: it is not a valid hostname")
 
 
-def parse_env_file(text):
+def parse_env_file(text, version):
     """Parse an environment file as systemd's parse_env_file_internal() does, the last assignment winning."""
     entries = {}
     state = "pre_key"
@@ -372,7 +379,8 @@ def parse_env_file(text):
                 state = "pre_key"
 
         elif state == "comment_escape":
-            state = "pre_key" if character in ENV_NEWLINE else "comment"
+            # systemd 253 and earlier continue an escaped comment onto the next line
+            state = "pre_key" if character in ENV_NEWLINE and version >= 254 else "comment"
 
     if state not in ("pre_key", "key", "comment", "comment_escape"):
         push()
@@ -390,14 +398,16 @@ def read_text(module, path):
         module.fail_json(msg=f"unable to read {path}: {to_native(error)}")
 
 
-def read_machine_info(module):
-    entries = parse_env_file(read_text(module, MACHINE_INFO) or "")
+def read_machine_info(module, version):
+    entries = parse_env_file(read_text(module, MACHINE_INFO) or "", version)
 
     return {param: entries.get(key, "") for key, param in MACHINE_INFO_KEYS.items()}
 
 
-def hostname_cleanup(value):
-    """Normalize a hostname as systemd's hostname_cleanup() does, keeping the '?' and '$' it allows."""
+def hostname_cleanup(value, version):
+    """Normalize a hostname as hostname_cleanup() of the given systemd version does."""
+    # systemd 258 and later keep '?' wildcards, and 262 and later '$' tokens too
+    allowed = HOSTNAME_CHARACTERS | frozenset("?$" if version >= 262 else "?" if version >= 258 else "")
     result = []
     dot = hyphen = True
 
@@ -417,25 +427,29 @@ def hostname_cleanup(value):
 
             result.append(character)
             dot, hyphen = False, True
-        elif character in HOSTNAME_CHARACTERS:
+        elif character in allowed:
             result.append(character)
             dot = hyphen = False
 
+    # systemd 261 and earlier drop only one trailing '-' or '.'
     while result and result[-1] in "-.":
         result.pop()
+
+        if version < 262:
+            break
 
     return "".join(result)
 
 
-def read_static_hostname(module):
+def read_static_hostname(module, version):
     """Read the static hostname as systemd's read_etc_hostname() does, an unusable one reading as unset."""
     for line in re.split(r"\r\n|[\r\n\x00]", read_text(module, HOSTNAME_FILE) or ""):
         line = line.strip(ENV_WHITESPACE)
 
         if line and not line.startswith("#"):
-            hostname = hostname_cleanup(line)
+            hostname = hostname_cleanup(line, version)
 
-            # systemd accepts '?' wildcards and '$' tokens in a stored hostname, even where this module does not.
+            # newer systemd accepts '?' wildcards and '$' tokens in a stored hostname, even where this module does not.
             return hostname if hostname_valid(hostname.replace("?", "0").replace("$", "0")) else ""
 
     return ""
@@ -457,11 +471,18 @@ def ensure_present(module):
 
     current = systemd_properties(module, proxy, HOSTNAME_PROPERTIES)
     stored = {}
-    if any(module.params[param] is not None for param in MACHINE_INFO_KEYS.values()):
-        stored = read_machine_info(module)
+    compare_machine_info = any(module.params[param] is not None for param in MACHINE_INFO_KEYS.values())
+    compare_static_hostname = module.params["static_hostname"] is not None
 
-    if module.params["static_hostname"] is not None:
-        stored["static_hostname"] = read_static_hostname(module)
+    # the files are read as the running systemd reads them, which changes between versions
+    if compare_machine_info or compare_static_hostname:
+        version = systemd_version(module)
+
+    if compare_machine_info:
+        stored = read_machine_info(module, version)
+
+    if compare_static_hostname:
+        stored["static_hostname"] = read_static_hostname(module, version)
 
     default = current["default_hostname"] or ""
     predicted = dict(current)
@@ -526,6 +547,7 @@ def main():
         "chassis": {
             "type": "str",
             "choices": [
+                "",
                 "container",
                 "convertible",
                 "desktop",

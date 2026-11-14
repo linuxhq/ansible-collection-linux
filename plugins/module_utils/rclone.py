@@ -88,7 +88,11 @@ def deobscure(obscured):
     buf = decoded[AES.block_size :]
 
     crypter = AES.new(key=SECRET_KEY, mode=AES.MODE_CTR, initial_value=iv, nonce=b"")
-    return crypter.decrypt(buf).decode("utf-8")
+
+    try:
+        return crypter.decrypt(buf).decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise ValueError("revealed value is not valid UTF-8") from error
 
 
 _SALSA20_QUARTERROUNDS = (

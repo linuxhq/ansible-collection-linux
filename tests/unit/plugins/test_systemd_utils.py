@@ -114,3 +114,21 @@ def test_locale_normalization_and_preservation(module_factory):
         "LC_TIME=de_DE.UTF-8",
     ]
     assert variables["lc_time"] == "en_US.UTF-8"
+
+
+@pytest.mark.parametrize(
+    "version,expected",
+    [("252-51.el9_6.2.alma.2", 252), ("252.39-1~deb12u1", 252), ("257.8-1~deb13u2", 257), ("262", 262)],
+)
+def test_systemd_version(monkeypatch, module_factory, version, expected):
+    proxy = SimpleNamespace(Version=version)
+    monkeypatch.setattr(systemd, "systemd_proxy", Mock(return_value=proxy))
+    assert systemd.systemd_version(module_factory()) == expected
+    assert systemd.systemd_proxy.call_args.args[1] == "systemd1"
+
+
+@pytest.mark.parametrize("proxy", [SimpleNamespace(), SimpleNamespace(Version=""), SimpleNamespace(Version="v252")])
+def test_systemd_version_unreadable(monkeypatch, module_factory, invoke, proxy):
+    monkeypatch.setattr(systemd, "systemd_proxy", Mock(return_value=proxy))
+    result = invoke(systemd.systemd_version, module_factory())
+    assert result["failed"] and "unable to read the systemd version" in result["msg"]

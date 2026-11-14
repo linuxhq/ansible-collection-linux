@@ -49,6 +49,13 @@ def test_deobscure_rejects_invalid_encoding(value):
         rclone_deobscure.rclone_deobscure(value)
 
 
+@pytest.mark.parametrize("function", [rclone.deobscure, rclone_deobscure.rclone_deobscure])
+def test_deobscure_rejects_invalid_utf8(function):
+    error = AnsibleFilterError if function is rclone_deobscure.rclone_deobscure else ValueError
+    with pytest.raises(error, match="revealed value is not valid UTF-8"):
+        function("AAAAAAAAAAAAAAAAAAAAAP8")
+
+
 def test_base64_newlines_and_binary():
     value = b"\xff\x00\xfe"
     assert rclone.base64_urlsafe_decode("\r\n" + rclone.base64_urlsafe_encode(value) + "\n") == value

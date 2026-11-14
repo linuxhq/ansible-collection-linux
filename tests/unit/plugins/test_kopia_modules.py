@@ -623,3 +623,62 @@ def test_snapshot_tags_keep_their_keys(monkeypatch, run_module):
     monkeypatch.setattr(kopia_snapshot_info, "kopia_command", Mock(return_value=(0, listing, "")))
     result = run_module(kopia_snapshot_info)
     assert result["snapshots"] == [{"start_time": "now", "tags": {"tag:Env": "prod", "tag:role_name": "db"}}]
+
+
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_maintenance_rejects_empty_owner(monkeypatch, run_module, check_mode):
+    monkeypatch.setattr(kopia_maintenance, "kopia_available", lambda module: True)
+    monkeypatch.setattr(kopia_maintenance, "maintenance_info", Mock(side_effect=AssertionError("must not query")))
+    monkeypatch.setattr(kopia_maintenance, "kopia_command", Mock(side_effect=AssertionError("must not run kopia")))
+    result = run_module(kopia_maintenance, {"owner": ""}, check_mode)
+    assert result["failed"] and "owner" in result["msg"]
+
+
+@pytest.mark.parametrize("state", ["present", "absent"])
+def test_policy_mutation_failure_names_target(monkeypatch, run_module, state):
+    monkeypatch.setattr(kopia_policy, "policy_export", lambda *args: {"keepLatest": 1})
+    monkeypatch.setattr(kopia_policy, "kopia_command", Mock(return_value=(1, "", "permission denied")))
+    params = {"target": "root@host:/data", "state": state, "policy": {"keep_latest": 2}}
+    result = run_module(kopia_policy, params)
+    assert result["failed"] and "root@host:/data" in result["msg"]
+
+
+@pytest.mark.parametrize("response", [(1, "", "denied"), (0, "not json", "")])
+def test_policy_info_show_failure_names_target(monkeypatch, run_module, response):
+    monkeypatch.setattr(kopia_policy_info, "policy_export", lambda *args: None)
+    monkeypatch.setattr(kopia_policy_info, "kopia_command", Mock(return_value=response))
+    result = run_module(kopia_policy_info, {"target": "root@host:/data"})
+    assert result["failed"] and "root@host:/data" in result["msg"]
+
+
+def test_snapshot_failure_names_path(monkeypatch, run_module):
+    monkeypatch.setattr(kopia_snapshot, "kopia_command", Mock(return_value=(1, "", "disk full")))
+    result = run_module(kopia_snapshot, {"path": "/data"})
+    assert result["failed"] and "unable to create kopia snapshot of /data" in result["msg"]
+
+
+@pytest.mark.parametrize("response", [(1, "", "denied"), (0, "not json", "")])
+@pytest.mark.parametrize("path", [None, "/data"])
+def test_snapshot_info_failure_names_path(monkeypatch, run_module, response, path):
+    monkeypatch.setattr(kopia_snapshot_info, "kopia_command", Mock(return_value=response))
+    result = run_module(kopia_snapshot_info, {"path": path})
+    assert result["failed"] and ("of /data" in result["msg"]) is (path is not None)
+
+
+@pytest.mark.parametrize("stored", ["/srv/kopia/", "//srv/kopia", "/srv/./kopia", "/srv/other/../kopia"])
+@pytest.mark.parametrize("swap", [False, True])
+def test_repository_filesystem_path_is_normalized(monkeypatch, run_module, stored, swap):
+    stored, path = ("/srv/kopia", stored) if swap else (stored, "/srv/kopia")
+    storage = {"type": "filesystem", "config": {"path": stored}}
+    monkeypatch.setattr(kopia_repository, "repository_status", lambda module, password=None: {"storage": storage})
+    monkeypatch.setattr(kopia_repository, "kopia_command", Mock(side_effect=AssertionError("must not reconnect")))
+    assert run_module(kopia_repository, repository_params(options={"path": path}))["changed"] is False
+
+
+def test_repository_other_paths_are_compared_literally(monkeypatch, run_module):
+    storage = {"type": "sftp", "config": {"host": "backup", "path": "/srv/kopia"}}
+    monkeypatch.setattr(kopia_repository, "repository_status", lambda module, password=None: {"storage": storage})
+    monkeypatch.setattr(kopia_repository, "kopia_command", Mock(side_effect=AssertionError("must not reconnect")))
+    params = {"storage": "sftp", "password": "secret", "options": {"host": "backup", "path": "/srv/kopia/"}}
+    result = run_module(kopia_repository, params)
+    assert result["failed"] and "path is /srv/kopia, not /srv/kopia/" in result["msg"]

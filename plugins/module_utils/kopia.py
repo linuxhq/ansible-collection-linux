@@ -116,14 +116,14 @@ def policy_export(module, target):
         try:
             policies = json.loads(stdout)
         except ValueError:
-            module.fail_json(msg=f"unable to parse kopia policy export output: {stdout.strip()}")
+            module.fail_json(msg=f"unable to parse kopia policy export output for {target}: {stdout.strip()}")
 
         return next(iter(policies.values()), {})
 
     if "policy not found" in stderr:
         return None
 
-    module.fail_json(msg=f"unable to export kopia policy: {stderr.strip()}")
+    module.fail_json(msg=f"unable to export kopia policy {target}: {stderr.strip()}")
 
 
 def prune_empty(value):

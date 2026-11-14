@@ -1,0 +1,18 @@
+---
+bugfixes:
+  - systemd_hostname - read ``/etc/hostname`` and ``/etc/machine-info`` as the
+    running systemd version does, read from the ``Version`` property of
+    ``org.freedesktop.systemd1``. Before systemd 262 only one trailing ``-`` or
+    ``.`` is removed from the static hostname, before systemd 258 ``?`` is
+    removed as well, and before systemd 254 a comment ending in ``\`` continues
+    onto the next line of ``/etc/machine-info``, so a stored value is no longer
+    misread on EL 9, EL 10, Debian 12 and Debian 13.
+  - systemd_timedate - read the current time for ``time=now`` right before
+    setting the clock, after the other settings and the wait for the
+    ``ntp`` change, so the clock is no longer set back by the time they took.
+  - systemd_locale - document the files ``systemd-localed`` writes on EL and
+    Debian, and that on Debian it generates a missing locale during the
+    request instead of refusing it.
+minor_changes:
+  - systemd_hostname - accept an empty ``chassis`` to remove it from
+    ``/etc/machine-info``.

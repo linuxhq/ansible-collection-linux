@@ -88,11 +88,37 @@ def test_password_validation(tmp_path, run_module, params, message):
 def test_missing_crypto(monkeypatch, tmp_path, run_module, check_mode):
     monkeypatch.setattr(plugin, "HAS_PYCRYPTODOME", False)
     path = tmp_path / "config"
+    path.write_text("config")
     result = run_module(plugin, {"path": str(path), "password": "secret"}, check_mode)
-    assert not path.exists()
+    assert path.read_text() == "config"
     assert result.get("failed", False) is not check_mode
     if check_mode:
         assert result["changed"] and result["encrypted"]
+    else:
+        assert "pycryptodome" in result["msg"]
+
+
+@pytest.mark.parametrize(
+    "params, message",
+    [
+        ({"password": "secret"}, "configuration file does not exist"),
+        ({"password": " ", "content": "config"}, "invalid password for configuration file"),
+        ({"password": " ", "state": "absent", "content": "config"}, "invalid password for configuration file"),
+    ],
+)
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_missing_crypto_fails_like_a_real_run(monkeypatch, tmp_path, run_module, params, message, check_mode):
+    monkeypatch.setattr(plugin, "HAS_PYCRYPTODOME", False)
+    path = tmp_path / "config"
+    result = run_module(plugin, {"path": str(path), **params}, check_mode)
+    assert not path.exists()
+    assert result["failed"] and message in result["msg"]
+
+
+def test_invalid_password_names_path(tmp_path, run_module):
+    path = tmp_path / "config"
+    result = run_module(plugin, {"path": str(path), "password": " ", "content": "config"})
+    assert result["msg"] == f"invalid password for configuration file {path}: no characters in password"
 
 
 def test_atomic_move_failure_removes_temporary_file(tmp_path, module_factory, invoke):
