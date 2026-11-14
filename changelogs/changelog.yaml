@@ -337,6 +337,14 @@ releases:
     fragments:
     - msmtpd-hardening.yml
     release_date: '2026-10-24'
+  2.4.12:
+    changes:
+      bugfixes:
+      - post_transaction_actions role - write action files with the ``.action`` extension,
+        which the dnf plugin requires; ``.conf`` files were ignored (https://github.com/linuxhq/ansible-collection-linux/pull/68).
+    fragments:
+    - post-transaction-actions-extension.yml
+    release_date: '2026-11-13'
   2.4.2:
     changes:
       minor_changes:
