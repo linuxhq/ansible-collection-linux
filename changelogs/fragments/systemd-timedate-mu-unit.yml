@@ -1,5 +1,14 @@
 ---
 bugfixes:
   - systemd_timedate - accept the Greek small letter mu (U+03BC) in the
-    microsecond unit of ``time``, such as ``+500μs``, as systemd 253 and later do, in
+    microsecond unit of ``time``, such as ``+500μs``, as systemd 254 and later do, in
     addition to the micro sign (U+00B5).
+  - systemd_timedate - parse ``time`` after ``@`` as a span, as systemd does, so
+    ``@1h`` or ``@1min 30s`` are accepted, and ``@1e9`` or ``@1_000``, which
+    systemd refuses, are rejected.
+  - systemd_timedate - reject digits other than ASCII ``0`` to ``9`` in
+    ``time``, such as ``+٣h``, which systemd refuses but the module turned
+    into a change of the clock.
+  - systemd_timedate - accept a span in ``time`` that starts with a decimal
+    point, such as ``+.5s``, and relative times written as ``5min ago`` or
+    ``5min left``, as systemd does.

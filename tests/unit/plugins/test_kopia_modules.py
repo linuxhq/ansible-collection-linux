@@ -409,6 +409,22 @@ def test_snapshot_failure_does_not_query_latest(monkeypatch, run_module):
     assert command.call_count == 1
 
 
+def test_snapshot_saved_with_errors_reports_change(monkeypatch, run_module):
+    # kopia prints the saved manifest, then exits non-zero for fatal errors such as an unreadable file
+    created = '{"id":"new","rootEntry":{"summ":{"numFailed":1}}}\n'
+    listing = '[{"id":"new","startTime":"new"},{"id":"other","startTime":"later"}]'
+    command = Mock(side_effect=[(1, created, "Found 1 fatal error(s) while snapshotting\n"), (0, listing, "")])
+    monkeypatch.setattr(kopia_snapshot, "kopia_command", command)
+    result = run_module(kopia_snapshot, {"path": "/data"})
+    assert result["failed"] and result["changed"]
+    assert result["snapshot"] == {"id": "new", "start_time": "new"}
+    assert (
+        result["msg"]
+        == "created kopia snapshot new of /data, but kopia reported errors: Found 1 fatal error(s) while snapshotting"
+    )
+    assert command.call_args_list[1].args[1] == ["snapshot", "list", "/data", "--json"]
+
+
 @pytest.mark.parametrize("response", [(1, "", "denied"), (0, "not json", ""), (0, "[]", "")])
 def test_latest_snapshot_unavailable(monkeypatch, module_factory, response):
     monkeypatch.setattr(kopia_snapshot, "kopia_command", Mock(return_value=response))

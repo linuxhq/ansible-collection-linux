@@ -12,3 +12,7 @@ bugfixes:
     rejected.
   - rclone_config_encryption, rclone_obscure, rclone_deobscure - document the
     minimum pycryptodome or pycryptodomex version, 3.7.0.
+  - rclone_config_encryption - read the lines before the encryption header in
+    pieces of 4096 bytes, as rclone does, so a comment longer than that before
+    ``RCLONE_ENCRYPT_V0:`` no longer makes the module treat a file rclone reads
+    as plain text as already encrypted.

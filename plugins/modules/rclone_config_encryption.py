@@ -40,6 +40,10 @@ options:
         the encrypted content is damaged, is replaced rather than failing, which
         is what makes a password rotation a single run.
       - Treated as a secret and kept out of logs, like O(password).
+      - Content containing a lone surrogate code point, such as U+D800, which a
+        JSON value can carry, is rejected before anything is read or written
+        because it is not valid UTF-8. U+DC80 to U+DCFF, which Ansible uses for
+        bytes that are not valid UTF-8, are written as those bytes.
       - When omitted, the file must already exist and only its encryption state
         is managed, and a file that cannot be opened with O(password) fails.
     type: str
@@ -164,7 +168,7 @@ CONFIG_UMASK = 0o077
 
 def read_config(module, path):
     if not os.path.exists(path):
-        return None, None
+        return None
 
     try:
         with open(path, "rb") as handle:
@@ -172,7 +176,7 @@ def read_config(module, path):
     except OSError as error:
         module.fail_json(msg=f"unable to read {path}: {to_native(error)}")
 
-    return raw, to_text(raw, errors="replace")
+    return raw
 
 
 def discard_file(path):
@@ -217,12 +221,12 @@ def write_config(module, path, content):
             discard_file(tmp)
 
 
-def current_config(module, path, raw, text):
-    if text is None:
+def current_config(module, path, raw):
+    if raw is None:
         return False, None
 
     try:
-        encrypted = is_encrypted(text)
+        encrypted = is_encrypted(raw)
     except ValueError as error:
         module.fail_json(msg=f"unable to read configuration file {path}: {to_native(error)}")
 
@@ -233,7 +237,7 @@ def current_config(module, path, raw, text):
         return True, None
 
     try:
-        return True, decrypt_config(text, module.params["password"])
+        return True, decrypt_config(raw, module.params["password"])
     except ValueError:
         return True, None
 
@@ -248,8 +252,8 @@ def config_diff(module, before, after):
 
 
 def ensure_present(module, path):
-    raw, text = read_config(module, path)
-    encrypted, current = current_config(module, path, raw, text)
+    raw = read_config(module, path)
+    encrypted, current = current_config(module, path, raw)
     desired = module.params["content"]
 
     if desired is None:
@@ -275,8 +279,8 @@ def ensure_present(module, path):
 
 
 def ensure_absent(module, path):
-    raw, text = read_config(module, path)
-    encrypted, current = current_config(module, path, raw, text)
+    raw = read_config(module, path)
+    encrypted, current = current_config(module, path, raw)
     desired = module.params["content"]
 
     if desired is None:
@@ -328,6 +332,16 @@ def main():
             check_config_password(password)
         except ValueError as error:
             module.fail_json(msg=f"invalid password for configuration file {path}: {to_native(error)}")
+
+    if module.params["content"] is not None:
+        # a lone surrogate, which a JSON value can carry, cannot be written; U+DC80 to U+DCFF stand for raw bytes
+        try:
+            to_bytes(module.params["content"], errors="surrogate_or_strict")
+        except UnicodeEncodeError as error:
+            module.fail_json(
+                msg=f"invalid content for configuration file {path}: character U+{ord(error.object[error.start]):04X}"
+                " is a surrogate, which is not valid UTF-8"
+            )
 
     if module.params["content"] is None and not os.path.exists(path):
         module.fail_json(msg=f"configuration file does not exist: {path}")
