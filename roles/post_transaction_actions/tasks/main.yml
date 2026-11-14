@@ -23,7 +23,7 @@
     - post_transaction_actions
   become: true
   ansible.builtin.template:
-    dest: "{{ post_transaction_actions_dir }}/{{ _pta.package_filter }}.conf"
+    dest: "{{ post_transaction_actions_dir }}/{{ _pta.package_filter }}.action"
     group: root
     mode: '0644'
     owner: root
