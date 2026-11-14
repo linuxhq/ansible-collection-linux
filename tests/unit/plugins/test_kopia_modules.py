@@ -305,7 +305,8 @@ def test_snapshot_rejects_tag_key_with_colon(monkeypatch, run_module, check_mode
 
 
 def test_snapshot_creates_with_tags_and_returns_latest(monkeypatch, run_module):
-    command = Mock(side_effect=[(0, "", ""), (0, '[{"startTime":"old"},{"startTime":"new"}]', "")])
+    created = '{"id":"new","startTime":"new"}\n'
+    command = Mock(side_effect=[(0, created, ""), (0, '[{"startTime":"old"},{"startTime":"new"}]', "")])
     monkeypatch.setattr(kopia_snapshot, "kopia_command", command)
     result = run_module(kopia_snapshot, {"path": "/data", "description": "backup", "tags": {"z": "last", "a": "first"}})
     assert result == {"changed": True, "snapshot": {"start_time": "new"}}
@@ -313,10 +314,20 @@ def test_snapshot_creates_with_tags_and_returns_latest(monkeypatch, run_module):
         "snapshot",
         "create",
         "/data",
+        "--json",
         "--description=backup",
         "--tags=a:first",
         "--tags=z:last",
     ]
+
+
+def test_snapshot_skipped_as_identical_is_unchanged(monkeypatch, run_module):
+    skipped = (0, "", "Not saving snapshot because no files have been changed since previous snapshot")
+    command = Mock(side_effect=[skipped, (0, '[{"id":"old"}]', "")])
+    monkeypatch.setattr(kopia_snapshot, "kopia_command", command)
+    result = run_module(kopia_snapshot, {"path": "/data"})
+    assert result == {"changed": False, "snapshot": {"id": "old"}}
+    assert command.call_args_list[0].args[1] == ["snapshot", "create", "/data", "--json"]
 
 
 @pytest.mark.parametrize("path", [None, "/data"])
