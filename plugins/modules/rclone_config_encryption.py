@@ -54,6 +54,9 @@ options:
       - Whitespace is significant and is not stripped, matching rclone. A password
         that is empty or entirely whitespace is rejected, where whitespace is the
         set of Unicode space characters rclone trims.
+      - A password containing a lone surrogate code point, such as U+D800,
+        which a JSON value can carry, is rejected because it is not valid UTF-8,
+        as rclone requires.
       - The password is NFKC normalized with the Unicode tables of the Python
         on the managed node, which can be older than the ones rclone is built
         with. A password containing a character that is unassigned in those
@@ -64,9 +67,10 @@ options:
       - A password whose compatibility decomposition has a run of more than 30
         consecutive combining characters, marks or Hangul jamo is rejected,
         because rclone inserts U+034F into such a run while normalizing and
-        this Python does not. Every mark and every Hangul jamo is counted,
-        including those that rclone may not count, so some such passwords that
-        rclone could open are rejected as well.
+        this Python does not. Every mark, every Hangul jamo and every other
+        character that combines with the one before it, such as U+16D67, is
+        counted, including marks that rclone may not count, so some such
+        passwords that rclone could open are rejected as well.
     type: str
   path:
     description:

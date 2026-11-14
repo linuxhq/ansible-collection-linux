@@ -199,6 +199,8 @@ def test_ntp_requires_available_service(monkeypatch, run_module):
         ("1.5s", 1500000),
         ("2ms", 2000),
         ("3us", 3),
+        ("500\u00b5s", 500),
+        ("500\u03bcs", 500),
         ("0", 0),
         ("", None),
         ("1fortnight", None),
@@ -382,6 +384,37 @@ def test_x11_keyboard_compares_against_converted_settings(
     calls = [entry.args[2:] for entry in mutate.call_args_list]
     assert calls[0] == ("SetVConsoleKeyboard", "de", "", True, False)
     assert calls[1:] == ([("SetX11Keyboard", *x11_args)] if x11_args else [])
+
+
+@pytest.mark.parametrize(
+    "current,params,args",
+    [
+        # a toggle-only change must not convert the unchanged keymap over the configured X11 settings
+        ({}, {"vconsole_keymap_toggle": "ru"}, ("us", "ru", False, False)),
+        ({}, {"vconsole_keymap": "us", "vconsole_keymap_toggle": "ru"}, ("us", "ru", False, False)),
+        ({"vconsole_keymap_toggle": "ru"}, {"vconsole_keymap": "us"}, ("us", "", False, False)),
+        ({"vconsole_keymap_toggle": "ru"}, {"vconsole_keymap_toggle": ""}, ("us", "", False, False)),
+        # a keymap change is converted into the X11 settings, as localectl set-keymap does
+        ({}, {"vconsole_keymap": "de"}, ("de", "", True, False)),
+        ({"vconsole_keymap": ""}, {"vconsole_keymap": "us", "vconsole_keymap_toggle": "ru"}, ("us", "ru", True, False)),
+    ],
+)
+@pytest.mark.parametrize("x11", [{}, {"x11_options": "grp:alt_shift_toggle"}])
+def test_vconsole_keyboard_converts_only_a_changed_keymap(monkeypatch, run_module, current, params, args, x11):
+    initial = {**LOCALE, "x11_layout": "us,ru", "x11_options": "grp:ctrl_shift_toggle", **current}
+    status = Mock(return_value=initial)
+    monkeypatch.setattr(systemd_locale, "HAS_DASBUS", True)
+    monkeypatch.setattr(systemd_locale, "systemd_proxy", Mock())
+    monkeypatch.setattr(systemd_locale, "locale_status", status)
+    mutate = Mock()
+    monkeypatch.setattr(systemd_locale, "systemd_call", mutate)
+    assert run_module(systemd_locale, {**params, **x11})["changed"]
+    calls = [entry.args[2:] for entry in mutate.call_args_list]
+    assert calls[0] == ("SetVConsoleKeyboard", *args)
+    # the X11 settings are re-read before SetX11Keyboard only after a conversion
+    assert status.call_count == (3 if args[2] and x11 else 2)
+    if x11:
+        assert calls[1] == ("SetX11Keyboard", "us,ru", "pc105", "", "grp:alt_shift_toggle", False, False)
 
 
 @pytest.mark.parametrize(

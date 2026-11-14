@@ -186,6 +186,7 @@ UNITS = [
     ("usec", 1),
     ("us", 1),
     ("\u00b5s", 1),
+    ("\u03bcs", 1),
     ("msec", 1000),
     ("ms", 1000),
     ("seconds", MICROSECONDS),

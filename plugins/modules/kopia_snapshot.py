@@ -86,9 +86,11 @@ EXAMPLES = r"""
 RETURN = r"""
 snapshot:
   description:
-    - Newest snapshot for the path, reported by C(kopia snapshot list).
-    - This is the snapshot just created, or the existing newest snapshot when
-      kopia skipped an identical snapshot.
+    - Snapshot for the path, as reported by C(kopia snapshot list).
+    - This is the snapshot just created, identified by the ID kopia prints when
+      it saves it, or the existing newest snapshot when kopia skipped an
+      identical snapshot. When the printed ID cannot be read or is not listed,
+      the newest snapshot is returned.
     - Keys under C(tags) are returned as kopia reports them, such as
       C(tag:role).
     - Empty in check mode and when the snapshot manifest cannot be read back.
@@ -111,7 +113,16 @@ from ansible.module_utils.common.dict_transformations import camel_dict_to_snake
 from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import kopia_command
 
 
-def latest_snapshot(module, path):
+def created_snapshot_id(stdout):
+    try:
+        manifest = json.loads(stdout)
+    except ValueError:
+        return None
+
+    return manifest.get("id") if isinstance(manifest, dict) else None
+
+
+def latest_snapshot(module, path, snapshot_id=None):
     rc, stdout, _dummy = kopia_command(module, ["snapshot", "list", path, "--json"], password=module.params["password"])
 
     if rc != 0:
@@ -125,7 +136,10 @@ def latest_snapshot(module, path):
     if not snapshots:
         return {}
 
-    return camel_dict_to_snake_dict(snapshots[-1], ignore_list=["tags"])
+    # another snapshot of the path, such as a scheduled one, can be newer than the one just created
+    snapshot = next((entry for entry in snapshots if snapshot_id and entry.get("id") == snapshot_id), snapshots[-1])
+
+    return camel_dict_to_snake_dict(snapshot, ignore_list=["tags"])
 
 
 def ensure_present(module):
@@ -153,7 +167,10 @@ def ensure_present(module):
 
     # kopia prints the new manifest only when it saves a snapshot; nothing is
     # printed when ignore_identical_snapshots skips an unchanged source.
-    module.exit_json(changed=bool(stdout.strip()), snapshot=latest_snapshot(module, path))
+    if not stdout.strip():
+        module.exit_json(changed=False, snapshot=latest_snapshot(module, path))
+
+    module.exit_json(changed=True, snapshot=latest_snapshot(module, path, created_snapshot_id(stdout)))
 
 
 def main():

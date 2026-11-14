@@ -172,6 +172,48 @@ def test_long_combining_run_password_is_rejected(
     )
 
 
+@pytest.mark.skipif(
+    int(unicodedata.unidata_version.split(".", maxsplit=1)[0]) < 16, reason="U+16D67 is unassigned before Unicode 16"
+)
+@pytest.mark.parametrize("password", ["a" + "\U00016d67" * 31, "a" + "\U00016d68" * 16])
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_backward_combining_letter_run_password_is_rejected(tmp_path, run_module, password, check_mode):
+    path = tmp_path / "config"
+    result = run_module(plugin, {"path": str(path), "password": password, "content": "config"}, check_mode)
+    assert not path.exists()
+    assert result["failed"] and "more than 30 consecutive" in result["msg"]
+
+
+def test_every_second_element_of_a_composition_is_a_non_starter():
+    # Go counts the second element of every canonical composition as a non-starter, so a Unicode upgrade that
+    # adds one of class 0 outside the marks and Hangul jamo must be added to rclone.BACKWARD_COMBINING
+    missing = []
+    for codepoint in range(0x110000):
+        decomposition = unicodedata.decomposition(chr(codepoint)).split()
+        if len(decomposition) != 2 or decomposition[0].startswith("<"):
+            continue
+
+        first, second = (chr(int(part, 16)) for part in decomposition)
+        if unicodedata.normalize("NFC", first + second) == chr(codepoint) and not rclone.is_non_starter(second):
+            missing.append(f"U+{ord(second):04X}")
+
+    assert not missing
+
+
+@pytest.mark.parametrize("state", ["present", "absent"])
+@pytest.mark.parametrize("crypto", [True, False])
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_surrogate_password_character_is_rejected(monkeypatch, tmp_path, run_module, state, crypto, check_mode):
+    monkeypatch.setattr(plugin, "HAS_PYCRYPTODOME", crypto)
+    path = tmp_path / "config"
+    params = {"path": str(path), "password": "pw\ud800", "state": state, "content": "config"}
+    result = run_module(plugin, params, check_mode)
+    assert not path.exists()
+    assert result["failed"] and result["msg"] == (
+        f"invalid password for configuration file {path}: character U+D800 is a surrogate, which is not valid UTF-8"
+    )
+
+
 @pytest.mark.parametrize(
     "password",
     [

@@ -1,0 +1,5 @@
+---
+bugfixes:
+  - systemd_timedate - accept the Greek small letter mu (U+03BC) in the
+    microsecond unit of ``time``, such as ``+500μs``, as systemd 253 and later do, in
+    addition to the micro sign (U+00B5).

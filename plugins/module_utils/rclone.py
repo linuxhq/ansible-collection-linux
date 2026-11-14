@@ -40,6 +40,10 @@ MAX_NON_STARTERS = 30
 # Hangul Jamo, whose medial vowels and final consonants Go counts as non-starters although their class is 0.
 HANGUL_JAMO = range(0x1100, 0x1200)
 
+# Other letters of class 0 that are the second element of a canonical composition, which Go also counts as
+# non-starters: U+16D67 KIRAT RAI VOWEL SIGN E (Unicode 16).
+BACKWARD_COMBINING = frozenset({0x16D67})
+
 # Unicode White_Space, which Go's strings.TrimSpace removes. str.strip() also removes U+001C to U+001F.
 GO_WHITESPACE = "\t\n\v\f\r \x85\xa0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000"
 
@@ -215,6 +219,7 @@ def is_non_starter(character):
         unicodedata.combining(character) != 0
         or unicodedata.category(character).startswith("M")
         or ord(character) in HANGUL_JAMO
+        or ord(character) in BACKWARD_COMBINING
     )
 
 
@@ -222,8 +227,12 @@ def check_config_password(password):
     if not password or not password.strip(GO_WHITESPACE):
         raise ValueError("no characters in password")
 
-    # NFKC of a code point unknown to this Python may differ from rclone's newer tables
     for character in password:
+        # rclone refuses a password that is not valid UTF-8, and a lone surrogate cannot be encoded as UTF-8
+        if unicodedata.category(character) == "Cs":
+            raise ValueError(f"character U+{ord(character):04X} is a surrogate, which is not valid UTF-8")
+
+        # NFKC of a code point unknown to this Python may differ from rclone's newer tables
         if unicodedata.category(character) == "Cn" and not is_noncharacter(character):
             raise ValueError(
                 f"character U+{ord(character):04X} is unassigned in Unicode {unicodedata.unidata_version},"
@@ -231,7 +240,8 @@ def check_config_password(password):
             )
 
     # Python does not insert U+034F into a long run of non-starters, as rclone does. Go also counts characters
-    # of class 0 that combine with the one before as non-starters, so every mark and Hangul jamo is counted.
+    # of class 0 that combine with the one before as non-starters, so every mark, Hangul jamo and other such
+    # character is counted.
     run = 0
     for character in unicodedata.normalize("NFKD", password):
         if is_non_starter(character):
