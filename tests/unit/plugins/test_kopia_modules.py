@@ -321,6 +321,25 @@ def test_snapshot_creates_with_tags_and_returns_latest(monkeypatch, run_module):
     ]
 
 
+@pytest.mark.parametrize(
+    "created,expected",
+    [
+        # a newer snapshot of the path, such as a scheduled one, is not returned as the one just created
+        ('{"id":"new","startTime":"new"}\n', {"id": "new", "start_time": "new"}),
+        # the newest listed snapshot is returned when the created one cannot be identified or found
+        ('{"id":"gone"}\n', {"id": "other", "start_time": "later"}),
+        ("not json\n", {"id": "other", "start_time": "later"}),
+        ('["new"]\n', {"id": "other", "start_time": "later"}),
+    ],
+)
+def test_snapshot_returns_the_created_snapshot(monkeypatch, run_module, created, expected):
+    listing = '[{"id":"old","startTime":"old"},{"id":"new","startTime":"new"},{"id":"other","startTime":"later"}]'
+    command = Mock(side_effect=[(0, created, ""), (0, listing, "")])
+    monkeypatch.setattr(kopia_snapshot, "kopia_command", command)
+    result = run_module(kopia_snapshot, {"path": "/data"})
+    assert result == {"changed": True, "snapshot": expected}
+
+
 def test_snapshot_skipped_as_identical_is_unchanged(monkeypatch, run_module):
     skipped = (0, "", "Not saving snapshot because no files have been changed since previous snapshot")
     command = Mock(side_effect=[skipped, (0, '[{"id":"old"}]', "")])

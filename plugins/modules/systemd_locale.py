@@ -39,11 +39,13 @@ notes:
     into C(/etc/vconsole.conf). Debian 12 writes O(locale) to
     C(/etc/default/locale) unless C(/etc/locale.conf) exists, and the X11
     keyboard settings to C(/etc/default/keyboard).
-  - A written console keymap is converted into the X11 keyboard settings, as
-    C(localectl set-keymap) does by default, and the C(x11_*) options that are
-    set are then applied over the converted values without converting them back,
-    so O(vconsole_keymap) and O(x11_layout) can be managed together with values
-    that do not correspond.
+  - A console keymap that changes is converted into the X11 keyboard settings,
+    as C(localectl set-keymap) does by default, and the C(x11_*) options that
+    are set are then applied over the converted values without converting them
+    back, so O(vconsole_keymap) and O(x11_layout) can be managed together with
+    values that do not correspond. When only the toggle keymap changes, the
+    console settings are written without that conversion, so the X11 keyboard
+    settings are left as they are.
   - When only C(x11_*) options are set, the X11 keyboard settings are converted
     into the console keymap, as C(localectl set-x11-keymap) does by default.
     That conversion also clears the console toggle keymap, as
@@ -314,12 +316,16 @@ def ensure_present(module):
         pending.append(("SetLocale", (locale_setting(locale_present(module.params["locale"])), False)))
 
     keymap = vconsole_change(module, current)
+    convert_keymap = False
     if keymap is not None:
+        # localed converts even an unchanged keymap, which would replace X11 settings a toggle change leaves alone
+        convert_keymap = keymap["vconsole_keymap"] != (current["vconsole_keymap"] or "")
+
         predicted.update(keymap)
         pending.append(
             (
                 "SetVConsoleKeyboard",
-                tuple(keymap[name] for name in VCONSOLE_SETTINGS) + (True, False),
+                tuple(keymap[name] for name in VCONSOLE_SETTINGS) + (convert_keymap, False),
             )
         )
 
@@ -336,7 +342,7 @@ def ensure_present(module):
     for method, args in pending:
         systemd_call(module, proxy, method, *args)
 
-    if keymap is not None and any(module.params[name] is not None for name in X11_SETTINGS):
+    if convert_keymap and any(module.params[name] is not None for name in X11_SETTINGS):
         # SetVConsoleKeyboard converts the keymap into the X11 settings, so compare against those
         keyboard = keyboard_change(module, locale_status(module, proxy), X11_SETTINGS)
 
