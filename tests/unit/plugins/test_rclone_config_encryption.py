@@ -173,7 +173,7 @@ def test_long_combining_run_password_is_rejected(
 
 
 @pytest.mark.skipif(
-    int(unicodedata.unidata_version.split(".")[0]) < 16, reason="U+16D67 is unassigned before Unicode 16"
+    int(unicodedata.unidata_version.split(".", maxsplit=1)[0]) < 16, reason="U+16D67 is unassigned before Unicode 16"
 )
 @pytest.mark.parametrize("password", ["a" + "\U00016d67" * 31, "a" + "\U00016d68" * 16])
 @pytest.mark.parametrize("check_mode", [False, True])
