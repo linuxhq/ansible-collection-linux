@@ -77,6 +77,7 @@ options:
   owner:
     description:
       - Maintenance owner as C(user@hostname).
+      - Must not be empty.
       - kopia resolves the special value V(me) to the current user and host at
         set time, so V(me) always reports a change, prefer the explicit form.
     type: str
@@ -247,6 +248,9 @@ def validate_settings(module):
 
         if kind in INTEGER_KINDS and value is not None and value < 0:
             module.fail_json(msg=f"invalid {param} {value}: it must not be negative")
+
+    if module.params["owner"] == "":
+        module.fail_json(msg="invalid owner: it must not be empty")
 
 
 def ensure_present(module):

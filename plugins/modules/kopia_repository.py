@@ -23,7 +23,9 @@ description:
     C(endpoint), C(folder_id), C(host), C(path), C(prefix), C(remote_path),
     C(storage_account) or C(url) differs from the connected storage
     configuration. A leading V(~) in the C(path) of V(filesystem) storage is
-    resolved to the home directory first, as kopia does. Disconnect it with
+    resolved to the home directory first, as kopia does, and that C(path) is
+    compared as a normalized path, so V(/srv/kopia/) and V(//srv/kopia) match
+    V(/srv/kopia). Disconnect it with
     C(kopia repository disconnect) first to switch repositories.
 options:
   config_file:
@@ -187,10 +189,19 @@ def storage_description(module):
 
 
 def storage_value(storage, option, value):
+    if storage != "filesystem" or option != "path":
+        return value
+
     home = os.environ.get("HOME", "")
 
-    if storage == "filesystem" and option == "path" and value.startswith("~") and home:
-        return home + value[1:]
+    if value.startswith("~") and home:
+        value = home + value[1:]
+
+    value = os.path.normpath(value)
+
+    # normpath keeps a leading "//", which Linux resolves like "/"
+    if value.startswith("//"):
+        value = "/" + value.lstrip("/")
 
     return value
 
@@ -214,9 +225,9 @@ def storage_mismatch(module, status):
         if not isinstance(value, str):
             continue
 
-        value = storage_value(storage, option, value)
-        if config.get(key, "") != value:
-            return f"{option} is {config.get(key, '')}, not {value}"
+        stored = config.get(key, "")
+        if storage_value(storage, option, stored) != storage_value(storage, option, value):
+            return f"{option} is {stored}, not {value}"
 
     return None
 

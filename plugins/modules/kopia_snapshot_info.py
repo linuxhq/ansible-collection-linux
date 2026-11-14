@@ -99,19 +99,21 @@ def list_snapshots(module):
         module.exit_json(changed=False, snapshots=[])
 
     command = ["snapshot", "list", "--json"]
+    source = ""
 
     if module.params["path"]:
         command.append(module.params["path"])
+        source = f" of {module.params['path']}"
 
     rc, stdout, stderr = kopia_command(module, command, password=module.params["password"])
 
     if rc != 0:
-        module.fail_json(msg=f"unable to list kopia snapshots: {stderr.strip()}")
+        module.fail_json(msg=f"unable to list kopia snapshots{source}: {stderr.strip()}")
 
     try:
         snapshots = json.loads(stdout)
     except ValueError:
-        module.fail_json(msg=f"unable to parse kopia snapshot list output: {stdout.strip()}")
+        module.fail_json(msg=f"unable to parse kopia snapshot list output{source}: {stdout.strip()}")
 
     return [camel_dict_to_snake_dict(snapshot, ignore_list=["tags"]) for snapshot in snapshots or []]
 

@@ -54,8 +54,9 @@ options:
         V(2026-07-26 14:30:00.5), V(Sun 2026-07-26 14:30), V(26-07-26),
         V(2026-07-26), V(14:30:00) or V(14:30), each optionally suffixed with
         V(UTC).
-      - V(now) sets the clock to the current time read by the module, as
-        C(timedatectl set-time now) does.
+      - V(now) sets the clock to the current time read by the module right
+        before it sets the clock, after the other settings in the same task are
+        applied, as C(timedatectl set-time now) does.
       - A weekday prefix must name the weekday of the date, otherwise the
         module fails, as C(timedatectl) does.
       - Timestamps without a zone are read in the time zone the host ends up
@@ -396,6 +397,11 @@ def ensure_present(module):
         module.exit_json(changed=True, timedate=predicted)
 
     for method, args in pending:
+        if method == "SetTime":
+            # parse again so a time relative to now does not lag behind the earlier changes and the NTP wait
+            usec, relative = parse_time(module, value, predicted["timezone"])
+            args = (usec, relative, False)
+
         systemd_call(module, proxy, method, *args)
 
         if method == "SetNTP":

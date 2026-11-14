@@ -1,0 +1,9 @@
+---
+bugfixes:
+  - rclone_config_encryption - check the password and that ``path`` exists
+    when ``content`` is unset before the pycryptodome check, so check mode
+    without pycryptodome fails where a real run would.
+  - rclone_config_encryption - name the configuration file when the password
+    is invalid.
+  - rclone_deobscure - report a value that reveals invalid UTF-8 as such
+    instead of with a codec error.

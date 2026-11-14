@@ -1,6 +1,7 @@
 # Copyright: Ansible Project
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
+import re
 import traceback
 
 from ansible.module_utils.basic import missing_required_lib
@@ -27,6 +28,7 @@ else:
 INTERFACES = {
     "hostname1": ("org.freedesktop.hostname1", "/org/freedesktop/hostname1"),
     "locale1": ("org.freedesktop.locale1", "/org/freedesktop/locale1"),
+    "systemd1": ("org.freedesktop.systemd1", "/org/freedesktop/systemd1"),
     "timedate1": ("org.freedesktop.timedate1", "/org/freedesktop/timedate1"),
 }
 
@@ -146,6 +148,18 @@ def systemd_properties(module, proxy, properties):
         values[name] = systemd_value(value)
 
     return values
+
+
+def systemd_version(module):
+    """Return the major version of the running systemd, such as 252 for "252.32-1.el9"."""
+    proxy = systemd_proxy(module, "systemd1")
+    version = systemd_properties(module, proxy, [("version", "Version")])["version"]
+    match = re.match(r"\d+", version) if isinstance(version, str) else None
+
+    if not match:
+        module.fail_json(msg=f"unable to read the systemd version: unexpected Version property {version!r}")
+
+    return int(match.group())
 
 
 def systemd_result(module, proxy, method, *args):

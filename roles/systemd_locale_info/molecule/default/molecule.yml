@@ -16,8 +16,20 @@ platforms:
     cpus: 4
     memory: 4096
 
+  - name: almalinux10
+    box: bento/almalinux-10.0
+    box_architecture: arm64
+    cpus: 4
+    memory: 4096
+
   - name: debian12
     box: bento/debian-12.12
+    box_architecture: arm64
+    cpus: 4
+    memory: 4096
+
+  - name: debian13
+    box: bento/debian-13.1
     box_architecture: arm64
     cpus: 4
     memory: 4096

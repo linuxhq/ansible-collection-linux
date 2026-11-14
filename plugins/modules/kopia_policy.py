@@ -157,7 +157,7 @@ def ensure_present(module):
     rc, _dummy, stderr = kopia_command(module, ["policy", "import", "--from-file", source])
 
     if rc != 0:
-        module.fail_json(msg=f"unable to import kopia policy: {stderr.strip()}")
+        module.fail_json(msg=f"unable to import kopia policy {target}: {stderr.strip()}")
 
     current = policy_export(module, target)
 
@@ -180,7 +180,7 @@ def ensure_absent(module):
     rc, _dummy, stderr = kopia_command(module, ["policy", "delete", target])
 
     if rc != 0:
-        module.fail_json(msg=f"unable to delete kopia policy: {stderr.strip()}")
+        module.fail_json(msg=f"unable to delete kopia policy {target}: {stderr.strip()}")
 
     module.exit_json(changed=True)
 

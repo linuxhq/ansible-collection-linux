@@ -147,9 +147,6 @@ CONFIG_UMASK = 0o077
 
 def read_config(module, path):
     if not os.path.exists(path):
-        if module.params["content"] is None:
-            module.fail_json(msg=f"configuration file does not exist: {path}")
-
         return None, None
 
     try:
@@ -306,6 +303,18 @@ def main():
         supports_check_mode=True,
     )
 
+    password = module.params["password"]
+    path = os.path.realpath(module.params["path"])
+
+    if password is not None:
+        try:
+            check_config_password(password)
+        except ValueError as error:
+            module.fail_json(msg=f"invalid password for configuration file {path}: {to_native(error)}")
+
+    if module.params["content"] is None and not os.path.exists(path):
+        module.fail_json(msg=f"configuration file does not exist: {path}")
+
     if not HAS_PYCRYPTODOME:
         if module.check_mode:
             module.exit_json(
@@ -315,16 +324,6 @@ def main():
             )
 
         module.fail_json(msg=missing_required_lib("pycryptodome"))
-
-    password = module.params["password"]
-
-    if password is not None:
-        try:
-            check_config_password(password)
-        except ValueError as error:
-            module.fail_json(msg=to_native(error))
-
-    path = os.path.realpath(module.params["path"])
 
     if module.params["state"] == "present":
         ensure_present(module, path)

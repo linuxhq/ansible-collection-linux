@@ -1,5 +1,5 @@
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock
 
 import pytest
@@ -72,6 +72,14 @@ def hostname_files(monkeypatch, tmp_path):
     monkeypatch.setattr(systemd_hostname, "HOSTNAME_FILE", str(files["hostname"]))
     monkeypatch.setattr(systemd_hostname, "MACHINE_INFO", str(files["machine_info"]))
     return files
+
+
+@pytest.fixture(autouse=True)
+def systemd_version(monkeypatch):
+    """Report systemd 262 to the hostname module unless a test sets another version."""
+    version = Mock(return_value=262)
+    monkeypatch.setattr(systemd_hostname, "systemd_version", version)
+    return version
 
 
 @pytest.mark.parametrize("plugin,key,reader,current,params,method,args", MANAGERS)
@@ -357,6 +365,28 @@ def test_ntp_change_is_reported_before_time_is_set(monkeypatch, run_module, ntp)
         assert calls.systemd_call.call_args.args[2:] == ("SetTime", 1784083200000000, False, False)
 
 
+def test_time_now_is_taken_after_earlier_changes(monkeypatch, run_module):
+    start = datetime(2026, 7, 15, 3, tzinfo=timezone.utc)
+    later = start + timedelta(seconds=20)
+    clock = Mock(side_effect=[start, start, later, later])
+    monkeypatch.setattr(systemd_timedate, "current_time", clock)
+    monkeypatch.setattr(systemd_timedate, "sleep", Mock())
+    monkeypatch.setattr(systemd_timedate, "systemd_proxy", Mock())
+    monkeypatch.setattr(
+        systemd_timedate,
+        "systemd_properties",
+        Mock(side_effect=[{**TIMEDATE, "ntp": True}, {"ntp": False}, {**TIMEDATE, "ntp": False}]),
+    )
+    mutate = Mock()
+    monkeypatch.setattr(systemd_timedate, "systemd_call", mutate)
+    result = run_module(systemd_timedate, {"ntp": False, "time": "now"})
+    assert result["changed"]
+    assert [entry.args[2:] for entry in mutate.call_args_list] == [
+        ("SetNTP", False, False),
+        ("SetTime", int(later.timestamp() * 1000000), False, False),
+    ]
+
+
 def test_ntp_change_wait_times_out(monkeypatch, run_module):
     clock = iter(range(0, 1000, 10))
     monkeypatch.setattr(systemd_timedate, "monotonic", lambda: next(clock))
@@ -458,7 +488,86 @@ def test_hostname_machine_info_values_are_compared(monkeypatch, tmp_path, run_mo
     ],
 )
 def test_parse_env_file(text, expected):
-    assert systemd_hostname.parse_env_file(text).get("KEY", "") == expected
+    assert systemd_hostname.parse_env_file(text, 262).get("KEY", "") == expected
+
+
+@pytest.mark.parametrize("version,expected", [(252, ""), (253, ""), (254, "Foo"), (257, "Foo"), (262, "Foo")])
+def test_parse_env_file_escaped_comment_follows_version(version, expected):
+    text = "# note \\\nPRETTY_HOSTNAME=Foo\n"
+    assert systemd_hostname.parse_env_file(text, version).get("PRETTY_HOSTNAME", "") == expected
+
+
+@pytest.mark.parametrize("version,changed", [(252, True), (257, False)])
+def test_hostname_machine_info_parsed_as_running_systemd(
+    monkeypatch, tmp_path, run_module, systemd_version, version, changed
+):
+    systemd_version.return_value = version
+    mutate = hostname_module(monkeypatch, tmp_path, HOSTNAME, "# note \\\nPRETTY_HOSTNAME=Foo\n")
+    assert run_module(systemd_hostname, {"pretty_hostname": "Foo"})["changed"] is changed
+    assert bool(mutate.call_count) is changed
+
+
+@pytest.mark.parametrize(
+    "value,version,expected",
+    [
+        ("web--", 252, "web-"),
+        ("web--", 257, "web-"),
+        ("web--", 261, "web-"),
+        ("web--", 262, "web"),
+        ("web.-", 257, "web"),
+        ("web-??", 252, "web"),
+        ("web-??", 257, "web"),
+        ("web-??", 258, "web-??"),
+        ("web-$a", 258, "web-a"),
+        ("web-$a", 262, "web-$a"),
+    ],
+)
+def test_hostname_cleanup_follows_version(value, version, expected):
+    assert systemd_hostname.hostname_cleanup(value, version) == expected
+
+
+@pytest.mark.parametrize(
+    "etc_hostname,value,version,changed",
+    [
+        ("web--\n", "web", 252, True),
+        ("web--\n", "", 252, False),
+        ("web--\n", "web", 262, False),
+        ("web-??\n", "web", 257, False),
+        ("web-??\n", "web-??", 258, False),
+    ],
+)
+def test_hostname_static_hostname_read_as_running_systemd(
+    monkeypatch, tmp_path, run_module, systemd_version, etc_hostname, value, version, changed
+):
+    systemd_version.return_value = version
+    status = {**HOSTNAME, "hostname": "web", "static_hostname": "web"}
+    mutate = hostname_module(monkeypatch, tmp_path, status, etc_hostname=etc_hostname)
+    assert run_module(systemd_hostname, {"static_hostname": value}, True)["changed"] is changed
+    mutate.assert_not_called()
+
+
+def test_hostname_version_read_only_to_compare(monkeypatch, tmp_path, run_module, systemd_version):
+    hostname_module(monkeypatch, tmp_path, HOSTNAME)
+    assert run_module(systemd_hostname, {"transient_hostname": "old"})["changed"] is False
+    systemd_version.assert_not_called()
+
+
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_hostname_empty_chassis_removes_it(monkeypatch, tmp_path, run_module, check_mode):
+    mutate = hostname_module(monkeypatch, tmp_path, {**HOSTNAME, "chassis": "vm"}, "CHASSIS=server\n")
+    result = run_module(systemd_hostname, {"chassis": ""}, check_mode)
+    assert result["changed"]
+    if check_mode:
+        assert result["hostname"]["chassis"] == ""
+        mutate.assert_not_called()
+    else:
+        assert mutate.call_args.args[2:] == ("SetChassis", "", False)
+
+
+def test_hostname_empty_chassis_matches_missing_machine_info(monkeypatch, tmp_path, run_module):
+    mutate = hostname_module(monkeypatch, tmp_path, {**HOSTNAME, "chassis": "vm"})
+    assert run_module(systemd_hostname, {"chassis": ""})["changed"] is False
+    mutate.assert_not_called()
 
 
 @pytest.mark.parametrize(

@@ -117,12 +117,12 @@ def info(module):
     rc, stdout, stderr = kopia_command(module, ["policy", "show", "--json", target])
 
     if rc != 0:
-        module.fail_json(msg=f"unable to show kopia policy: {stderr.strip()}")
+        module.fail_json(msg=f"unable to show kopia policy {target}: {stderr.strip()}")
 
     try:
         effective = json.loads(stdout)
     except ValueError:
-        module.fail_json(msg=f"unable to parse kopia policy show output: {stdout.strip()}")
+        module.fail_json(msg=f"unable to parse kopia policy show output for {target}: {stdout.strip()}")
 
     module.exit_json(
         changed=False,
