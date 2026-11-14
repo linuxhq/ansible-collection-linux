@@ -27,7 +27,7 @@
     group: root
     mode: '0644'
     owner: root
-    src: package_filter.conf.j2
+    src: package_filter.action.j2
   loop: "{{ post_transaction_actions_list }}"
   loop_control:
     label: "{{ _pta.package_filter | d(none) }}"
