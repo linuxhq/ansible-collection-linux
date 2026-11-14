@@ -299,6 +299,50 @@ def test_vconsole_reset_toggle_when_keymap_changes(module_factory):
     assert systemd_locale.vconsole_change(module, current) == {"vconsole_keymap": "us", "vconsole_keymap_toggle": ""}
 
 
+@pytest.mark.parametrize(
+    "params,initial_options,converted_options,x11_args",
+    [
+        # unset X11 values come from the conversion, not from the read before SetVConsoleKeyboard
+        (
+            {"vconsole_keymap": "de", "x11_options": "grp:alt_shift_toggle"},
+            "terminate:ctrl_alt_bksp",
+            "terminate:ctrl_alt_bksp",
+            ("de", "pc105+inet", "", "grp:alt_shift_toggle", True, False),
+        ),
+        # a requested X11 value that matched before the conversion is written again
+        (
+            {"vconsole_keymap": "de", "x11_options": "grp:alt_shift_toggle"},
+            "grp:alt_shift_toggle",
+            "terminate:ctrl_alt_bksp",
+            ("de", "pc105+inet", "", "grp:alt_shift_toggle", True, False),
+        ),
+        # nothing requested still differs after the conversion
+        (
+            {"vconsole_keymap": "de", "x11_layout": "de"},
+            "terminate:ctrl_alt_bksp",
+            "terminate:ctrl_alt_bksp",
+            None,
+        ),
+    ],
+)
+def test_x11_keyboard_compares_against_converted_settings(
+    monkeypatch, run_module, params, initial_options, converted_options, x11_args
+):
+    initial = {**LOCALE, "x11_model": "pc105+inet", "x11_options": initial_options}
+    converted = {**initial, "vconsole_keymap": "de", "x11_layout": "de", "x11_options": converted_options}
+    final = {**converted, "x11_options": params.get("x11_options", converted_options)}
+    monkeypatch.setattr(systemd_locale, "HAS_DASBUS", True)
+    monkeypatch.setattr(systemd_locale, "systemd_proxy", Mock())
+    monkeypatch.setattr(systemd_locale, "locale_status", Mock(side_effect=[initial, converted, final]))
+    mutate = Mock()
+    monkeypatch.setattr(systemd_locale, "systemd_call", mutate)
+    result = run_module(systemd_locale, params)
+    assert result["changed"] and result["locale"] == final
+    calls = [entry.args[2:] for entry in mutate.call_args_list]
+    assert calls[0] == ("SetVConsoleKeyboard", "de", "", True, False)
+    assert calls[1:] == ([("SetX11Keyboard", *x11_args)] if x11_args else [])
+
+
 def test_timedate_setter_order_and_arguments(monkeypatch, run_module):
     monkeypatch.setattr(systemd_timedate, "systemd_proxy", Mock())
     monkeypatch.setattr(
