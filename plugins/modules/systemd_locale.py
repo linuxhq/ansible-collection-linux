@@ -153,7 +153,9 @@ options:
 requirements:
   - dasbus
   - systemd >= 239, the first version whose C(systemd-localed) merges a partial
-    locale request into the configured variables instead of clearing the rest
+    locale request into the configured variables instead of clearing the rest;
+    the module fails before writing any setting when O(locale) would change
+    the locale on an older systemd
 attributes:
   check_mode:
     description: Predicts changes without modifying the target.
@@ -226,7 +228,11 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.systemd import (
     locale_status,
     systemd_call,
     systemd_proxy,
+    systemd_version,
 )
+
+# the first systemd-localed whose SetLocale keeps the variables a request leaves out
+LOCALE_MERGE_VERSION = 239
 
 VCONSOLE_SETTINGS = ["vconsole_keymap", "vconsole_keymap_toggle"]
 X11_SETTINGS = ["x11_layout", "x11_model", "x11_variant", "x11_options"]
@@ -296,6 +302,12 @@ def ensure_present(module):
 
     locale = locale_change(module, current)
     if locale is not None:
+        version = systemd_version(module)
+        if version < LOCALE_MERGE_VERSION:
+            module.fail_json(
+                msg=f"unable to set locale: systemd >= {LOCALE_MERGE_VERSION} is required, found {version}"
+            )
+
         simplified = locale_simplify(locale)
 
         predicted["locale"] = {name: simplified.get(name) for name in LOCALE_VARIABLES}

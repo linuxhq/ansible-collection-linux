@@ -76,9 +76,10 @@ def hostname_files(monkeypatch, tmp_path):
 
 @pytest.fixture(autouse=True)
 def systemd_version(monkeypatch):
-    """Report systemd 262 to the hostname module unless a test sets another version."""
+    """Report systemd 262 to the hostname and locale modules unless a test sets another version."""
     version = Mock(return_value=262)
     monkeypatch.setattr(systemd_hostname, "systemd_version", version)
+    monkeypatch.setattr(systemd_locale, "systemd_version", version)
     return version
 
 
@@ -291,6 +292,46 @@ def test_locale_sends_only_requested_variables(monkeypatch, run_module, check_mo
         mutate.assert_not_called()
     else:
         assert mutate.call_args.args[2:] == ("SetLocale", ["LC_TIME=en_GB.UTF-8"], False)
+
+
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_locale_requires_systemd_239_before_any_write(monkeypatch, run_module, systemd_version, check_mode):
+    systemd_version.return_value = 238
+    monkeypatch.setattr(systemd_locale, "HAS_DASBUS", True)
+    monkeypatch.setattr(systemd_locale, "systemd_proxy", Mock())
+    monkeypatch.setattr(systemd_locale, "locale_status", Mock(return_value=LOCALE))
+    mutate = Mock()
+    monkeypatch.setattr(systemd_locale, "systemd_call", mutate)
+    params = {"locale": {"lc_time": "en_GB.UTF-8"}, "vconsole_keymap": "de"}
+    result = run_module(systemd_locale, params, check_mode)
+    assert result["failed"] and result["msg"] == "unable to set locale: systemd >= 239 is required, found 238"
+    mutate.assert_not_called()
+
+
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_locale_proceeds_on_systemd_239(monkeypatch, run_module, systemd_version, check_mode):
+    systemd_version.return_value = 239
+    monkeypatch.setattr(systemd_locale, "HAS_DASBUS", True)
+    monkeypatch.setattr(systemd_locale, "systemd_proxy", Mock())
+    monkeypatch.setattr(systemd_locale, "locale_status", Mock(return_value=LOCALE))
+    mutate = Mock()
+    monkeypatch.setattr(systemd_locale, "systemd_call", mutate)
+    assert run_module(systemd_locale, {"locale": {"lc_time": "en_GB.UTF-8"}}, check_mode)["changed"]
+    assert systemd_version.call_count == 1
+    if check_mode:
+        mutate.assert_not_called()
+    else:
+        assert mutate.call_args.args[2:] == ("SetLocale", ["LC_TIME=en_GB.UTF-8"], False)
+
+
+def test_locale_version_not_read_without_locale_change(monkeypatch, run_module, systemd_version):
+    systemd_version.return_value = 238
+    monkeypatch.setattr(systemd_locale, "systemd_proxy", Mock())
+    monkeypatch.setattr(systemd_locale, "locale_status", Mock(return_value=LOCALE))
+    mutate = Mock()
+    monkeypatch.setattr(systemd_locale, "systemd_call", mutate)
+    assert run_module(systemd_locale, {"vconsole_keymap": "de"})["changed"]
+    systemd_version.assert_not_called()
 
 
 def test_vconsole_reset_toggle_when_keymap_changes(module_factory):
@@ -759,15 +800,41 @@ def test_time_requires_ntp_disabled_before_any_write(monkeypatch, run_module):
     mutate.assert_not_called()
 
 
-@pytest.mark.parametrize("value", ["@0", "@-5", "1970-01-01 00:00:00 UTC"])
-def test_time_rejects_absolute_epoch_before_any_write(monkeypatch, run_module, value):
+@pytest.mark.parametrize(
+    "value",
+    ["@0", "@-5", "1970-01-01 00:00:00 UTC", "-60y", "-100y", "@1e13", "+300000y", "-300000y"],
+)
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_time_rejects_invalid_time_before_any_write(monkeypatch, run_module, value, check_mode):
+    monkeypatch.setattr(systemd_timedate, "HAS_DASBUS", True)
+    monkeypatch.setattr(systemd_timedate, "systemd_proxy", Mock())
+    monkeypatch.setattr(systemd_timedate, "systemd_properties", Mock(return_value=TIMEDATE))
+    mutate = Mock()
+    monkeypatch.setattr(systemd_timedate, "systemd_call", mutate)
+    result = run_module(systemd_timedate, {"timezone": "Europe/Berlin", "time": value}, check_mode)
+    assert result["failed"] and result["msg"] == f"unable to set time: invalid time {value}"
+    mutate.assert_not_called()
+
+
+@pytest.mark.parametrize("value", ["@1e400", "+" + "9" * 400])
+def test_time_rejects_infinite_time_before_any_write(monkeypatch, run_module, value):
     monkeypatch.setattr(systemd_timedate, "systemd_proxy", Mock())
     monkeypatch.setattr(systemd_timedate, "systemd_properties", Mock(return_value=TIMEDATE))
     mutate = Mock()
     monkeypatch.setattr(systemd_timedate, "systemd_call", mutate)
     result = run_module(systemd_timedate, {"timezone": "Europe/Berlin", "time": value})
-    assert result["failed"] and "invalid absolute time" in result["msg"]
+    assert result["failed"] and "unable to parse the time specification" in result["msg"]
     mutate.assert_not_called()
+
+
+@pytest.mark.parametrize("value", ["-1y", "+300y", "@1"])
+def test_time_accepts_time_in_range(monkeypatch, run_module, value):
+    monkeypatch.setattr(systemd_timedate, "systemd_proxy", Mock())
+    monkeypatch.setattr(systemd_timedate, "systemd_properties", Mock(return_value=TIMEDATE))
+    mutate = Mock()
+    monkeypatch.setattr(systemd_timedate, "systemd_call", mutate)
+    assert run_module(systemd_timedate, {"time": value})["changed"]
+    assert mutate.call_args.args[2] == "SetTime"
 
 
 def test_hostname_check_mode_predicts_default_after_clearing_static(monkeypatch, tmp_path, run_module):

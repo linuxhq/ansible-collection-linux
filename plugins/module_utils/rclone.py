@@ -37,6 +37,9 @@ CONFIG_TAG_SIZE = 16
 # Go's norm package inserts U+034F after this many consecutive non-starters (UAX #15 Stream-Safe Text Format).
 MAX_NON_STARTERS = 30
 
+# Hangul Jamo, whose medial vowels and final consonants Go counts as non-starters although their class is 0.
+HANGUL_JAMO = range(0x1100, 0x1200)
+
 # Unicode White_Space, which Go's strings.TrimSpace removes. str.strip() also removes U+001C to U+001F.
 GO_WHITESPACE = "\t\n\v\f\r \x85\xa0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000"
 
@@ -207,6 +210,14 @@ def is_noncharacter(character):
     return 0xFDD0 <= codepoint <= 0xFDEF or codepoint & 0xFFFE == 0xFFFE
 
 
+def is_non_starter(character):
+    return (
+        unicodedata.combining(character) != 0
+        or unicodedata.category(character).startswith("M")
+        or ord(character) in HANGUL_JAMO
+    )
+
+
 def check_config_password(password):
     if not password or not password.strip(GO_WHITESPACE):
         raise ValueError("no characters in password")
@@ -219,14 +230,18 @@ def check_config_password(password):
                 " the version of this Python, so its normalization may differ from rclone's"
             )
 
-    # Python does not insert U+034F into a long run of non-starters, as rclone does
+    # Python does not insert U+034F into a long run of non-starters, as rclone does. Go also counts characters
+    # of class 0 that combine with the one before as non-starters, so every mark and Hangul jamo is counted.
     run = 0
     for character in unicodedata.normalize("NFKD", password):
-        run = run + 1 if unicodedata.combining(character) else 0
+        if is_non_starter(character):
+            run += 1
+        else:
+            run = 0
 
         if run > MAX_NON_STARTERS:
             raise ValueError(
-                f"password has more than {MAX_NON_STARTERS} consecutive combining characters,"
+                f"password has more than {MAX_NON_STARTERS} consecutive combining characters, marks or Hangul jamo,"
                 " which rclone normalizes differently"
             )
 

@@ -11,10 +11,15 @@ version_added: "2.3.0"
 short_description: Create a kopia snapshot
 description:
   - Create a snapshot of a local path in the connected kopia repository.
-  - The module is deliberately one-shot. Every run takes a new snapshot and
-    reports RV(ignore:changed) as V(true), the same way C(kopia snapshot create)
-    behaves, so it is not idempotent and belongs in a play that is meant to run
-    on a schedule rather than in a converge that is expected to settle.
+  - The module is deliberately one-shot. Every run asks kopia to take a new
+    snapshot, the same way C(kopia snapshot create) behaves, so it is not
+    idempotent and belongs in a play that is meant to run on a schedule rather
+    than in a converge that is expected to settle.
+  - When the policy for the path sets C(retention.ignore_identical_snapshots)
+    and no files have changed since the previous snapshot, kopia does not save
+    a new snapshot. The module then reports RV(ignore:changed) as V(false) and
+    returns the existing newest snapshot. Otherwise it reports
+    RV(ignore:changed) as V(true).
 options:
   config_file:
     description:
@@ -53,7 +58,11 @@ requirements:
   - kopia
 attributes:
   check_mode:
-    description: Reports changed without creating a snapshot.
+    description:
+      - Reports changed without creating a snapshot.
+      - Check mode cannot tell whether kopia would skip an identical snapshot,
+        so it reports changed even when C(retention.ignore_identical_snapshots)
+        would leave the repository unchanged.
     support: full
   diff_mode:
     description: Diff mode is not supported.
@@ -78,6 +87,8 @@ RETURN = r"""
 snapshot:
   description:
     - Newest snapshot for the path, reported by C(kopia snapshot list).
+    - This is the snapshot just created, or the existing newest snapshot when
+      kopia skipped an identical snapshot.
     - Keys under C(tags) are returned as kopia reports them, such as
       C(tag:role).
     - Empty in check mode and when the snapshot manifest cannot be read back.
@@ -127,7 +138,7 @@ def ensure_present(module):
     if module.check_mode:
         module.exit_json(changed=True, snapshot={})
 
-    command = ["snapshot", "create", path]
+    command = ["snapshot", "create", path, "--json"]
 
     if module.params["description"]:
         command.append(f"--description={module.params['description']}")
@@ -135,12 +146,14 @@ def ensure_present(module):
     for key, value in sorted((module.params["tags"] or {}).items()):
         command.append(f"--tags={key}:{value}")
 
-    rc, _dummy, stderr = kopia_command(module, command, password=module.params["password"])
+    rc, stdout, stderr = kopia_command(module, command, password=module.params["password"])
 
     if rc != 0:
         module.fail_json(msg=f"unable to create kopia snapshot of {path}: {stderr.strip()}")
 
-    module.exit_json(changed=True, snapshot=latest_snapshot(module, path))
+    # kopia prints the new manifest only when it saves a snapshot; nothing is
+    # printed when ignore_identical_snapshots skips an unchanged source.
+    module.exit_json(changed=bool(stdout.strip()), snapshot=latest_snapshot(module, path))
 
 
 def main():

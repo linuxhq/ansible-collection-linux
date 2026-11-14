@@ -1,0 +1,6 @@
+---
+bugfixes:
+  - kopia_snapshot - report no change when kopia skips the snapshot because the
+    policy sets ``retention.ignore_identical_snapshots`` and no files changed
+    since the previous snapshot. The module reported a change and returned the
+    previous snapshot as if it were new.

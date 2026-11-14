@@ -62,8 +62,11 @@ options:
         are accepted. A character that this Python normalizes but an older
         rclone build does not cannot be detected.
       - A password whose compatibility decomposition has a run of more than 30
-        consecutive combining characters is rejected, because rclone inserts
-        U+034F into such a run while normalizing and this Python does not.
+        consecutive combining characters, marks or Hangul jamo is rejected,
+        because rclone inserts U+034F into such a run while normalizing and
+        this Python does not. Every mark and every Hangul jamo is counted,
+        including those that rclone may not count, so some such passwords that
+        rclone could open are rejected as well.
     type: str
   path:
     description:

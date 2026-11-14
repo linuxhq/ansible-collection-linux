@@ -67,12 +67,14 @@ options:
         enabled, so pair it with O(ntp=false) on a host that has it on. The
         module fails before writing any setting when network time
         synchronization would still be enabled.
-      - An absolute time at or before the epoch is rejected before any setting
-        is written.
-      - systemd 258 and later also refuse an absolute time before the date
-        systemd was built. Only C(systemd-timedated) knows that date, so the
-        refusal is reported after the other settings in the same task are
-        applied.
+      - A time at or before the epoch, or outside the range of a signed 64-bit
+        count of microseconds, is rejected before any setting is written. This
+        applies to absolute times and to relative times, which are resolved
+        against the current time.
+      - systemd 258 and later also refuse a time, absolute or relative, before
+        the date systemd was built. Only C(systemd-timedated) knows that date,
+        so the refusal is reported after the other settings in the same task
+        are applied.
     type: str
   timezone:
     description:
@@ -126,6 +128,7 @@ timedate:
 import os
 import re
 from datetime import datetime, timedelta, timezone
+from math import isfinite
 from time import monotonic, sleep, tzset
 
 from ansible.module_utils.basic import AnsibleModule
@@ -137,6 +140,10 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.systemd import (
     systemd_properties,
     systemd_proxy,
 )
+
+INT64_MAX = 2**63 - 1
+
+INT64_MIN = -(2**63)
 
 MICROSECONDS = 1000000
 
@@ -238,7 +245,7 @@ def parse_span(value):
         total += float(amount) * factor
         position = match.end()
 
-    return int(total) if position else None
+    return int(total) if position and isfinite(total) else None
 
 
 def parse_stamp(value, utc):
@@ -266,7 +273,7 @@ def parse_value(module, value):
     if value.startswith("@"):
         try:
             return int(float(value[1:]) * MICROSECONDS), False
-        except ValueError:
+        except (OverflowError, ValueError):
             module.fail_json(msg=f"unable to parse the time specification: {value}")
 
     if value.startswith(("+", "-")):
@@ -383,11 +390,13 @@ def ensure_present(module):
 
         usec, relative = parse_time(module, value, predicted["timezone"])
 
-        if not relative and usec <= 0:
-            module.fail_json(msg=f"unable to set time: invalid absolute time {value}")
-
         now = int(current_time().timestamp() * MICROSECONDS)
-        predicted["time_usec"] = now + usec if relative else usec
+        target = now + usec if relative else usec
+
+        if not INT64_MIN <= usec <= INT64_MAX or not 0 < target <= INT64_MAX:
+            module.fail_json(msg=f"unable to set time: invalid time {value}")
+
+        predicted["time_usec"] = target
         pending.append(("SetTime", (usec, relative, False)))
 
     if not pending:

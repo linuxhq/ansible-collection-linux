@@ -1,0 +1,13 @@
+---
+bugfixes:
+  - systemd_timedate - reject a relative ``time`` that resolves to a time at or
+    before the epoch, such as ``-60y``, and a ``time`` outside the range of a
+    signed 64-bit count of microseconds, such as ``@1e13``, before any setting
+    is written. ``systemd-timedated`` refused them only after the other
+    settings in the same task, such as ``timezone``, were applied, and the
+    module could fail with a Python error on values outside that range. A
+    ``time`` too large to represent, such as ``@1e400``, is now reported as a
+    time specification that cannot be parsed instead of a Python error.
+  - systemd_locale - fail before writing any setting when ``locale`` would
+    change the locale on systemd older than 239, whose ``systemd-localed``
+    clears the locale variables a request leaves out.

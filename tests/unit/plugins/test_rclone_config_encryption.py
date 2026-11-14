@@ -143,7 +143,17 @@ def test_unassigned_password_character_is_rejected(monkeypatch, tmp_path, run_mo
 
 @pytest.mark.parametrize(
     "password",
-    ["a" + "\u0301" * 31, "\u00e9" + "\u0301" * 30, "a" + "\u0344" * 16, "a" + "\u0301" * 30 + "b" + "\u0301" * 31],
+    [
+        "a" + "\u0301" * 31,
+        "\u00e9" + "\u0301" * 30,
+        "a" + "\u0344" * 16,
+        "a" + "\u0301" * 30 + "b" + "\u0301" * 31,
+        "\uac00" + "\u0301" * 30,
+        "\uac01" + "\u0301" * 29,
+        "a" + "\u0b3e" * 31,
+        "a" + "\u1161" * 31,
+        "a" + "\u11a8" * 31,
+    ],
 )
 @pytest.mark.parametrize("state", ["present", "absent"])
 @pytest.mark.parametrize("crypto", [True, False])
@@ -158,7 +168,7 @@ def test_long_combining_run_password_is_rejected(
     assert not path.exists()
     assert result["failed"] and result["msg"] == (
         f"invalid password for configuration file {path}: password has more than 30 consecutive combining "
-        "characters, which rclone normalizes differently"
+        "characters, marks or Hangul jamo, which rclone normalizes differently"
     )
 
 
@@ -172,6 +182,7 @@ def test_long_combining_run_password_is_rejected(
         "\u00e9" + "\u0301" * 29,
         "a" + "\u0344" * 15,
         "a" + "\u0301" * 30 + "b" + "\u0301" * 30,
+        "a" + "\u0b3e" * 30,
         "pw\uffff",
         "pw\ufdd0",
         "pw\U0010fffe",
