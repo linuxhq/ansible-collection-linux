@@ -54,6 +54,12 @@ options:
       - Whitespace is significant and is not stripped, matching rclone. A password
         that is empty or entirely whitespace is rejected, where whitespace is the
         set of Unicode space characters rclone trims.
+      - The password is NFKC normalized with the Unicode tables of the Python
+        on the managed node, which can be older than the ones rclone is built
+        with. A password containing a character that is unassigned in those
+        tables is rejected, because rclone may normalize it differently. A
+        character that this Python normalizes but an older rclone build does
+        not cannot be detected.
     type: str
   path:
     description:

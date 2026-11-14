@@ -1,4 +1,5 @@
 import os
+import unicodedata
 from unittest.mock import Mock
 
 import pytest
@@ -119,6 +120,33 @@ def test_invalid_password_names_path(tmp_path, run_module):
     path = tmp_path / "config"
     result = run_module(plugin, {"path": str(path), "password": " ", "content": "config"})
     assert result["msg"] == f"invalid password for configuration file {path}: no characters in password"
+
+
+UNASSIGNED = "\U0001ccf0"
+
+
+@pytest.mark.skipif(unicodedata.category(UNASSIGNED) != "Cn", reason="assigned in this Python's Unicode tables")
+@pytest.mark.parametrize("state", ["present", "absent"])
+@pytest.mark.parametrize("crypto", [True, False])
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_unassigned_password_character_is_rejected(monkeypatch, tmp_path, run_module, state, crypto, check_mode):
+    monkeypatch.setattr(plugin, "HAS_PYCRYPTODOME", crypto)
+    path = tmp_path / "config"
+    params = {"path": str(path), "password": "pw" + UNASSIGNED, "state": state, "content": "config"}
+    result = run_module(plugin, params, check_mode)
+    assert not path.exists()
+    assert result["failed"] and result["msg"] == (
+        f"invalid password for configuration file {path}: character U+1CCF0 is unassigned in Unicode "
+        f"{unicodedata.unidata_version}, the version of this Python, so its normalization may differ from rclone's"
+    )
+
+
+@pytest.mark.parametrize("password", ["pāss🔑", "e\u0301", "\uff21\u2460"])
+def test_assigned_non_ascii_password_is_accepted(tmp_path, run_module, password):
+    path = tmp_path / "rclone.conf"
+    result = run_module(plugin, {"path": str(path), "password": password, "content": "config"})
+    assert result["changed"] and not result.get("failed")
+    assert rclone.decrypt_config(path.read_text(), password) == b"config"
 
 
 def test_atomic_move_failure_removes_temporary_file(tmp_path, module_factory, invoke):

@@ -1,0 +1,7 @@
+---
+bugfixes:
+  - rclone_config_encryption - reject a ``password`` containing a character
+    that is unassigned in the Unicode tables of the managed node's Python,
+    which rclone may NFKC normalize differently and then fail to decrypt the
+    file. Such passwords were accepted before and are now refused before
+    anything is read or written.
