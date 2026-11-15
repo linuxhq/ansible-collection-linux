@@ -1,0 +1,22 @@
+---
+bugfixes:
+  - kopia_policy - fail before running kopia, also in check mode, when a
+    ``policy`` key converts to capitalization kopia does not report, such as
+    ``Retention`` or ``KEEP_LATEST``. kopia matched such a key to its field
+    ignoring case and stored the policy, but reported the field in camelCase,
+    so the task reported a change on every run. Write keys in snake_case or
+    in kopia's camelCase.
+  - kopia_policy, kopia_policy_info, kopia_maintenance, kopia_repository,
+    kopia_snapshot, kopia_snapshot_info - fail before running kopia, also in
+    check mode, when a policy target or value, a maintenance owner, a storage
+    option or secret, or a snapshot path, description or tag is not valid
+    UTF-8, such as text with a lone surrogate code point. kopia recorded such
+    text with U+FFFD in its place, so a policy was imported again on every
+    run while ``state=absent`` reported no change and left it in place, the
+    maintenance owner was set on every run, and the next run failed against
+    the module's own repository connection. Some such values made the module
+    fail with a traceback. A failure names the option or key, never a value.
+  - kopia_maintenance, kopia_policy - document that the returned
+    ``maintenance`` and ``policy`` are the predicted settings in check mode
+    when a change would be made, and empty when kopia is unavailable in check
+    mode.

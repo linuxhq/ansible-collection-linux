@@ -48,6 +48,9 @@ options:
         single target instead of RV(policies).
       - Passed to kopia as given, so V(~) and environment variables are not
         expanded.
+      - A target that is not valid UTF-8, such as one with a lone surrogate
+        code point, fails before kopia runs, also in check mode, because kopia
+        records a target with U+FFFD in its place.
     type: str
 requirements:
   - kopia >= 0.18.0
@@ -120,6 +123,7 @@ from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.common.dict_transformations import camel_dict_to_snake_dict
 
 from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
+    check_utf8,
     kopia_available,
     kopia_command,
     policy_export,
@@ -128,6 +132,8 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
 
 
 def info(module):
+    check_utf8(module, [("target", module.params["target"])])
+
     if module.check_mode and not kopia_available(module):
         module.exit_json(changed=False, defined=False, effective_policy={}, policy={})
 

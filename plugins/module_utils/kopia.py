@@ -63,6 +63,49 @@ def kopia_flags(options):
     return flags
 
 
+def text_label(text):
+    """Return text with any character that cannot be encoded as UTF-8 written as an escape, for a message."""
+    return text.encode("utf-8", "backslashreplace").decode("utf-8")
+
+
+def invalid_utf8(value, name):
+    """Return the name of the first string in value, a key or item at any depth, that is not valid UTF-8, or None."""
+    if isinstance(value, str):
+        try:
+            value.encode("utf-8")
+        except UnicodeEncodeError:
+            return name
+
+    elif isinstance(value, dict):
+        for key, item in value.items():
+            child = f"{name}.{text_label(str(key))}"
+            found = invalid_utf8(key, child) or invalid_utf8(item, child)
+            if found:
+                return found
+
+    elif isinstance(value, (list, tuple)):
+        for index, item in enumerate(value):
+            found = invalid_utf8(item, f"{name}[{index}]")
+            if found:
+                return found
+
+    return None
+
+
+def check_utf8(module, settings):
+    """Fail naming the first (name, value) setting holding text that is not valid UTF-8, never its value."""
+    for name, value in settings:
+        found = invalid_utf8(value, name)
+
+        # a lone surrogate, which a JSON value can carry, reaches kopia as a raw byte or not at all, and kopia records
+        # text that is not valid UTF-8 with U+FFFD in its place, so the value it reports never matches
+        if found:
+            module.fail_json(
+                msg=f"invalid {found}: it must be valid UTF-8, without a lone surrogate code point, "
+                "as kopia records other text with U+FFFD in its place"
+            )
+
+
 def kopia_available(module):
     return module.get_bin_path("kopia") is not None
 

@@ -51,6 +51,10 @@ options:
         or a list for one of the options that identify the repository, listed
         in the description, such as C(bucket) or C(path). Quote a value such as
         V(no) that YAML reads as a Boolean.
+      - Text that is not valid UTF-8, such as a lone surrogate code point, is
+        rejected before kopia runs, also in check mode, because kopia records
+        it with U+FFFD in its place, so the connected repository would never
+        match.
       - Put credential-carrying flags in O(secrets) instead so they stay out of
         logs.
       - Values are passed to kopia as given, so the module does not expand V(~)
@@ -75,7 +79,8 @@ options:
       - Storage provider flags whose values are secrets, such as
         V(secret_access_key) or V(key).
       - Converted to CLI flags exactly like O(options), with the same rejected
-        values and number formatting, but kept out of logs.
+        values and number formatting, but kept out of logs. A rejected value is
+        not included in the failure message.
       - A key also given in O(options) takes its value from O(secrets).
       - The options that identify the repository, listed in the description,
         are compared with the connected repository like O(options), but a
@@ -176,6 +181,7 @@ from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.common.dict_transformations import camel_dict_to_snake_dict
 
 from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
+    check_utf8,
     clean_path,
     kopia_available,
     kopia_command,
@@ -200,6 +206,8 @@ STORAGE_TYPES = {"azure": "azureBlob"}
 
 
 def check_option_values(module):
+    check_utf8(module, [(param, module.params[param]) for param in ("options", "secrets")])
+
     for param in ("options", "secrets"):
         for option, value in sorted(module.params[param].items()):
             # kopia_flags would send a dictionary as Python text and a list as one flag per element
