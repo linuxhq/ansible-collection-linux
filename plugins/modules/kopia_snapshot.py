@@ -31,7 +31,7 @@ description:
   - O(path) is made absolute and cleaned, as kopia does, and its snapshots
     are listed by that path, to which kopia adds the client user and host.
     kopia reads a bare path in which an V(@) comes before any V(:) as
-    C(user@host) or C(user@host:/path), so when the absolute path is such a
+    C(user@host) or C(user@host:path), so when the absolute path is such a
     path, such as V(/home/alice@example.com), it is listed by the source kopia
     records, C(user@host:/path), taken from the snapshot kopia printed or, when
     it printed none, from the client user and host reported by

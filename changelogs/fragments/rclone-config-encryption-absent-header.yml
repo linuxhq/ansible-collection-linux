@@ -4,4 +4,4 @@ bugfixes:
     ``state=absent`` would write plain text that begins with an rclone
     encryption header such as ``RCLONE_ENCRYPT_V0:``, which rclone would read
     as encrypted rather than as the plain text written, instead of writing it
-    and reporting a change on every run.
+    and then reporting a change on every later run or failing on the next run.

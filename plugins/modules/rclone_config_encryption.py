@@ -308,7 +308,7 @@ def ensure_absent(module, path):
 
     if not readable:
         module.fail_json(
-            msg=f"plain text for configuration {path} begins with an rclone encryption header, so rclone would not read it as plain text"
+            msg=f"plain text for configuration file {path} begins with an rclone encryption header, so rclone would not read it as plain text"
         )
 
     changed = encrypted or current != desired
