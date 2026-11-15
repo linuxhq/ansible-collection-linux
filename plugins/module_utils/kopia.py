@@ -112,11 +112,13 @@ def absolute_path(path):
 
 
 def snapshot_source(module, path, operation):
-    # kopia reads a bare path containing "@" as user@host, so only such a path is qualified with the client user
-    # and host; any other path is passed absolute, so a name such as "--all" or "(global)" stays a path, and kopia
-    # adds its own client user and host
-    if "@" not in path:
-        return absolute_path(path)
+    # the path is passed absolute, so a name such as "--all" or "(global)" stays a path, and kopia adds its own client
+    # user and host; kopia reads an absolute path containing "@" as user@host, so only such a path is qualified with
+    # the client user and host
+    absolute = absolute_path(path)
+
+    if "@" not in absolute:
+        return absolute
 
     status = repository_status(module, password=module.params["password"])
 
@@ -135,12 +137,12 @@ def snapshot_source(module, path, operation):
     if any(char in username + hostname for char in "@:"):
         module.fail_json(
             msg=(
-                f"unable to {operation} of {path}: kopia cannot list a path containing '@' for client user "
-                f"{username!r} on host {hostname!r}, as it splits user@host:/path at the first '@' and ':'"
+                f"unable to {operation} of {path}: kopia cannot list {absolute}, a path containing '@', for client "
+                f"user {username!r} on host {hostname!r}, as it splits user@host:/path at the first '@' and ':'"
             )
         )
 
-    return f"{username}@{hostname}:{absolute_path(path)}"
+    return f"{username}@{hostname}:{absolute}"
 
 
 def repository_status(module, password=None):

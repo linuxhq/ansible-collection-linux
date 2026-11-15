@@ -30,15 +30,15 @@ description:
     been saved, with an empty RV(snapshot).
   - O(path) is made absolute and cleaned, as kopia does, and its snapshots
     are listed by that path, to which kopia adds the client user and host.
-    kopia reads a bare path containing V(@) as C(user@host), so such a path,
-    such as V(/home/alice@example.com), is listed by the source kopia records,
-    C(user@host:/path), taken from the snapshot kopia printed or, when it
-    printed none, from the client user and host reported by
-    C(kopia repository status) and the path made absolute and cleaned.
-  - kopia splits C(user@host:/path) at the first V(@) and the first V(:), so a
-    path containing V(@) cannot be listed when the client user or host
-    contains V(@) or V(:), such as V(alice@corp.example.com). The module then
-    fails before taking the snapshot.
+    kopia reads a bare path containing V(@) as C(user@host), so when the
+    absolute path contains V(@), such as V(/home/alice@example.com), it is
+    listed by the source kopia records, C(user@host:/path), taken from the
+    snapshot kopia printed or, when it printed none, from the client user and
+    host reported by C(kopia repository status).
+  - kopia splits C(user@host:/path) at the first V(@) and the first V(:), so an
+    absolute path containing V(@) cannot be listed when the client user or
+    host contains V(@) or V(:), such as V(alice@corp.example.com). The module
+    then fails before taking the snapshot.
 notes:
   - A failure reported by kopia after it saved the snapshot without printing
     it, such as applying the retention policy, cannot be told apart from a
@@ -84,8 +84,8 @@ attributes:
   check_mode:
     description:
       - Reports changed without creating a snapshot.
-      - For a O(path) containing V(@), fails as a real run would when the
-        snapshots of the path cannot be listed and kopia is installed.
+      - When the absolute O(path) contains V(@), fails as a real run would
+        when the snapshots of the path cannot be listed and kopia is installed.
       - Check mode cannot tell whether kopia would skip an identical snapshot,
         so it reports changed even when C(retention.ignore_identical_snapshots)
         would leave the repository unchanged.
@@ -158,12 +158,12 @@ def created_manifest(stdout):
     return manifest if isinstance(manifest, dict) else {}
 
 
-def listed_source(manifest, path, source):
-    # a path containing "@" is listed by the source kopia recorded when it printed one
+def listed_source(manifest, source):
+    # a source qualified as user@host:/path is listed as kopia recorded it when it printed one
     recorded = manifest.get("source")
 
     if (
-        "@" in path
+        "@" in source
         and isinstance(recorded, dict)
         and all(isinstance(recorded.get(key), str) and recorded[key] for key in SOURCE_KEYS)
     ):
@@ -211,7 +211,7 @@ def ensure_present(module):
             module.fail_json(msg=f"invalid tag key {key!r}: kopia splits tags at the first ':'")
 
     if module.check_mode:
-        if "@" in path and kopia_available(module):
+        if "@" in absolute_path(path) and kopia_available(module):
             snapshot_source(module, path, OPERATION)
 
         module.exit_json(changed=True, snapshot={})
@@ -236,7 +236,7 @@ def ensure_present(module):
         # kopia prints the manifest once the snapshot is saved, then can fail on
         # fatal errors found while snapshotting or in automatic maintenance, but
         # also in the final repository flush, which leaves the snapshot unsaved
-        snapshots = list_snapshots(module, listed_source(manifest, path, source))
+        snapshots = list_snapshots(module, listed_source(manifest, source))
         if snapshots is None:
             module.fail_json(
                 msg=(
@@ -263,7 +263,7 @@ def ensure_present(module):
     if not stdout.strip():
         module.exit_json(changed=False, snapshot=latest_snapshot(module, source))
 
-    module.exit_json(changed=True, snapshot=latest_snapshot(module, listed_source(manifest, path, source), snapshot_id))
+    module.exit_json(changed=True, snapshot=latest_snapshot(module, listed_source(manifest, source), snapshot_id))
 
 
 def main():

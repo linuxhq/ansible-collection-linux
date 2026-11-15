@@ -906,3 +906,31 @@ def test_snapshot_relative_path_is_passed_absolute(monkeypatch, run_module, kopi
     assert run_module(kopia_snapshot_info, {"path": path}) == {"changed": False, "snapshots": []}
     assert command.call_args.args[1] == ["snapshot", "list", "--json", f"/work/{path}"]
     kopia_client.assert_not_called()
+
+
+@pytest.mark.parametrize("client,listed", [(CLIENT_STATUS, True), (FQDN_CLIENT, False)])
+def test_relative_path_in_directory_with_at_sign_is_qualified(monkeypatch, run_module, kopia_client, client, listed):
+    # the absolute path decides, as kopia reads /home/alice@example.com/data as user@host
+    kopia_client.return_value = client
+    monkeypatch.setattr(kopia_utils, "working_directory", lambda: "/home/alice@example.com")
+    source = "root@host:/home/alice@example.com/data"
+    command = Mock(side_effect=[(0, '{"id":"new"}', ""), (0, '[{"id":"new"}]', "")])
+    monkeypatch.setattr(kopia_snapshot, "kopia_command", command)
+    result = run_module(kopia_snapshot, {"path": "data"})
+    assert bool(result.get("failed")) is not listed
+    if listed:
+        assert result == {"changed": True, "snapshot": {"id": "new"}}
+        assert command.call_args_list[0].args[1] == ["snapshot", "create", "/home/alice@example.com/data", "--json"]
+        assert command.call_args_list[1].args[1] == ["snapshot", "list", source, "--json"]
+    else:
+        assert "/home/alice@example.com/data" in result["msg"] and not result.get("changed")
+        command.assert_not_called()
+
+    command = Mock(return_value=(0, "[]", ""))
+    monkeypatch.setattr(kopia_snapshot_info, "kopia_command", command)
+    result = run_module(kopia_snapshot_info, {"path": "data"})
+    assert bool(result.get("failed")) is not listed
+    if listed:
+        assert command.call_args.args[1] == ["snapshot", "list", "--json", source]
+    else:
+        command.assert_not_called()
