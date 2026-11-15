@@ -88,7 +88,11 @@ options:
   state:
     description:
       - V(present) writes the configuration encrypted.
-      - V(absent) writes the configuration decrypted.
+      - V(absent) writes the configuration decrypted. When the plain text to
+        be written, O(content) or the decrypted configuration, begins with an
+        rclone encryption header such as C(RCLONE_ENCRYPT_V0:), after any blank
+        or comment lines, the module fails before writing anything, because
+        rclone would read the file as encrypted and could not load it.
     type: str
     choices:
       - absent
@@ -295,6 +299,16 @@ def ensure_absent(module, path):
         desired = current
     else:
         desired = to_bytes(desired)
+
+    try:
+        readable = not is_encrypted(desired)
+    except ValueError:
+        readable = False
+
+    if not readable:
+        module.fail_json(
+            msg=f"plain text for configuration {path} begins with an rclone encryption header, so rclone cannot read it"
+        )
 
     changed = encrypted or current != desired
 

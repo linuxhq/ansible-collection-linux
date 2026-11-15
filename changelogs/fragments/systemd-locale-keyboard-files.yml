@@ -7,3 +7,7 @@ bugfixes:
     a file, so the module applied ``locale`` and then failed, or reported a
     console keymap or a converted keyboard setting as changed although
     systemd-localed did not store it.
+  - systemd_locale - document that systemd 253 and later also keep the X11
+    keyboard settings in ``/etc/vconsole.conf`` and ignore a failure to write
+    ``/etc/X11/xorg.conf.d/00-keyboard.conf``, which Debian 13 makes
+    read-only for systemd-localed once the directory exists.

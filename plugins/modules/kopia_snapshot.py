@@ -87,8 +87,9 @@ attributes:
   check_mode:
     description:
       - Reports changed without creating a snapshot.
-      - When the absolute O(path) contains V(@), fails as a real run would
-        when the snapshots of the path cannot be listed and kopia is installed.
+      - When the absolute O(path) is one in which an V(@) comes before any
+        V(:), fails as a real run would when the snapshots of the path cannot
+        be listed and kopia is installed.
       - Check mode cannot tell whether kopia would skip an identical snapshot,
         so it reports changed even when C(retention.ignore_identical_snapshots)
         would leave the repository unchanged.
