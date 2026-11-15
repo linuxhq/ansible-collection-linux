@@ -22,11 +22,12 @@ description:
     from O(storage), or when one of the O(options) C(bucket), C(container),
     C(endpoint), C(folder_id), C(host), C(path), C(prefix), C(remote_path),
     C(storage_account) or C(url) differs from the connected storage
-    configuration. A leading V(~) in the C(path) of V(filesystem) storage is
-    resolved to the home directory first, as kopia does, and that C(path) is
-    compared as a normalized path, so V(/srv/kopia/) and V(//srv/kopia) match
-    V(/srv/kopia). Disconnect it with
-    C(kopia repository disconnect) first to switch repositories.
+    configuration. A number in these options is compared as the text passed
+    to kopia, so V(20261115) matches a stored V("20261115"). A leading V(~)
+    in the C(path) of V(filesystem) storage is resolved to the home directory
+    first, as kopia does, and that C(path) is compared as a normalized path,
+    so V(/srv/kopia/) and V(//srv/kopia) match V(/srv/kopia). Disconnect it
+    with C(kopia repository disconnect) first to switch repositories.
   - With O(storage=from-config), the existing connection is not compared, so
     a host already connected to any repository is left untouched.
 options:
@@ -219,9 +220,12 @@ def storage_mismatch(module, status):
 
     for option, key in sorted(STORAGE_KEYS.items()):
         value = module.params["options"].get(option)
-        if not isinstance(value, str):
+
+        # kopia_flags sends any other value as --name=value, so compare it as text
+        if value is None or isinstance(value, (bool, list, tuple, dict)):
             continue
 
+        value = str(value)
         stored = config.get(key, "")
         if storage_value(storage, option, stored) != storage_value(storage, option, value):
             return f"{option} is {stored}, not {value}"

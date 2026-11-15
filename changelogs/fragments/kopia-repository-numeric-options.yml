@@ -1,0 +1,6 @@
+---
+bugfixes:
+  - kopia_repository - compare a number given for an identifying storage
+    option, such as ``bucket``, with the connected repository as the text
+    passed to kopia, so a host connected to a different repository fails
+    instead of reporting no change.

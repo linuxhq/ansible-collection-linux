@@ -317,19 +317,19 @@ def test_snapshot_rejects_tag_key_with_colon(monkeypatch, run_module, check_mode
 
 
 @pytest.mark.parametrize("check_mode", [False, True])
-@pytest.mark.parametrize("value", [None, True, False])
-def test_snapshot_rejects_null_and_boolean_tag_values(monkeypatch, run_module, check_mode, value):
-    # str() would record them as "None", "True" or "False"
+@pytest.mark.parametrize("value", [None, True, False, 42, 1.5, ["a", "b"], {"a": "b"}])
+def test_snapshot_rejects_non_string_tag_values(monkeypatch, run_module, check_mode, value):
+    # str() would record them as Python text, such as "None", "True" or "1.1" for an unquoted 1.10
     monkeypatch.setattr(kopia_snapshot, "kopia_command", Mock(side_effect=AssertionError("must not run kopia")))
     monkeypatch.setattr(kopia_snapshot, "kopia_available", Mock(side_effect=AssertionError("must not look up kopia")))
     result = run_module(kopia_snapshot, {"path": "/data", "tags": {"env": value, "role": "db"}}, check_mode)
-    assert result["failed"] and "'env'" in result["msg"] and "null or Boolean" in result["msg"]
+    assert result["failed"] and "'env'" in result["msg"] and "not a string" in result["msg"]
 
 
-def test_snapshot_records_number_tag_values_as_text(monkeypatch, run_module):
+def test_snapshot_records_quoted_tag_values_as_given(monkeypatch, run_module):
     command = Mock(side_effect=[(0, '{"id":"new"}\n', ""), (0, '[{"id":"new"}]', "")])
     monkeypatch.setattr(kopia_snapshot, "kopia_command", command)
-    result = run_module(kopia_snapshot, {"path": "/data", "tags": {"build": 42, "ratio": 1.5}})
+    result = run_module(kopia_snapshot, {"path": "/data", "tags": {"build": "42", "ratio": "1.10", "time": "12:30"}})
     assert result == {"changed": True, "snapshot": {"id": "new"}}
     assert command.call_args_list[0].args[1] == [
         "snapshot",
@@ -337,7 +337,8 @@ def test_snapshot_records_number_tag_values_as_text(monkeypatch, run_module):
         "/data",
         "--json",
         "--tags=build:42",
-        "--tags=ratio:1.5",
+        "--tags=ratio:1.10",
+        "--tags=time:12:30",
     ]
 
 
@@ -704,6 +705,11 @@ def test_repository_status_uses_password(monkeypatch, run_module):
             {"type": "s3", "config": {"bucket": "b"}},
             "prefix is , not a/",
         ),
+        (
+            {"storage": "s3", "password": "secret", "options": {"bucket": 20261115}},
+            {"type": "s3", "config": {"bucket": "other"}},
+            "bucket is other, not 20261115",
+        ),
     ],
 )
 @pytest.mark.parametrize("check_mode", [False, True])
@@ -731,6 +737,10 @@ def test_repository_connected_elsewhere_fails(monkeypatch, run_module, params, s
         (
             {"storage": "rclone", "password": "secret", "options": {"remote_path": "remote:kopia"}},
             {"type": "rclone", "config": {"remotePath": "remote:kopia"}},
+        ),
+        (
+            {"storage": "s3", "password": "secret", "options": {"bucket": 20261115}},
+            {"type": "s3", "config": {"bucket": "20261115"}},
         ),
     ],
 )
