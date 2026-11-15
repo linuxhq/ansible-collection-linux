@@ -5,6 +5,7 @@ import pytest
 
 from ansible.module_utils import basic
 
+from ansible_collections.linuxhq.linux.plugins.module_utils import kopia as kopia_utils
 from ansible_collections.linuxhq.linux.plugins.modules import (
     kopia_maintenance,
     kopia_maintenance_info,
@@ -37,8 +38,7 @@ CLIENT_STATUS = {"clientOptions": {"hostname": "host", "username": "root"}}
 def kopia_client(monkeypatch):
     """Report the client user and host that kopia_snapshot and kopia_snapshot_info qualify a path with."""
     status = Mock(return_value=CLIENT_STATUS)
-    monkeypatch.setattr(kopia_snapshot, "repository_status", status, raising=False)
-    monkeypatch.setattr(kopia_snapshot_info, "repository_status", status, raising=False)
+    monkeypatch.setattr(kopia_utils, "repository_status", status)
     return status
 
 
@@ -367,7 +367,7 @@ def test_snapshot_info(monkeypatch, run_module, path):
     monkeypatch.setattr(kopia_snapshot_info, "kopia_command", command)
     result = run_module(kopia_snapshot_info, {"path": path})
     assert result == {"changed": False, "snapshots": [{"start_time": "now"}]}
-    assert command.call_args.args[1] == ["snapshot", "list", "--json"] + (["root@host:/data"] if path else [])
+    assert command.call_args.args[1] == ["snapshot", "list", "--json"] + (["/data"] if path else [])
 
 
 @pytest.mark.parametrize(
@@ -377,7 +377,7 @@ def test_snapshot_info(monkeypatch, run_module, path):
         ("/home/alice@example.com", "root@host:/home/alice@example.com"),
         ("/x@h:/y", "root@host:/x@h:/y"),
         # qualified as kopia records the source, absolute and cleaned
-        ("//srv/./data/../data/", "root@host:/srv/data"),
+        ("//srv/./a@b/../a@b/", "root@host:/srv/a@b"),
     ],
 )
 def test_snapshot_info_qualifies_path(monkeypatch, run_module, path, source):
@@ -391,8 +391,8 @@ def test_snapshot_info_qualifies_path(monkeypatch, run_module, path, source):
 def test_snapshot_info_path_without_client_fails(monkeypatch, run_module, kopia_client, status):
     kopia_client.return_value = status
     monkeypatch.setattr(kopia_snapshot_info, "kopia_command", Mock(side_effect=AssertionError("must not list")))
-    result = run_module(kopia_snapshot_info, {"path": "/data"})
-    assert result["failed"] and "unable to list kopia snapshots of /data" in result["msg"]
+    result = run_module(kopia_snapshot_info, {"path": "/a@b"})
+    assert result["failed"] and "unable to list kopia snapshots of /a@b" in result["msg"]
 
 
 @pytest.mark.parametrize("response", [(1, "", "denied"), (0, "not json", "")])
@@ -459,7 +459,7 @@ def test_snapshot_saved_with_errors_reports_change(monkeypatch, run_module):
         result["msg"]
         == "created kopia snapshot new of /data, but kopia reported errors: Found 1 fatal error(s) while snapshotting"
     )
-    assert command.call_args_list[1].args[1] == ["snapshot", "list", "root@host:/data", "--json"]
+    assert command.call_args_list[1].args[1] == ["snapshot", "list", "/data", "--json"]
 
 
 SOURCE = {"host": "client", "userName": "alice", "path": "/home/a@b"}
@@ -824,3 +824,69 @@ def test_repository_other_paths_are_compared_literally(monkeypatch, run_module):
     params = {"storage": "sftp", "password": "secret", "options": {"host": "backup", "path": "/srv/kopia/"}}
     result = run_module(kopia_repository, params)
     assert result["failed"] and "path is /srv/kopia, not /srv/kopia/" in result["msg"]
+
+
+FQDN_CLIENT = {"clientOptions": {"hostname": "host", "username": "alice@corp.example.com"}}
+FQDN_SOURCE = '{"id":"new","source":{"host":"host","userName":"alice@corp.example.com","path":"/srv/data"}}'
+
+
+@pytest.mark.parametrize(
+    "created,listed",
+    [
+        # saved
+        ((0, FQDN_SOURCE, ""), "new"),
+        # skipped as identical
+        ((0, "", ""), "old"),
+        # saved, then kopia reported errors
+        ((1, FQDN_SOURCE, "Found 1 fatal error(s) while snapshotting\n"), "new"),
+    ],
+)
+def test_snapshot_without_at_sign_lists_bare_path(monkeypatch, run_module, kopia_client, created, listed):
+    # kopia splits user@host:/path at the first "@", so a client user such as alice@corp.example.com cannot be
+    # qualified; a bare path is resolved by kopia with its own client user and host
+    kopia_client.return_value = FQDN_CLIENT
+    command = Mock(side_effect=[created, (0, '[{"id":"new"},{"id":"old"}]', "")])
+    monkeypatch.setattr(kopia_snapshot, "kopia_command", command)
+    result = run_module(kopia_snapshot, {"path": "/srv/data"})
+    assert result["snapshot"] == {"id": listed}
+    assert result["changed"] is (listed == "new")
+    assert command.call_args_list[1].args[1] == ["snapshot", "list", "/srv/data", "--json"]
+    kopia_client.assert_not_called()
+
+
+def test_snapshot_info_without_at_sign_lists_bare_path(monkeypatch, run_module, kopia_client):
+    kopia_client.return_value = FQDN_CLIENT
+    command = Mock(return_value=(0, '[{"id":"old"}]', ""))
+    monkeypatch.setattr(kopia_snapshot_info, "kopia_command", command)
+    assert run_module(kopia_snapshot_info, {"path": "/srv/data"}) == {"changed": False, "snapshots": [{"id": "old"}]}
+    assert command.call_args.args[1] == ["snapshot", "list", "--json", "/srv/data"]
+    kopia_client.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "client",
+    [
+        {"hostname": "host", "username": "alice@corp.example.com"},
+        {"hostname": "host", "username": "corp:alice"},
+        {"hostname": "host@corp", "username": "root"},
+        {"hostname": "host:1", "username": "root"},
+    ],
+)
+@pytest.mark.parametrize("plugin", [kopia_snapshot, kopia_snapshot_info])
+def test_path_with_at_sign_for_unlistable_client_fails(monkeypatch, run_module, kopia_client, plugin, client):
+    # no user@host:/path form can express a user or host containing "@" or ":"
+    kopia_client.return_value = {"clientOptions": client}
+    monkeypatch.setattr(plugin, "kopia_command", Mock(side_effect=AssertionError("must not run kopia")))
+    result = run_module(plugin, {"path": "/home/a@b"})
+    assert result["failed"] and not result.get("changed")
+    assert "/home/a@b" in result["msg"] and repr(client["username"]) in result["msg"]
+    assert repr(client["hostname"]) in result["msg"]
+
+
+@pytest.mark.parametrize("available", [False, True])
+def test_snapshot_check_mode_with_at_sign_for_unlistable_client(monkeypatch, run_module, kopia_client, available):
+    kopia_client.return_value = FQDN_CLIENT
+    monkeypatch.setattr(kopia_snapshot, "kopia_available", lambda module: available)
+    result = run_module(kopia_snapshot, {"path": "/home/a@b"}, check_mode=True)
+    assert bool(result.get("failed")) is available
+    assert kopia_client.called is available

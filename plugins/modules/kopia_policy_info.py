@@ -27,6 +27,13 @@ options:
       - kopia reads a target containing V(@) as C(user@host) or
         C(user@host:/path), so a directory whose path contains V(@), such as
         V(/home/alice@example.com), must be written as C(user@host:/path).
+      - kopia stores the user, host and path of C(user@host) and
+        C(user@host:/path) as given. To match the snapshots of the client, the
+        user and host must be the C(clientOptions.username) and
+        C(clientOptions.hostname) reported by C(kopia repository status), where
+        the host defaults to the short, lowercased hostname, and the path must
+        be absolute and clean, without V(.) or V(..) components or a trailing
+        V(/).
       - When set, RV(policy) and RV(effective_policy) are returned for the
         single target instead of RV(policies).
       - Passed to kopia as given, so V(~) and environment variables are not

@@ -1,3 +1,4 @@
+import os
 from copy import deepcopy
 from unittest.mock import Mock
 
@@ -137,22 +138,54 @@ def test_same_value(left, right, expected):
     assert kopia.same_value(left, right) is expected
 
 
+CLIENT = {"clientOptions": {"hostname": "host", "username": "root"}}
+
+
 @pytest.mark.parametrize(
     "path,source",
     [
         ("/home/a@b", "root@host:/home/a@b"),
-        ("//srv//data/./", "root@host:/srv/data"),
-        ("/srv/other/../data", "root@host:/srv/data"),
+        ("//srv//a@b/./", "root@host:/srv/a@b"),
+        ("/srv/other/../a@b", "root@host:/srv/a@b"),
         ("data@x", "root@host:/work/data@x"),
-        ("/", "root@host:/"),
+        # a path without "@" is passed bare and resolved by kopia
+        ("/srv/data/", "/srv/data/"),
+        ("data", "data"),
     ],
 )
-def test_snapshot_source_is_qualified_as_kopia_records_it(monkeypatch, path, source):
-    monkeypatch.setattr(kopia.os, "getcwd", lambda: "/work")
-    status = {"clientOptions": {"hostname": "host", "username": "root"}}
-    assert kopia.snapshot_source(status, path) == source
+def test_snapshot_source_is_qualified_as_kopia_records_it(monkeypatch, module_factory, path, source):
+    monkeypatch.setattr(kopia, "working_directory", lambda: "/work")
+    monkeypatch.setattr(kopia, "repository_status", lambda module, password=None: CLIENT)
+    assert kopia.snapshot_source(module_factory({"password": None}), path, "list") == source
 
 
-@pytest.mark.parametrize("status", [None, {}, {"clientOptions": {"username": "root"}}])
-def test_snapshot_source_without_client_is_unknown(status):
-    assert kopia.snapshot_source(status, "/data") is None
+@pytest.mark.parametrize(
+    "status,reason",
+    [
+        (None, "repository is not connected"),
+        ({}, "did not report"),
+        ([], "did not report"),
+        ({"clientOptions": {"username": "root"}}, "did not report"),
+        ({"clientOptions": {"username": "a@b", "hostname": "host"}}, "cannot list"),
+    ],
+)
+def test_snapshot_source_with_at_sign_fails(monkeypatch, module_factory, invoke, status, reason):
+    monkeypatch.setattr(kopia, "repository_status", lambda module, password=None: status)
+    result = invoke(kopia.snapshot_source, module_factory({"password": None}), "/a@b", "list snapshots")
+    assert result["failed"] and result["msg"].startswith("unable to list snapshots of /a@b: ")
+    assert reason in result["msg"]
+
+
+def test_absolute_path_follows_pwd_like_go(monkeypatch, tmp_path):
+    # Go's os.Getwd returns $PWD when it names the working directory, such as through a symlink
+    real = tmp_path / "real"
+    real.mkdir()
+    link = tmp_path / "link"
+    link.symlink_to(real)
+    monkeypatch.chdir(real)
+    monkeypatch.setenv("PWD", str(link))
+    assert kopia.absolute_path("a@b/./") == f"{link}/a@b"
+    # a stale, relative or missing $PWD is ignored
+    for pwd in (str(tmp_path), "link", str(tmp_path / "missing")):
+        monkeypatch.setenv("PWD", pwd)
+        assert kopia.absolute_path("a@b") == f"{os.getcwd()}/a@b"

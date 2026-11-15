@@ -21,7 +21,8 @@ description:
     computed fallback for a setting that is not stored, such as a chassis
     detected from the firmware or an icon name derived from the chassis. A
     missing file means no setting is stored. The file is parsed as the running
-    systemd version parses it.
+    systemd version parses it, which ignores a file containing a NUL byte
+    and everything from the first setting that is not valid UTF-8.
   - O(static_hostname) is compared against C(/etc/hostname), the file
     C(systemd-hostnamed) stores it in, read as systemd reads it, from the first
     line that is neither empty nor a comment, with surrounding whitespace and
@@ -282,6 +283,13 @@ def validate_settings(module):
         module.fail_json(msg=f"invalid transient_hostname {params['transient_hostname']!r}: it is not a valid hostname")
 
 
+def utf8_valid(text):
+    """Whether text decoded with surrogateescape passes systemd's utf8_is_valid(), which also refuses noncharacters."""
+    return not any(
+        0xD800 <= ord(char) <= 0xDFFF or 0xFDD0 <= ord(char) <= 0xFDEF or ord(char) & 0xFFFE == 0xFFFE for char in text
+    )
+
+
 def parse_env_file(text, version):
     """Parse an environment file as systemd's parse_env_file_internal() does, the last assignment winning."""
     entries = {}
@@ -291,7 +299,14 @@ def parse_env_file(text, version):
 
     def push():
         name = key if key_space is None else key[:key_space]
-        entries[name] = value if state != "value" or value_space is None else value[:value_space]
+        entry = value if state != "value" or value_space is None else value[:value_space]
+
+        # systemd stops parsing at the first entry that is not valid UTF-8, keeping the entries before it
+        if not utf8_valid(name) or not utf8_valid(entry):
+            return False
+
+        entries[name] = entry
+        return True
 
     for character in text:
         if state == "pre_key":
@@ -319,7 +334,9 @@ def parse_env_file(text, version):
 
         elif state == "pre_value":
             if character in ENV_NEWLINE:
-                push()
+                if not push():
+                    return entries
+
                 state = "pre_key"
             elif character == "'":
                 state = "single_quote"
@@ -333,7 +350,9 @@ def parse_env_file(text, version):
 
         elif state == "value":
             if character in ENV_NEWLINE:
-                push()
+                if not push():
+                    return entries
+
                 state = "pre_key"
             elif character == "\\":
                 state = "value_escape"
@@ -388,9 +407,9 @@ def parse_env_file(text, version):
     return entries
 
 
-def read_text(module, path):
+def read_bytes(module, path):
     try:
-        with open(path, encoding="utf-8", errors="replace", newline="") as handle:
+        with open(path, "rb") as handle:
             return handle.read()
     except FileNotFoundError:
         return None
@@ -398,8 +417,18 @@ def read_text(module, path):
         module.fail_json(msg=f"unable to read {path}: {to_native(error)}")
 
 
+def read_text(module, path):
+    content = read_bytes(module, path)
+
+    return None if content is None else content.decode("utf-8", errors="replace")
+
+
 def read_machine_info(module, version):
-    entries = parse_env_file(read_text(module, MACHINE_INFO) or "", version)
+    content = read_bytes(module, MACHINE_INFO) or b""
+
+    # systemd refuses to read a file containing a NUL byte, so none of its settings are stored; undecodable bytes
+    # are kept as surrogates for the UTF-8 check
+    entries = {} if b"\x00" in content else parse_env_file(content.decode("utf-8", errors="surrogateescape"), version)
 
     return {param: entries.get(key, "") for key, param in MACHINE_INFO_KEYS.items()}
 
