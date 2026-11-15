@@ -1,0 +1,9 @@
+---
+bugfixes:
+  - systemd_locale - document that in check mode ``locale`` holds the
+    settings predicted from the options, and that it is empty when dasbus is
+    unavailable in check mode.
+  - systemd_timedate - document that in check mode ``timedate`` holds the
+    settings predicted from the options, with ``time_usec`` set to the time
+    ``time`` would set, and that it is empty when dasbus is unavailable in
+    check mode.

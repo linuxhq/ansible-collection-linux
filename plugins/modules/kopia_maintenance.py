@@ -69,6 +69,8 @@ options:
     description:
       - Maximum total size of retained log sessions, in megabytes.
       - Must not be negative, kopia reads V(-1) as leaving it unset.
+      - Must not exceed V(8796093022207), the largest size in megabytes kopia
+        stores in bytes without overflowing.
       - V(0) means no size limit. When O(max_retained_log_age),
         O(max_retained_log_count) and O(max_retained_log_size_mb) are all
         V(0), kopia applies its default log retention instead, 30 days, 10000
@@ -151,6 +153,7 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
 )
 
 INTEGER_KINDS = ("duration", "int", "megabytes")
+MAX_LOG_SIZE_MB = (2**63 - 1) // 1048576
 MEGABYTES = 1048576
 NANOSECONDS = 1000000000
 
@@ -248,6 +251,10 @@ def validate_settings(module):
 
         if kind in INTEGER_KINDS and value is not None and value < 0:
             module.fail_json(msg=f"invalid {param} {value}: it must not be negative")
+
+    size = module.params["max_retained_log_size_mb"]
+    if size is not None and size > MAX_LOG_SIZE_MB:
+        module.fail_json(msg=f"invalid max_retained_log_size_mb {size}: it must not exceed {MAX_LOG_SIZE_MB}")
 
     if module.params["owner"] == "":
         module.fail_json(msg="invalid owner: it must not be empty")

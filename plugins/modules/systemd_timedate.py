@@ -116,7 +116,12 @@ EXAMPLES = r"""
 
 RETURN = r"""
 timedate:
-  description: Time and date settings reported by C(systemd-timedated).
+  description:
+    - Time and date settings reported by C(systemd-timedated).
+    - In check mode, the settings that would change are predicted from the
+      options, and when O(time) is set, C(time_usec) is the time it would
+      set.
+    - Empty when dasbus is unavailable in check mode.
   returned: always
   type: dict
   sample:
