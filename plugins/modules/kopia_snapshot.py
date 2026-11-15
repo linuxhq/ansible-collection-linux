@@ -80,9 +80,10 @@ options:
         given.
       - kopia splits each flag at its first V(:), so a key containing V(:) is
         rejected before kopia runs. Values may contain V(:).
-      - Values are recorded as text. Null and Boolean values are rejected
-        before kopia runs, so quote them to record them as text, such as
-        V("true").
+      - Values must be strings. Any other value, such as a number, Boolean,
+        null, list or dictionary, is rejected before kopia runs, so quote
+        numbers, Booleans and values that YAML reads as numbers, such as
+        V("42"), V("true") or V("12:30"), to record them as text.
     type: dict
 requirements:
   - kopia
@@ -218,8 +219,8 @@ def ensure_present(module):
         if ":" in key:
             module.fail_json(msg=f"invalid tag key {key!r}: kopia splits tags at the first ':'")
 
-        if value is None or isinstance(value, bool):
-            module.fail_json(msg=f"tag {key!r} has a null or Boolean value; quote it to record it as text")
+        if not isinstance(value, str):
+            module.fail_json(msg=f"tag {key!r} value is not a string; quote it to record it as text")
 
     if module.check_mode:
         if reads_as_user_host(absolute_path(path)) and kopia_available(module):
