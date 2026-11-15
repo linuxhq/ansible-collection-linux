@@ -1,8 +1,9 @@
 from copy import deepcopy
-from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock
 
 import pytest
+
+from ansible.module_utils import basic
 
 from ansible_collections.linuxhq.linux.plugins.modules import (
     systemd_hostname,
@@ -72,6 +73,25 @@ def hostname_files(monkeypatch, tmp_path):
     monkeypatch.setattr(systemd_hostname, "HOSTNAME_FILE", str(files["hostname"]))
     monkeypatch.setattr(systemd_hostname, "MACHINE_INFO", str(files["machine_info"]))
     return files
+
+
+def analyze_output(seconds, original="2026-07-26 14:30"):
+    """Return systemd-analyze timestamp output with the given UNIX seconds field, as systemd 252 prints it."""
+    return (
+        f"  Original form: {original}\n"
+        "Normalized form: Sun 2026-07-26 14:30:00 UTC\n"
+        f"   UNIX seconds: {seconds}\n"
+        "       From now: 1 week 3 days left\n"
+    )
+
+
+@pytest.fixture
+def analyze(monkeypatch, run_module):
+    """Answer systemd-analyze timestamp through AnsibleModule.run_command, once per call."""
+    command = Mock(return_value=(0, analyze_output("@1784083200"), ""))
+    monkeypatch.setattr(basic.AnsibleModule, "get_bin_path", Mock(return_value="/usr/bin/systemd-analyze"))
+    monkeypatch.setattr(basic.AnsibleModule, "run_command", command)
+    return command
 
 
 @pytest.fixture(autouse=True)
@@ -190,79 +210,6 @@ def test_ntp_requires_available_service(monkeypatch, run_module):
     result = run_module(systemd_timedate, {"ntp": True})
     assert result["failed"] and "no network time service" in result["msg"]
     mutate.assert_not_called()
-
-
-@pytest.mark.parametrize(
-    "value,expected",
-    [
-        ("1h30min", 5400000000),
-        ("1.5s", 1500000),
-        ("2ms", 2000),
-        ("3us", 3),
-        ("500\u00b5s", 500),
-        ("500\u03bcs", 500),
-        (".5s", 500000),
-        ("12.34s.56", 12900000),
-        ("1min 30s ", 90000000),
-        ("0", 0),
-        ("", None),
-        ("1fortnight", None),
-        ("bad", None),
-        # systemd accepts only ASCII digits, an optional fraction and no exponent or separators
-        ("\u0663h", None),
-        ("\u0661\u0660", None),
-        ("1e9", None),
-        ("1_000", None),
-        ("5.", None),
-    ],
-)
-def test_parse_duration(value, expected):
-    assert systemd_timedate.parse_span(value) == expected
-
-
-@pytest.mark.parametrize(
-    "value,expected",
-    [
-        ("@1.5", (1500000, False)),
-        ("@1h", (3600000000, False)),
-        ("@1min 30s", (90000000, False)),
-        ("+2min", (120000000, True)),
-        ("+.5s", (500000, True)),
-        ("-1h", (-3600000000, True)),
-        ("5min ago", (-300000000, True)),
-        ("5min left", (300000000, True)),
-        ("now", (1784084400000000, False)),
-        ("now UTC", (1784084400000000, False)),
-        ("1970-01-01 00:00:01 UTC", (1000000, False)),
-        ("Thu, 1970-01-01 UTC", (0, False)),
-    ],
-)
-def test_parse_time_specification(monkeypatch, module_factory, value, expected):
-    now = datetime(2026, 7, 15, 3, tzinfo=timezone.utc)
-    monkeypatch.setattr(systemd_timedate, "current_time", lambda utc=False: now)
-    assert systemd_timedate.parse_value(module_factory(), value) == expected
-
-
-@pytest.mark.parametrize("origin", [None, "UTC"])
-def test_timezone_restored_on_parse_failure(monkeypatch, module_factory, invoke, origin):
-    if origin is None:
-        monkeypatch.delenv("TZ", raising=False)
-    else:
-        monkeypatch.setenv("TZ", origin)
-
-    tzset = Mock()
-    monkeypatch.setattr(systemd_timedate, "tzset", tzset)
-    result = invoke(systemd_timedate.parse_time, module_factory(), "not a timestamp", "Europe/Berlin")
-    assert result["failed"]
-    assert systemd_timedate.os.environ.get("TZ") == origin
-    assert tzset.call_count == 2
-
-
-def test_relative_day_uses_fixed_clock(monkeypatch, module_factory):
-    now = datetime(2026, 1, 2, 12, tzinfo=timezone.utc)
-    monkeypatch.setattr(systemd_timedate, "current_time", lambda utc=False: now)
-    expected = int(datetime(2026, 1, 3, tzinfo=timezone.utc).timestamp() * 1000000)
-    assert systemd_timedate.parse_value(module_factory(), "tomorrow UTC") == (expected, False)
 
 
 def test_locale_change_preserves_unspecified_categories(monkeypatch, run_module):
@@ -452,61 +399,8 @@ def test_x11_keyboard_converts_only_without_console_settings(monkeypatch, run_mo
     assert calls[-1][0] == "SetX11Keyboard" and calls[-1][-2:] == (convert, False)
 
 
-def test_timedate_setter_order_and_arguments(monkeypatch, run_module):
-    monkeypatch.setattr(systemd_timedate, "systemd_proxy", Mock())
-    monkeypatch.setattr(
-        systemd_timedate, "systemd_properties", Mock(side_effect=[{**TIMEDATE, "ntp": True}, {"ntp": False}, TIMEDATE])
-    )
-    monkeypatch.setattr(systemd_timedate, "parse_time", Mock(return_value=(1500000, True)))
-    mutate = Mock()
-    monkeypatch.setattr(systemd_timedate, "systemd_call", mutate)
-    result = run_module(
-        systemd_timedate,
-        {"timezone": "Europe/Berlin", "local_rtc": True, "adjust_system_clock": True, "ntp": False, "time": "+1.5s"},
-    )
-    assert result["changed"]
-    assert [entry.args[2:] for entry in mutate.call_args_list] == [
-        ("SetTimezone", "Europe/Berlin", False),
-        ("SetLocalRTC", True, True, False),
-        ("SetNTP", False, False),
-        ("SetTime", 1500000, True, False),
-    ]
-    assert systemd_timedate.parse_time.call_args.args[1:] == ("+1.5s", "Europe/Berlin")
-
-
-@pytest.mark.parametrize(
-    "value",
-    [
-        "@invalid",
-        "@-5",
-        "@1e9",
-        "@1_000",
-        "@\u0661\u0660",
-        "+bad",
-        "-bad",
-        "+\u0663h",
-        "ago",
-        "+5min ago",
-        "5min ago UTC",
-        "never",
-        "Fri, 1970-01-01 UTC",
-        "Sun 2026-07-27",
-    ],
-)
-def test_invalid_time_specification(module_factory, invoke, value):
-    result = invoke(systemd_timedate.parse_value, module_factory(), value)
-    assert result["failed"] and "unable to parse" in result["msg"]
-
-
-def test_weekday_matches_the_date_in_the_time_zone(module_factory):
-    # 08:00 on Sunday in UTC+14 is still Saturday in UTC
-    expected = int(datetime(2026, 7, 25, 18, tzinfo=timezone.utc).timestamp() * 1000000)
-    result = systemd_timedate.parse_time(module_factory(), "Sun 2026-07-26 08:00", "Pacific/Kiritimati")
-    assert result == (expected, False)
-
-
 @pytest.mark.parametrize("ntp", [False, True])
-def test_ntp_change_is_reported_before_time_is_set(monkeypatch, run_module, ntp):
+def test_ntp_change_is_reported_before_time_is_set(monkeypatch, run_module, analyze, ntp):
     calls = Mock()
     calls.systemd_properties.side_effect = [
         {**TIMEDATE, "ntp": not ntp},
@@ -536,29 +430,7 @@ def test_ntp_change_is_reported_before_time_is_set(monkeypatch, run_module, ntp)
         assert calls.systemd_call.call_args.args[2:] == ("SetTime", 1784083200000000, False, False)
 
 
-def test_time_now_is_taken_after_earlier_changes(monkeypatch, run_module):
-    start = datetime(2026, 7, 15, 3, tzinfo=timezone.utc)
-    later = start + timedelta(seconds=20)
-    clock = Mock(side_effect=[start, start, later, later])
-    monkeypatch.setattr(systemd_timedate, "current_time", clock)
-    monkeypatch.setattr(systemd_timedate, "sleep", Mock())
-    monkeypatch.setattr(systemd_timedate, "systemd_proxy", Mock())
-    monkeypatch.setattr(
-        systemd_timedate,
-        "systemd_properties",
-        Mock(side_effect=[{**TIMEDATE, "ntp": True}, {"ntp": False}, {**TIMEDATE, "ntp": False}]),
-    )
-    mutate = Mock()
-    monkeypatch.setattr(systemd_timedate, "systemd_call", mutate)
-    result = run_module(systemd_timedate, {"ntp": False, "time": "now"})
-    assert result["changed"]
-    assert [entry.args[2:] for entry in mutate.call_args_list] == [
-        ("SetNTP", False, False),
-        ("SetTime", int(later.timestamp() * 1000000), False, False),
-    ]
-
-
-def test_ntp_change_wait_times_out(monkeypatch, run_module):
+def test_ntp_change_wait_times_out(monkeypatch, run_module, analyze):
     clock = iter(range(0, 1000, 10))
     monkeypatch.setattr(systemd_timedate, "monotonic", lambda: next(clock))
     monkeypatch.setattr(systemd_timedate, "sleep", Mock())
@@ -855,7 +727,7 @@ def test_hostname_check_mode_predicts_static_over_reset_transient(monkeypatch, t
     mutate.assert_not_called()
 
 
-def test_time_requires_ntp_disabled_before_any_write(monkeypatch, run_module):
+def test_time_requires_ntp_disabled_before_any_write(monkeypatch, run_module, analyze):
     monkeypatch.setattr(systemd_timedate, "systemd_proxy", Mock())
     monkeypatch.setattr(systemd_timedate, "systemd_properties", Mock(return_value={**TIMEDATE, "ntp": True}))
     mutate = Mock()
@@ -863,43 +735,134 @@ def test_time_requires_ntp_disabled_before_any_write(monkeypatch, run_module):
     result = run_module(systemd_timedate, {"timezone": "Europe/Berlin", "time": "@1"})
     assert result["failed"] and "time" in result["msg"] and "ntp" in result["msg"]
     mutate.assert_not_called()
+    analyze.assert_not_called()
+
+
+def timedate_module(monkeypatch, current=None, after=None):
+    monkeypatch.setattr(systemd_timedate, "HAS_DASBUS", True)
+    monkeypatch.setattr(systemd_timedate, "systemd_proxy", Mock())
+    reads = [dict(current or TIMEDATE), dict(after or current or TIMEDATE)]
+    monkeypatch.setattr(systemd_timedate, "systemd_properties", Mock(side_effect=reads))
+    mutate = Mock()
+    monkeypatch.setattr(systemd_timedate, "systemd_call", mutate)
+    return mutate
 
 
 @pytest.mark.parametrize(
-    "value",
-    ["@0", "1970-01-01 00:00:00 UTC", "-60y", "-100y", "60y ago", "@10000000000000", "+300000y", "-300000y"],
+    "seconds,usec",
+    [
+        ("@1784083200", 1784083200000000),
+        # read as integers, so the microseconds are not rounded through a float
+        ("@1784083200.000001", 1784083200000001),
+        ("@0.000001", 1),
+        ("@9223372036854.775807", 2**63 - 1),
+    ],
 )
 @pytest.mark.parametrize("check_mode", [False, True])
-def test_time_rejects_invalid_time_before_any_write(monkeypatch, run_module, value, check_mode):
-    monkeypatch.setattr(systemd_timedate, "HAS_DASBUS", True)
-    monkeypatch.setattr(systemd_timedate, "systemd_proxy", Mock())
-    monkeypatch.setattr(systemd_timedate, "systemd_properties", Mock(return_value=TIMEDATE))
-    mutate = Mock()
-    monkeypatch.setattr(systemd_timedate, "systemd_call", mutate)
-    result = run_module(systemd_timedate, {"timezone": "Europe/Berlin", "time": value}, check_mode)
-    assert result["failed"] and result["msg"] == f"unable to set time: invalid time {value}"
+def test_time_parsed_by_systemd_analyze(monkeypatch, run_module, analyze, seconds, usec, check_mode):
+    mutate = timedate_module(monkeypatch)
+    analyze.return_value = (0, analyze_output(seconds), "")
+    result = run_module(systemd_timedate, {"time": "2026-07-26 14:30"}, check_mode)
+    assert result["changed"]
+    assert analyze.call_args.args == (["/usr/bin/systemd-analyze", "timestamp", "--", "2026-07-26 14:30"],)
+    assert analyze.call_args.kwargs == {"environ_update": {"LC_ALL": "C", "TZ": ":UTC"}, "expand_user_and_vars": False}
+    if check_mode:
+        assert result["timedate"]["time_usec"] == usec
+        mutate.assert_not_called()
+        assert analyze.call_count == 1
+    else:
+        assert [entry.args[2:] for entry in mutate.call_args_list] == [("SetTime", usec, False, False)]
+        assert analyze.call_count == 2
+
+
+@pytest.mark.parametrize(
+    "current,params,environ",
+    [
+        # read in the time zone the host ends up with, as timedatectl does after set-timezone
+        (TIMEDATE, {"timezone": "Europe/Berlin"}, {"LC_ALL": "C", "TZ": ":Europe/Berlin"}),
+        ({**TIMEDATE, "timezone": "America/Los_Angeles"}, {}, {"LC_ALL": "C", "TZ": ":America/Los_Angeles"}),
+        ({**TIMEDATE, "timezone": ""}, {}, {"LC_ALL": "C"}),
+    ],
+)
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_time_read_in_predicted_timezone(monkeypatch, run_module, analyze, current, params, environ, check_mode):
+    timedate_module(monkeypatch, current)
+    assert run_module(systemd_timedate, {**params, "time": "14:30"}, check_mode)["changed"]
+    for entry in analyze.call_args_list:
+        assert entry.kwargs["environ_update"] == environ
+
+
+def test_time_parsed_again_right_before_it_is_set(monkeypatch, run_module, analyze):
+    # now and relative times resolve after the earlier settings and the NTP wait
+    monkeypatch.setattr(systemd_timedate, "sleep", Mock())
+    mutate = timedate_module(monkeypatch, {**TIMEDATE, "ntp": True})
+    monkeypatch.setattr(
+        systemd_timedate,
+        "systemd_properties",
+        Mock(side_effect=[{**TIMEDATE, "ntp": True}, {"ntp": False}, {**TIMEDATE, "ntp": False}]),
+    )
+    calls = []
+    analyze.side_effect = lambda *args, **kwargs: (
+        calls.append(mutate.call_count) or (0, analyze_output(f"@{1784083200 + 20 * len(calls)}", "now"), "")
+    )
+    result = run_module(systemd_timedate, {"ntp": False, "time": "now"})
+    assert result["changed"]
+    assert calls == [0, 1]
+    assert [entry.args[2:] for entry in mutate.call_args_list] == [
+        ("SetNTP", False, False),
+        ("SetTime", 1784083240000000, False, False),
+    ]
+
+
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_time_rejected_by_systemd_analyze_before_any_write(monkeypatch, run_module, analyze, check_mode):
+    mutate = timedate_module(monkeypatch)
+    error = 'Failed to parse "now UTC": Invalid argument\nHint: this expression is a valid calendar specification.\n'
+    analyze.return_value = (1, "", error)
+    result = run_module(systemd_timedate, {"timezone": "Europe/Berlin", "time": "now UTC"}, check_mode)
+    assert result["failed"]
+    assert result["msg"] == f"unable to parse the time specification now UTC: {error.strip()}"
     mutate.assert_not_called()
 
 
-@pytest.mark.parametrize("value", ["@" + "9" * 400, "+" + "9" * 400])
-def test_time_rejects_infinite_time_before_any_write(monkeypatch, run_module, value):
-    monkeypatch.setattr(systemd_timedate, "systemd_proxy", Mock())
-    monkeypatch.setattr(systemd_timedate, "systemd_properties", Mock(return_value=TIMEDATE))
-    mutate = Mock()
-    monkeypatch.setattr(systemd_timedate, "systemd_call", mutate)
-    result = run_module(systemd_timedate, {"timezone": "Europe/Berlin", "time": value})
-    assert result["failed"] and "unable to parse the time specification" in result["msg"]
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_time_unexpected_systemd_analyze_output_fails_before_any_write(monkeypatch, run_module, analyze, check_mode):
+    mutate = timedate_module(monkeypatch)
+    analyze.return_value = (0, "Original form: now\n", "")
+    result = run_module(systemd_timedate, {"timezone": "Europe/Berlin", "time": "now"}, check_mode)
+    assert result["failed"] and "unable to parse the time specification now" in result["msg"]
     mutate.assert_not_called()
 
 
-@pytest.mark.parametrize("value", ["-1y", "+300y", "@1"])
-def test_time_accepts_time_in_range(monkeypatch, run_module, value):
-    monkeypatch.setattr(systemd_timedate, "systemd_proxy", Mock())
-    monkeypatch.setattr(systemd_timedate, "systemd_properties", Mock(return_value=TIMEDATE))
-    mutate = Mock()
-    monkeypatch.setattr(systemd_timedate, "systemd_call", mutate)
-    assert run_module(systemd_timedate, {"time": value})["changed"]
-    assert mutate.call_args.args[2] == "SetTime"
+def test_time_reads_the_last_unix_seconds_field(monkeypatch, run_module, analyze):
+    # the original form is echoed first, so a value spanning lines cannot supply the field
+    mutate = timedate_module(monkeypatch)
+    analyze.return_value = (0, analyze_output("@1784083200", "x\n   UNIX seconds: @5"), "")
+    assert run_module(systemd_timedate, {"time": "x"})["changed"]
+    assert mutate.call_args.args[2:] == ("SetTime", 1784083200000000, False, False)
+
+
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_time_requires_systemd_analyze_before_any_write(monkeypatch, run_module, check_mode):
+    def missing(arg, opt_dirs=None):
+        raise ValueError(f"Failed to find required executable {arg}")
+
+    mutate = timedate_module(monkeypatch)
+    monkeypatch.setattr(basic, "get_bin_path", missing)
+    result = run_module(systemd_timedate, {"timezone": "Europe/Berlin", "time": "now"}, check_mode)
+    assert result["failed"] and "systemd-analyze" in result["msg"]
+    mutate.assert_not_called()
+
+
+@pytest.mark.parametrize("seconds", ["@0", "@9223372036854.775808", "@18446744073709551615"])
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_time_rejects_out_of_range_time_before_any_write(monkeypatch, run_module, analyze, seconds, check_mode):
+    # systemd-analyze reports a relative time before the epoch, such as -60y, as @0
+    mutate = timedate_module(monkeypatch)
+    analyze.return_value = (0, analyze_output(seconds, "-60y"), "")
+    result = run_module(systemd_timedate, {"timezone": "Europe/Berlin", "time": "-60y"}, check_mode)
+    assert result["failed"] and result["msg"] == "unable to set time: invalid time -60y"
+    mutate.assert_not_called()
 
 
 def test_hostname_check_mode_predicts_default_after_clearing_static(monkeypatch, tmp_path, run_module):

@@ -31,6 +31,9 @@ SECRET_KEY = (
 
 BASE64_URLSAFE_RAW = re.compile(r"[A-Za-z0-9_-]*\Z")
 
+# Go's base64.StdEncoding: padded quanta only, nothing after the padding (Python 3.11 and older accept more).
+BASE64_STD = re.compile(rb"(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?")
+
 CONFIG_HEADER = "# Encrypted rclone configuration File"
 CONFIG_MARKER = "RCLONE_ENCRYPT_V0:"
 CONFIG_NONCE_SIZE = 24
@@ -328,6 +331,9 @@ def decrypt_config(text, password):
 
     if body is None:
         raise ValueError("configuration is not encrypted")
+
+    if not BASE64_STD.fullmatch(body):
+        raise ValueError("configuration data is not valid base64")
 
     raw = base64.b64decode(body, validate=True)
 
