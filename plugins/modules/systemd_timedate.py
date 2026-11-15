@@ -53,8 +53,10 @@ options:
         are accepted, as described in
         L(systemd.time(7),https://www.freedesktop.org/software/systemd/man/latest/systemd.time.html).
       - Examples are V(now), V(today), V(@1784083200), V(+3h30min), V(-1w),
-        V(5min ago), V(2026-07-26 14:30), V(Sun 2026-07-26 14:30),
-        V(2026-07-26 14:30 UTC) and V(2026-07-26 14:30 Europe/Berlin).
+        V(5min ago), V(2026-07-26 14:30), V(Sun 2026-07-26 14:30) and
+        V(2026-07-26 14:30 UTC). Newer systemd releases also accept a time
+        zone name suffix, such as V(2026-07-26 14:30 Europe/Berlin), which
+        systemd 252 refuses.
       - V(now) and relative times are resolved right before the module sets
         the clock, after the other settings in the same task are applied, as
         C(timedatectl set-time now) does.

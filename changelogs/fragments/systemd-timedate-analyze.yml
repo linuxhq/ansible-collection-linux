@@ -5,11 +5,11 @@ breaking_changes:
     that host is accepted. ``systemd-analyze`` is now required when ``time``
     is set, and the module fails before writing any setting when it is not
     installed. Spellings the module accepted but systemd refuses now fail
-    before any setting is written, such as ``now UTC``, a lowercase ``utc``
-    suffix, ``UTC`` without a space before it (``14:30UTC``), a comma after
-    the weekday (``Thu, 1970-01-01 UTC``), ``TODAY`` or another case of
-    ``today``, ``yesterday`` and ``tomorrow``, surrounding whitespace, and
-    ``12.34.56``.
+    before any setting is written, such as ``now UTC``, ``UTC`` without a
+    space before it (``14:30UTC``), a comma after the weekday
+    (``Sun, 2026-07-26 14:30``), ``TODAY`` or another case of ``today``,
+    ``yesterday`` and ``tomorrow``, surrounding whitespace, ``12.34.56``, and
+    on systemd 257 a lowercase ``utc`` suffix.
 bugfixes:
   - systemd_timedate - reject digits other than ASCII ``0`` to ``9`` and
     whitespace other than ASCII in a ``time`` timestamp, such as
@@ -19,6 +19,6 @@ bugfixes:
     microsecond, such as ``+1.000001s``, which the module rounded down by one
     microsecond.
   - systemd_timedate - accept the ``time`` forms systemd accepts that the
-    module refused, such as a fraction of seconds with more than six digits, a
-    time zone name suffix (``2026-07-26 14:30 Europe/Berlin``),
-    ``Jul 26 14:30:00`` and ``++5min``.
+    module refused, such as a fraction of seconds with more than six digits,
+    ``Jul 26 14:30:00``, ``++5min``, and on systemd 257 a time zone name
+    suffix (``2026-07-26 14:30 Europe/Berlin``).

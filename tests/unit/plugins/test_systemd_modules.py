@@ -857,11 +857,10 @@ def test_time_requires_systemd_analyze_before_any_write(monkeypatch, run_module,
 @pytest.mark.parametrize("seconds", ["@0", "@9223372036854.775808", "@18446744073709551615"])
 @pytest.mark.parametrize("check_mode", [False, True])
 def test_time_rejects_out_of_range_time_before_any_write(monkeypatch, run_module, analyze, seconds, check_mode):
-    # systemd-analyze reports a relative time before the epoch, such as -60y, as @0
     mutate = timedate_module(monkeypatch)
-    analyze.return_value = (0, analyze_output(seconds, "-60y"), "")
-    result = run_module(systemd_timedate, {"timezone": "Europe/Berlin", "time": "-60y"}, check_mode)
-    assert result["failed"] and result["msg"] == "unable to set time: invalid time -60y"
+    analyze.return_value = (0, analyze_output(seconds, seconds), "")
+    result = run_module(systemd_timedate, {"timezone": "Europe/Berlin", "time": seconds}, check_mode)
+    assert result["failed"] and result["msg"] == f"unable to set time: invalid time {seconds}"
     mutate.assert_not_called()
 
 
