@@ -19,10 +19,10 @@ description:
     is left untouched.
   - A host connected to a different repository fails rather than being
     reconnected. The connection is different when its storage type differs
-    from O(storage), or when one of the O(options) C(bucket), C(container),
+    from O(storage), or when one of the options C(bucket), C(container),
     C(endpoint), C(folder_id), C(host), C(path), C(prefix), C(remote_path),
-    C(storage_account) or C(url) differs from the connected storage
-    configuration. A number in these options is compared as the text passed
+    C(storage_account) or C(url), given in O(options) or O(secrets), differs
+    from the connected storage configuration. A number in these options is compared as the text passed
     to kopia, so V(20261115) matches a stored V("20261115"), and that text is
     the number as Python formats it, as described in O(options). A leading V(~)
     in the C(path) of V(filesystem) storage is resolved to the home directory
@@ -47,9 +47,10 @@ options:
         C(--bucket) and V(storage_account) becomes C(--storage-account).
       - Booleans toggle the flag, V(true) emits C(--flag) and V(false) emits
         C(--no-flag), and a list repeats the flag once per element.
-      - A dictionary value is rejected before kopia runs, and so is a list for
-        one of the options that identify the repository, listed in the
-        description, such as C(bucket) or C(path).
+      - A dictionary value is rejected before kopia runs, and so is a Boolean
+        or a list for one of the options that identify the repository, listed
+        in the description, such as C(bucket) or C(path). Quote a value such as
+        V(no) that YAML reads as a Boolean.
       - Put credential-carrying flags in O(secrets) instead so they stay out of
         logs.
       - Values are passed to kopia as given, so the module does not expand V(~)
@@ -75,6 +76,10 @@ options:
         V(secret_access_key) or V(key).
       - Converted to CLI flags exactly like O(options), with the same rejected
         values and number formatting, but kept out of logs.
+      - A key also given in O(options) takes its value from O(secrets).
+      - The options that identify the repository, listed in the description,
+        are compared with the connected repository like O(options), but a
+        failure names only the option, not its value or the connected one.
     type: dict
     default: {}
   storage:
@@ -201,15 +206,34 @@ def check_option_values(module):
             if isinstance(value, dict):
                 module.fail_json(msg=f"invalid {param} value for {option}: a dictionary cannot be passed to kopia")
 
+            # kopia takes these as text flags, which kopia_flags cannot send for a Boolean or a list
+            if option in STORAGE_KEYS and isinstance(value, bool):
+                module.fail_json(
+                    msg=f"invalid {param} value for {option}: it identifies the repository, so it takes a text value, not a Boolean; quote it"
+                )
+
             if option in STORAGE_KEYS and isinstance(value, (list, tuple)):
                 module.fail_json(
                     msg=f"invalid {param} value for {option}: it identifies the repository, so it takes one value, not a list"
                 )
 
 
+def storage_options(module):
+    """Return the options sent to kopia, secrets overriding options of the same name."""
+    options = dict(module.params["options"])
+    options.update(module.params["secrets"])
+
+    return options
+
+
 def storage_description(module):
     options = module.params["options"]
-    details = [f"{option}={options[option]}" for option in sorted(STORAGE_KEYS) if options.get(option) is not None]
+    # an option overridden by a secret is not the value sent, and the secret stays out of the message
+    details = [
+        f"{option}={options[option]}"
+        for option in sorted(STORAGE_KEYS)
+        if options.get(option) is not None and option not in module.params["secrets"]
+    ]
 
     return " ".join([module.params["storage"]] + details)
 
@@ -239,17 +263,22 @@ def storage_mismatch(module, status):
         return f"storage type is {connected.get('type')}, not {expected}"
 
     config = connected.get("config") or {}
+    options = storage_options(module)
 
     for option, key in sorted(STORAGE_KEYS.items()):
-        value = module.params["options"].get(option)
+        value = options.get(option)
 
-        # kopia_flags sends any other value as --name=value, so compare it as text
-        if value is None or isinstance(value, bool):
+        # check_option_values refuses a Boolean or a list, and kopia_flags sends any other value as --name=value,
+        # so compare it as text
+        if value is None:
             continue
 
         value = str(value)
         stored = config.get(key, "")
         if storage_value(storage, option, stored) != storage_value(storage, option, value):
+            if option in module.params["secrets"]:
+                return f"{option} differs from the connected repository"
+
             return f"{option} is {stored}, not {value}"
 
     return None
@@ -287,9 +316,7 @@ def ensure_present(module):
     if module.check_mode:
         module.exit_json(changed=True, repository={})
 
-    options = dict(module.params["options"])
-    options.update(module.params["secrets"])
-    target = [module.params["storage"]] + kopia_flags(options)
+    target = [module.params["storage"]] + kopia_flags(storage_options(module))
     description = storage_description(module)
 
     rc, _dummy, stderr = kopia_command(module, ["repository", "connect"] + target, password=password)

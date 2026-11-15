@@ -69,8 +69,9 @@ notes:
     fields, including a toggle keymap cleared by that conversion, can differ
     from the ones a real run produces.
   - A locale or keyboard value that is not valid UTF-8, such as one with a
-    lone surrogate code point, or that contains a Unicode noncharacter, such as
-    U+FFFE, is rejected before any setting is written, also in check mode.
+    lone surrogate code point, or that contains a NUL character or a Unicode
+    noncharacter, such as U+FFFE, is rejected before any setting is written,
+    also in check mode.
   - Only C(systemd-localed) can tell whether a console keymap or an X11 layout
     exists, so one it refuses is reported after the earlier settings in the
     same task, such as O(locale), are applied.

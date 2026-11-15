@@ -292,6 +292,10 @@ def test_locale_requires_systemd_239_before_any_write(monkeypatch, run_module, s
         ({"locale": {"lang": "de_DE.UTF-8"}, "vconsole_keymap_toggle": "\ud800"}, "vconsole_keymap_toggle"),
         ({"locale": {"lang": "de_DE.UTF-8"}, "x11_options": "grp:\ufffe"}, "x11_options"),
         ({"locale": {"lang": "de_DE.UTF-8", "lc_time": "\udc80"}}, "locale.lc_time"),
+        # GLib cuts a D-Bus string at NUL, so de_DE.UTF-8 would be sent and the task would change on every run
+        ({"locale": {"lang": "de_DE.UTF-8\x00x"}}, "locale.lang"),
+        ({"locale": {"lang": "de_DE.UTF-8"}, "vconsole_keymap": "de\x00"}, "vconsole_keymap"),
+        ({"locale": {"lang": "de_DE.UTF-8"}, "x11_layout": "\x00de"}, "x11_layout"),
     ],
 )
 @pytest.mark.parametrize("dasbus", [False, True])
@@ -307,7 +311,8 @@ def test_locale_value_not_valid_utf8_fails_before_any_call(
     # task-level no_log is what lets such a value past AnsibleModule's invocation logging
     result = run_module(systemd_locale, dict(params, _ansible_no_log=True), check_mode)
     assert (
-        result["failed"] and result["msg"] == f"invalid {option}: it must be valid UTF-8 without Unicode noncharacters"
+        result["failed"]
+        and result["msg"] == f"invalid {option}: it must be valid UTF-8 without NUL characters or Unicode noncharacters"
     )
     proxy.assert_not_called()
     systemd_version.assert_not_called()
@@ -319,6 +324,8 @@ def test_locale_value_not_valid_utf8_fails_before_any_call(
     [
         ({"ntp": False, "timezone": "\udc80"}, "timezone"),
         ({"ntp": False, "time": "2026-07-26 14:30 \udc80"}, "time"),
+        ({"ntp": False, "timezone": "UTC\x00x"}, "timezone"),
+        ({"ntp": False, "time": "2026-07-26 14:30\x00"}, "time"),
     ],
 )
 @pytest.mark.parametrize("dasbus", [False, True])
@@ -333,7 +340,8 @@ def test_timedate_value_not_valid_utf8_fails_before_any_call(
     monkeypatch.setattr(systemd_timedate, "systemd_call", mutate)
     result = run_module(systemd_timedate, dict(params, _ansible_no_log=True), check_mode)
     assert (
-        result["failed"] and result["msg"] == f"invalid {option}: it must be valid UTF-8 without Unicode noncharacters"
+        result["failed"]
+        and result["msg"] == f"invalid {option}: it must be valid UTF-8 without NUL characters or Unicode noncharacters"
     )
     proxy.assert_not_called()
     mutate.assert_not_called()
@@ -810,6 +818,13 @@ def test_hostname_machine_info_parsed_as_systemd(monkeypatch, tmp_path, run_modu
         # escaped bytes, even ones that form valid UTF-8, cannot be sent by dasbus; no_log lets them reach the module
         {"chassis": "vm", "pretty_hostname": "Caf\udcc3\udca9", "_ansible_no_log": True},
         {"chassis": "vm", "location": "rack\ud800", "_ansible_no_log": True},
+        # NUL also needs no_log to reach the module, as syslog refuses it
+        {"chassis": "vm", "deployment": "prod\x00", "_ansible_no_log": True},
+        {"chassis": "vm", "icon_name": "computer\x00", "_ansible_no_log": True},
+        {"chassis": "vm", "location": "rack\x004", "_ansible_no_log": True},
+        {"chassis": "vm", "pretty_hostname": "Laptop\x00", "_ansible_no_log": True},
+        {"chassis": "vm", "static_hostname": "web\x00", "_ansible_no_log": True},
+        {"chassis": "vm", "transient_hostname": "web\x00", "_ansible_no_log": True},
         {"chassis": "vm", "static_hostname": "-bad"},
         {"chassis": "vm", "static_hostname": "bad-"},
         {"chassis": "vm", "static_hostname": "a..b"},

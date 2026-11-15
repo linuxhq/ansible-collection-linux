@@ -21,8 +21,9 @@ notes:
   - Requires a running C(systemd-timedated) reachable on the system D-Bus, so the
     module does not work in a container or chroot without systemd.
   - A O(time) or O(timezone) value that is not valid UTF-8, such as one with a
-    lone surrogate code point, or that contains a Unicode noncharacter, such as
-    U+FFFE, is rejected before any setting is written, also in check mode.
+    lone surrogate code point, or that contains a NUL character or a Unicode
+    noncharacter, such as U+FFFE, is rejected before any setting is written,
+    also in check mode.
 options:
   adjust_system_clock:
     description:

@@ -8,7 +8,17 @@ bugfixes:
     or ``secrets`` is a dictionary, which was passed to kopia as Python text,
     or when an option that identifies the repository, such as ``bucket`` or
     ``path``, is given a list, which was passed as one flag per element and
-    not compared with the connected repository.
+    not compared with the connected repository, or a Boolean, which was
+    passed as a flag without a value and not compared either. Quote a value
+    such as ``no`` that YAML reads as a Boolean.
+  - kopia_repository - compare the options that identify the repository with
+    the connected repository also when they are given in ``secrets``, using
+    the value sent to kopia, where ``secrets`` takes precedence over
+    ``options``. A host connected elsewhere failed to be detected, and an
+    option overridden by a secret made the next run fail against the
+    module's own connection. A mismatch in a secret names only the option,
+    not its value, and failure messages no longer show an option that a
+    secret overrides.
   - kopia_repository - document that numbers in ``options`` and ``secrets``
     are passed to kopia as Python formats them, so values that YAML reads as
     numbers, such as an unquoted ``0755``, ``12:30`` or ``1.10``, should be

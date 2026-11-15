@@ -758,6 +758,19 @@ def test_repository_connected_same_storage(monkeypatch, run_module, params, stor
         ("secrets", "access_key", {"id": "key"}, "invalid secrets value for access_key: a dictionary"),
         ("options", "bucket", ["first", "second"], "invalid options value for bucket: it identifies the repository"),
         ("secrets", "path", ["/a", "/b"], "invalid secrets value for path: it identifies the repository"),
+        # kopia_flags would send --no-prefix, and the comparison skipped it
+        (
+            "options",
+            "prefix",
+            False,
+            "invalid options value for prefix: it identifies the repository, so it takes a text value, not a Boolean",
+        ),
+        (
+            "secrets",
+            "url",
+            True,
+            "invalid secrets value for url: it identifies the repository, so it takes a text value, not a Boolean",
+        ),
     ],
 )
 @pytest.mark.parametrize("connected", [False, True])
@@ -774,6 +787,53 @@ def test_repository_rejects_values_kopia_cannot_take(
     assert result["failed"] and message in result["msg"]
     status.assert_not_called()
     assert repr(value) not in result["msg"]
+
+
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_repository_secret_connected_elsewhere_fails_without_values(monkeypatch, run_module, check_mode):
+    storage = {"type": "webdav", "config": {"url": "https://other:stored@dav.example.com/kopia"}}
+    monkeypatch.setattr(kopia_repository, "kopia_available", lambda module: True)
+    monkeypatch.setattr(kopia_repository, "repository_status", lambda module, password=None: {"storage": storage})
+    monkeypatch.setattr(kopia_repository, "kopia_command", Mock(side_effect=AssertionError("must not reconnect")))
+    params = {
+        "storage": "webdav",
+        "password": "secret",
+        "options": {"url": "https://dav.example.com/kopia"},
+        "secrets": {"url": "https://user:requested@dav.example.com/kopia"},
+    }
+    result = run_module(kopia_repository, params, check_mode)
+    assert result["failed"]
+    assert result["msg"] == (
+        "already connected to a different repository than webdav: url differs from the connected repository"
+    )
+    assert "requested" not in result["msg"] and "stored" not in result["msg"]
+
+
+def test_repository_secret_overriding_option_converges(monkeypatch, run_module):
+    connected = {"storage": {"type": "s3", "config": {"bucket": "b"}}}
+    status = Mock(side_effect=[None, connected, connected])
+    monkeypatch.setattr(kopia_repository, "repository_status", status)
+    command = Mock(return_value=(0, "", ""))
+    monkeypatch.setattr(kopia_repository, "kopia_command", command)
+    params = {"storage": "s3", "password": "secret", "options": {"bucket": "a"}, "secrets": {"bucket": "b"}}
+    assert run_module(kopia_repository, params)["changed"]
+    assert command.call_args_list[0].args[1] == ["repository", "connect", "s3", "--bucket=b"]
+    assert run_module(kopia_repository, params)["changed"] is False
+    assert command.call_count == 1
+
+
+def test_repository_failure_omits_option_overridden_by_secret(monkeypatch, run_module):
+    monkeypatch.setattr(kopia_repository, "repository_status", lambda module, password=None: None)
+    monkeypatch.setattr(kopia_repository, "kopia_command", Mock(return_value=(1, "", "access denied")))
+    params = {
+        "storage": "s3",
+        "password": "secret",
+        "options": {"bucket": "a", "prefix": "p/"},
+        "secrets": {"bucket": "b"},
+    }
+    result = run_module(kopia_repository, params)
+    assert result["failed"]
+    assert result["msg"] == "unable to connect to the kopia repository in s3 prefix=p/: access denied"
 
 
 def test_repository_passes_lists_for_other_options(monkeypatch, run_module):
