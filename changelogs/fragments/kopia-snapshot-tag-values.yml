@@ -3,5 +3,6 @@ breaking_changes:
   - kopia_snapshot - fail before running kopia when a ``tags`` value is not a
     string. Null, Boolean, number, list and dictionary values were recorded on
     the snapshot as Python text, such as ``None``, ``True``, ``1.1`` for an
-    unquoted ``1.10`` or ``750`` for an unquoted ``12:30``. Quote such values
-    to record them as text.
+    unquoted ``1.10`` or ``750`` for an unquoted ``12:30``. Quote such literal
+    values to record them as text, and convert a templated value that can
+    render as a number with ``| string``.

@@ -68,6 +68,9 @@ notes:
   - Check mode cannot predict the converted values, so the reported counterpart
     fields, including a toggle keymap cleared by that conversion, can differ
     from the ones a real run produces.
+  - A locale or keyboard value that is not valid UTF-8, such as one with a
+    lone surrogate code point, or that contains a Unicode noncharacter, such as
+    U+FFFE, is rejected before any setting is written, also in check mode.
   - Only C(systemd-localed) can tell whether a console keymap or an X11 layout
     exists, so one it refuses is reported after the earlier settings in the
     same task, such as O(locale), are applied.
@@ -248,6 +251,7 @@ from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.linux.plugins.module_utils.systemd import (
     HAS_DASBUS,
     LOCALE_VARIABLES,
+    check_utf8,
     load_env_file,
     locale_present,
     locale_setting,
@@ -348,6 +352,13 @@ def keyboard_rewrites(module, version, keymap, convert_keymap, keyboard):
 
 
 def ensure_present(module):
+    # a value that cannot be sent would otherwise fail only after the earlier settings are written
+    check_utf8(
+        module,
+        [(f"locale.{name}", value) for name, value in sorted((module.params["locale"] or {}).items())]
+        + [(name, module.params[name]) for name in VCONSOLE_SETTINGS + X11_SETTINGS],
+    )
+
     if module.check_mode and not HAS_DASBUS:
         keyboard = VCONSOLE_SETTINGS + X11_SETTINGS
         requested = locale_present(module.params["locale"] or {})

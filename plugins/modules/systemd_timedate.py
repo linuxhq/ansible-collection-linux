@@ -20,6 +20,9 @@ description:
 notes:
   - Requires a running C(systemd-timedated) reachable on the system D-Bus, so the
     module does not work in a container or chroot without systemd.
+  - A O(time) or O(timezone) value that is not valid UTF-8, such as one with a
+    lone surrogate code point, or that contains a Unicode noncharacter, such as
+    U+FFFE, is rejected before any setting is written, also in check mode.
 options:
   adjust_system_clock:
     description:
@@ -133,6 +136,7 @@ from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.linuxhq.linux.plugins.module_utils.systemd import (
     HAS_DASBUS,
     TIMEDATE_PROPERTIES,
+    check_utf8,
     systemd_call,
     systemd_properties,
     systemd_proxy,
@@ -193,6 +197,8 @@ def wait_for_ntp(module, proxy, ntp):
 
 
 def ensure_present(module):
+    check_utf8(module, [(name, module.params[name]) for name in ("timezone", "time")])
+
     if module.check_mode and not HAS_DASBUS:
         module.exit_json(
             changed=any(module.params[param] is not None for param in SETTINGS),

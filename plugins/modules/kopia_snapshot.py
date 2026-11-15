@@ -81,9 +81,12 @@ options:
       - kopia splits each flag at its first V(:), so a key containing V(:) is
         rejected before kopia runs. Values may contain V(:).
       - Values must be strings. Any other value, such as a number, Boolean,
-        null, list or dictionary, is rejected before kopia runs, so quote
+        null, list or dictionary, is rejected before kopia runs. Quote literal
         numbers, Booleans and values that YAML reads as numbers, such as
-        V("42"), V("true") or V("12:30"), to record them as text.
+        V("42"), V("true") or V("12:30"), to record them as text. A templated
+        value can still be a number, because Ansible keeps the type a template
+        renders, so convert it with C(| string), as in
+        V("{{ build_number | string }}").
     type: dict
 requirements:
   - kopia
@@ -220,7 +223,9 @@ def ensure_present(module):
             module.fail_json(msg=f"invalid tag key {key!r}: kopia splits tags at the first ':'")
 
         if not isinstance(value, str):
-            module.fail_json(msg=f"tag {key!r} value is not a string; quote it to record it as text")
+            module.fail_json(
+                msg=f"tag {key!r} value is not a string; pass it as a string, for example quoted or with the string filter"
+            )
 
     if module.check_mode:
         if reads_as_user_host(absolute_path(path)) and kopia_available(module):

@@ -209,7 +209,14 @@ def write_config(module, path, content):
 
     try:
         try:
-            handle, tmp = tempfile.mkstemp(dir=os.path.dirname(path) or ".")
+            try:
+                handle, tmp = tempfile.mkstemp(dir=os.path.dirname(path) or ".")
+            except OSError:
+                if not module.params["unsafe_writes"]:
+                    raise
+
+                # atomic_move falls back to writing the file in place when it cannot create a file beside it
+                handle, tmp = tempfile.mkstemp(dir=module.tmpdir)
 
             with os.fdopen(handle, "wb") as stream:
                 stream.write(to_bytes(content))
@@ -259,6 +266,18 @@ def config_diff(module, before, after):
     }
 
 
+def check_plain_text(module, path, plain):
+    try:
+        readable = not is_encrypted(plain)
+    except ValueError:
+        readable = False
+
+    if not readable:
+        module.fail_json(
+            msg=f"plain text for configuration file {path} begins with an rclone encryption header, so rclone would not read it as plain text"
+        )
+
+
 def ensure_present(module, path):
     raw = read_config(module, path)
     encrypted, current = current_config(module, path, raw)
@@ -298,18 +317,10 @@ def ensure_absent(module, path):
             )
 
         desired = current
+
+        check_plain_text(module, path, desired)
     else:
         desired = to_bytes(desired)
-
-    try:
-        readable = not is_encrypted(desired)
-    except ValueError:
-        readable = False
-
-    if not readable:
-        module.fail_json(
-            msg=f"plain text for configuration file {path} begins with an rclone encryption header, so rclone would not read it as plain text"
-        )
 
     changed = encrypted or current != desired
 
@@ -360,6 +371,9 @@ def main():
                 msg=f"invalid content for configuration file {path}: character U+{ord(error.object[error.start]):04X}"
                 " is a surrogate, which is not valid UTF-8"
             )
+
+        if module.params["state"] == "absent":
+            check_plain_text(module, path, module.params["content"])
 
     if module.params["content"] is None and not os.path.exists(path):
         module.fail_json(msg=f"configuration file does not exist: {path}")

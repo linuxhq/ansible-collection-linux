@@ -221,6 +221,15 @@ def utf8_text(text):
     return text
 
 
+def check_utf8(module, settings):
+    """Fail naming the first (name, value) setting that cannot be sent to systemd, before any request is made."""
+    for name, value in settings:
+        # dasbus cannot encode a surrogate, and the system bus refuses a string systemd does not accept as UTF-8,
+        # such as one with a noncharacter
+        if value and utf8_text(value) != value:
+            module.fail_json(msg=f"invalid {name}: it must be valid UTF-8 without Unicode noncharacters")
+
+
 def parse_env_file(text, version):
     """Parse an environment file as systemd's parse_env_file_internal() does, the last assignment winning.
 

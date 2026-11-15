@@ -4,3 +4,12 @@ bugfixes:
     option, such as ``bucket``, with the connected repository as the text
     passed to kopia, so a host connected to a different repository fails
     instead of reporting no change.
+  - kopia_repository - fail before running kopia when a value in ``options``
+    or ``secrets`` is a dictionary, which was passed to kopia as Python text,
+    or when an option that identifies the repository, such as ``bucket`` or
+    ``path``, is given a list, which was passed as one flag per element and
+    not compared with the connected repository.
+  - kopia_repository - document that numbers in ``options`` and ``secrets``
+    are passed to kopia as Python formats them, so values that YAML reads as
+    numbers, such as an unquoted ``0755``, ``12:30`` or ``1.10``, should be
+    quoted.

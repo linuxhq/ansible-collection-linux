@@ -217,13 +217,13 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.systemd import (
     ENV_WHITESPACE,
     HAS_DASBUS,
     HOSTNAME_PROPERTIES,
+    check_utf8,
     load_env_file,
     read_bytes,
     systemd_call,
     systemd_properties,
     systemd_proxy,
     systemd_version,
-    utf8_text,
 )
 
 HOSTNAME_FILE = "/etc/hostname"
@@ -271,10 +271,7 @@ def validate_settings(module):
         if params[param] and CONTROL_CHARACTERS.search(params[param]):
             module.fail_json(msg=f"invalid {param}: control characters are not allowed")
 
-    # the system bus refuses a string systemd does not accept as UTF-8, such as one with a noncharacter
-    for param in ("icon_name", "location", "pretty_hostname"):
-        if params[param] and utf8_text(params[param]) is None:
-            module.fail_json(msg=f"invalid {param}: it must be valid UTF-8 without Unicode noncharacters")
+    check_utf8(module, [(param, params[param]) for param in ("icon_name", "location", "pretty_hostname")])
 
     if params["deployment"] and not DEPLOYMENT.match(params["deployment"]):
         module.fail_json(
