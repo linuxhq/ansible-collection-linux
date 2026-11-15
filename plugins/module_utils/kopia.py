@@ -133,8 +133,8 @@ def snapshot_source(module, path, operation):
     if not isinstance(username, str) or not username or not isinstance(hostname, str) or not hostname:
         module.fail_json(msg=f"unable to {operation} of {path}: kopia did not report the client user and host")
 
-    # kopia splits user@host:/path at the first "@" and the first ":"
-    if any(char in username + hostname for char in "@:"):
+    # kopia splits user@host:/path at the first "@" and the first ":", so a host may contain "@"
+    if "@" in username or ":" in username or ":" in hostname:
         module.fail_json(
             msg=(
                 f"unable to {operation} of {path}: kopia cannot list {absolute}, a path containing '@', for client "

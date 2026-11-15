@@ -34,6 +34,12 @@ options:
         the host defaults to the short, lowercased hostname, and the path must
         be absolute and clean, without V(.) or V(..) components or a trailing
         V(/).
+      - kopia splits C(user@host:/path) at the first V(@) and the first V(:), so
+        when the client user contains V(@) or V(:), or the host contains V(:),
+        no target can name a directory whose path contains V(@), as kopia would
+        store a different source.
+      - kopia makes a bare directory path absolute and cleans it into the
+        policy target.
       - When set, RV(policy) and RV(effective_policy) are returned for the
         single target instead of RV(policies).
       - Passed to kopia as given, so V(~) and environment variables are not

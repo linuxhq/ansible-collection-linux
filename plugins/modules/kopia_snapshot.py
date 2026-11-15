@@ -36,9 +36,9 @@ description:
     snapshot kopia printed or, when it printed none, from the client user and
     host reported by C(kopia repository status).
   - kopia splits C(user@host:/path) at the first V(@) and the first V(:), so an
-    absolute path containing V(@) cannot be listed when the client user or
-    host contains V(@) or V(:), such as V(alice@corp.example.com). The module
-    then fails before taking the snapshot.
+    absolute path containing V(@) cannot be listed when the client user
+    contains V(@) or V(:), such as V(alice@corp.example.com), or the host
+    contains V(:). The module then fails before taking the snapshot.
 notes:
   - A failure reported by kopia after it saved the snapshot without printing
     it, such as applying the retention policy, cannot be told apart from a

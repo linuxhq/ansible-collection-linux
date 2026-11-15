@@ -868,19 +868,31 @@ def test_snapshot_info_without_at_sign_lists_bare_path(monkeypatch, run_module, 
     [
         {"hostname": "host", "username": "alice@corp.example.com"},
         {"hostname": "host", "username": "corp:alice"},
-        {"hostname": "host@corp", "username": "root"},
         {"hostname": "host:1", "username": "root"},
     ],
 )
 @pytest.mark.parametrize("plugin", [kopia_snapshot, kopia_snapshot_info])
 def test_path_with_at_sign_for_unlistable_client_fails(monkeypatch, run_module, kopia_client, plugin, client):
-    # no user@host:/path form can express a user or host containing "@" or ":"
+    # no user@host:/path form can express a user containing "@" or ":", or a host containing ":"
     kopia_client.return_value = {"clientOptions": client}
     monkeypatch.setattr(plugin, "kopia_command", Mock(side_effect=AssertionError("must not run kopia")))
     result = run_module(plugin, {"path": "/home/a@b"})
     assert result["failed"] and not result.get("changed")
     assert "/home/a@b" in result["msg"] and repr(client["username"]) in result["msg"]
     assert repr(client["hostname"]) in result["msg"]
+
+
+def test_path_with_at_sign_for_host_with_at_sign_is_qualified(monkeypatch, run_module, kopia_client):
+    # kopia ends the user at the first "@" and the host at the first ":", so a host may contain "@"
+    kopia_client.return_value = {"clientOptions": {"hostname": "host@corp", "username": "root"}}
+    command = Mock(side_effect=[(0, '{"id":"new"}', ""), (0, '[{"id":"new"}]', "")])
+    monkeypatch.setattr(kopia_snapshot, "kopia_command", command)
+    assert run_module(kopia_snapshot, {"path": "/home/a@b"}) == {"changed": True, "snapshot": {"id": "new"}}
+    assert command.call_args_list[1].args[1] == ["snapshot", "list", "root@host@corp:/home/a@b", "--json"]
+    command = Mock(return_value=(0, "[]", ""))
+    monkeypatch.setattr(kopia_snapshot_info, "kopia_command", command)
+    assert run_module(kopia_snapshot_info, {"path": "/home/a@b"}) == {"changed": False, "snapshots": []}
+    assert command.call_args.args[1] == ["snapshot", "list", "--json", "root@host@corp:/home/a@b"]
 
 
 @pytest.mark.parametrize("available", [False, True])

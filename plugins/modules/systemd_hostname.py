@@ -23,6 +23,10 @@ description:
     missing file means no setting is stored. The file is parsed as the running
     systemd version parses it, which ignores a file containing a NUL byte
     and everything from the first setting that is not valid UTF-8.
+  - C(systemd-hostnamed) refuses to rewrite C(/etc/machine-info) when it
+    contains a NUL byte or a setting that is not valid UTF-8, so changing
+    O(chassis), O(deployment), O(icon_name), O(location) or O(pretty_hostname)
+    then fails before any setting is written, also in check mode.
   - O(static_hostname) is compared against C(/etc/hostname), the file
     C(systemd-hostnamed) stores it in, read as systemd reads it, from the first
     line that is neither empty nor a comment, with surrounding whitespace and
@@ -72,6 +76,7 @@ options:
       - Icon name of the machine, following the XDG icon naming specification.
       - Must be a valid file name, so it cannot contain V(/) or control
         characters and cannot be V(.) or V(..).
+      - Unicode noncharacters, such as U+FDD0 or U+FFFE, are not allowed.
       - Must not contain V(\\), V('), V("), V(*), V(?) or V([), which
         systemd 262 and later refuse.
       - Written to C(/etc/machine-info).
@@ -80,7 +85,8 @@ options:
   location:
     description:
       - Physical location of the machine, such as a rack or room name.
-      - Control characters are not allowed.
+      - Control characters and Unicode noncharacters, such as U+FDD0 or
+        U+FFFE, are not allowed.
       - Written to C(/etc/machine-info).
       - An empty string removes it from C(/etc/machine-info).
     type: str
@@ -88,7 +94,8 @@ options:
     description:
       - Free-form UTF-8 hostname for presentation, such as V(Taylor's Laptop), as
         C(hostnamectl hostname --pretty) sets.
-      - Control characters are not allowed.
+      - Control characters and Unicode noncharacters, such as U+FDD0 or
+        U+FFFE, are not allowed.
       - Written to C(/etc/machine-info).
       - An empty string removes it from C(/etc/machine-info).
     type: str
@@ -266,6 +273,11 @@ def validate_settings(module):
         if params[param] and CONTROL_CHARACTERS.search(params[param]):
             module.fail_json(msg=f"invalid {param}: control characters are not allowed")
 
+    # the system bus refuses a string systemd does not accept as UTF-8, such as one with a noncharacter
+    for param in ("icon_name", "location", "pretty_hostname"):
+        if params[param] and utf8_text(params[param]) is None:
+            module.fail_json(msg=f"invalid {param}: it must be valid UTF-8 without Unicode noncharacters")
+
     if params["deployment"] and not DEPLOYMENT.match(params["deployment"]):
         module.fail_json(
             msg=f"invalid deployment {params['deployment']!r}: only letters, digits, '-', '.' and ':' are allowed"
@@ -299,7 +311,11 @@ def utf8_text(text):
 
 
 def parse_env_file(text, version):
-    """Parse an environment file as systemd's parse_env_file_internal() does, the last assignment winning."""
+    """Parse an environment file as systemd's parse_env_file_internal() does, the last assignment winning.
+
+    Return the entries and whether systemd's load_env_file() accepts the file, which it does not when an entry is
+    not valid UTF-8.
+    """
     entries = {}
     state = "pre_key"
     key = value = ""
@@ -346,7 +362,7 @@ def parse_env_file(text, version):
         elif state == "pre_value":
             if character in ENV_NEWLINE:
                 if not push():
-                    return entries
+                    return entries, False
 
                 state = "pre_key"
             elif character == "'":
@@ -362,7 +378,7 @@ def parse_env_file(text, version):
         elif state == "value":
             if character in ENV_NEWLINE:
                 if not push():
-                    return entries
+                    return entries, False
 
                 state = "pre_key"
             elif character == "\\":
@@ -412,10 +428,10 @@ def parse_env_file(text, version):
             # systemd 253 and earlier continue an escaped comment onto the next line
             state = "pre_key" if character in ENV_NEWLINE and version >= 254 else "comment"
 
-    if state not in ("pre_key", "key", "comment", "comment_escape"):
-        push()
+    if state not in ("pre_key", "key", "comment", "comment_escape") and not push():
+        return entries, False
 
-    return entries
+    return entries, True
 
 
 def read_bytes(module, path):
@@ -435,13 +451,18 @@ def read_text(module, path):
 
 
 def read_machine_info(module, version):
+    """Return the stored settings and why systemd-hostnamed refuses to rewrite the file, or None."""
     content = read_bytes(module, MACHINE_INFO) or b""
 
     # systemd refuses to read a file containing a NUL byte, so none of its settings are stored; undecodable bytes
     # are kept as surrogates for the UTF-8 check
-    entries = {} if b"\x00" in content else parse_env_file(content.decode("utf-8", errors="surrogateescape"), version)
+    if b"\x00" in content:
+        entries, error = {}, "contains a NUL byte"
+    else:
+        entries, loadable = parse_env_file(content.decode("utf-8", errors="surrogateescape"), version)
+        error = None if loadable else "contains a setting that is not valid UTF-8"
 
-    return {param: entries.get(key, "") for key, param in MACHINE_INFO_KEYS.items()}
+    return {param: entries.get(key, "") for key, param in MACHINE_INFO_KEYS.items()}, error
 
 
 def hostname_cleanup(value, version):
@@ -511,6 +532,7 @@ def ensure_present(module):
 
     current = systemd_properties(module, proxy, HOSTNAME_PROPERTIES)
     stored = {}
+    machine_info_error = None
     compare_machine_info = any(module.params[param] is not None for param in MACHINE_INFO_KEYS.values())
     compare_static_hostname = module.params["static_hostname"] is not None
 
@@ -519,7 +541,7 @@ def ensure_present(module):
         version = systemd_version(module)
 
     if compare_machine_info:
-        stored = read_machine_info(module, version)
+        stored, machine_info_error = read_machine_info(module, version)
 
     if compare_static_hostname:
         stored["static_hostname"] = read_static_hostname(module, version)
@@ -535,6 +557,11 @@ def ensure_present(module):
 
         if stored[param] == value:
             continue
+
+        if machine_info_error and param in MACHINE_INFO_KEYS.values():
+            module.fail_json(
+                msg=f"unable to set {param}: {MACHINE_INFO} {machine_info_error}, which systemd-hostnamed refuses to rewrite"
+            )
 
         if param == "static_hostname":
             predicted["hostname"] = value or default or current["hostname"]

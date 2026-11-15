@@ -24,9 +24,9 @@ bugfixes:
     errors, the module failed without a change, so a retry took another
     snapshot. Other paths are listed without a user and host, so a client
     user such as ``alice@corp.example.com`` keeps working. When the client
-    user or host contains ``@`` or ``:``, which kopia cannot read in
-    ``user@host:/path``, the module fails before taking a snapshot of a path
-    containing ``@``.
+    user contains ``@`` or ``:``, or the host contains ``:``, which kopia
+    cannot read in ``user@host:/path``, the module fails before taking a
+    snapshot of a path containing ``@``.
   - kopia_snapshot, kopia_snapshot_info - pass ``path`` to kopia made absolute,
     so a relative path such as ``--all`` or ``(global)`` is no longer read as
     an option or as the global source.
@@ -34,8 +34,13 @@ bugfixes:
     its source ``user@host:/path``, with the client user and host and the path
     made absolute and cleaned. kopia read such a bare path as ``user@host``
     and returned no snapshots, or those of another source. Other paths are
-    listed without a user and host. When the client user or host contains
-    ``@`` or ``:``, the module fails for a path containing ``@``.
+    listed without a user and host. When the client user contains ``@`` or
+    ``:``, or the host contains ``:``, the module fails for a path containing
+    ``@``.
   - kopia_policy, kopia_policy_info - document that kopia stores the user, host
     and path of a ``user@host:/path`` target as given, so they must match the
-    client user and host and an absolute, clean path.
+    client user and host and an absolute, clean path, and that no target can
+    name a directory whose path contains ``@`` when the client user contains
+    ``@`` or ``:``, or the host contains ``:``.
+  - kopia_policy_info - document that kopia makes a bare directory path
+    ``target`` absolute and cleans it, as kopia_policy does.
