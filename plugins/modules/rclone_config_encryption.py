@@ -118,6 +118,10 @@ attributes:
         placeholder wherever it appears in the result, so when O(content) is
         set the after side of the diff shows that placeholder rather than the
         new configuration.
+      - The exception is O(content) containing U+DC80 to U+DCFF, which Ansible
+        uses for bytes that are not valid UTF-8. The diff shows those bytes as
+        U+FFFD, so it no longer matches O(content), and the after side shows
+        the full new configuration.
 """
 
 EXAMPLES = r"""

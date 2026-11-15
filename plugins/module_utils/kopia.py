@@ -68,42 +68,58 @@ def text_label(text):
     return text.encode("utf-8", "backslashreplace").decode("utf-8")
 
 
-def invalid_utf8(value, name):
-    """Return the name of the first string in value, a key or item at any depth, that is not valid UTF-8, or None."""
+def invalid_utf8(value, name, errors="strict"):
+    """Return the name of the first string in value, a key or item at any depth, that is not valid UTF-8, or None.
+
+    With errors="surrogateescape", U+DC80 to U+DCFF, which Ansible uses for bytes that are not valid UTF-8, are
+    accepted as those bytes, and only another lone surrogate is reported.
+    """
     if isinstance(value, str):
         try:
-            value.encode("utf-8")
+            value.encode("utf-8", errors)
         except UnicodeEncodeError:
             return name
 
     elif isinstance(value, dict):
         for key, item in value.items():
             child = f"{name}.{text_label(str(key))}"
-            found = invalid_utf8(key, child) or invalid_utf8(item, child)
+            found = invalid_utf8(key, child, errors) or invalid_utf8(item, child, errors)
             if found:
                 return found
 
     elif isinstance(value, (list, tuple)):
         for index, item in enumerate(value):
-            found = invalid_utf8(item, f"{name}[{index}]")
+            found = invalid_utf8(item, f"{name}[{index}]", errors)
             if found:
                 return found
 
     return None
 
 
-def check_utf8(module, settings):
-    """Fail naming the first (name, value) setting holding text that is not valid UTF-8, never its value."""
+def check_utf8(module, settings, errors="strict"):
+    """Fail naming the first (name, value) setting holding text that is not valid UTF-8, never its value.
+
+    With errors="surrogateescape", only a lone surrogate outside U+DC80 to U+DCFF fails, see invalid_utf8.
+    """
     for name, value in settings:
-        found = invalid_utf8(value, name)
+        found = invalid_utf8(value, name, errors)
+
+        if not found:
+            continue
+
+        # U+D800 to U+DC7F cannot be encoded, so run_command cannot pass them to kopia at all
+        if errors == "surrogateescape":
+            module.fail_json(
+                msg=f"invalid {found}: it must not contain a lone surrogate code point other than U+DC80 to U+DCFF, "
+                "which stand for bytes that are not valid UTF-8, as it cannot be passed to kopia"
+            )
 
         # a lone surrogate, which a JSON value can carry, reaches kopia as a raw byte or not at all, and kopia records
         # text that is not valid UTF-8 with U+FFFD in its place, so the value it reports never matches
-        if found:
-            module.fail_json(
-                msg=f"invalid {found}: it must be valid UTF-8, without a lone surrogate code point, "
-                "as kopia records other text with U+FFFD in its place"
-            )
+        module.fail_json(
+            msg=f"invalid {found}: it must be valid UTF-8, without a lone surrogate code point, "
+            "as kopia records other text with U+FFFD in its place"
+        )
 
 
 def kopia_available(module):

@@ -16,6 +16,29 @@ def test_obscure_round_trip_and_determinism(plaintext):
     assert rclone.deobscure(encoded) == expected
 
 
+@pytest.mark.parametrize("plaintext", ["a\udcffb", "\udc80", "pāss\udce9"])
+def test_obscure_surrogate_escaped_bytes_as_bytes(plaintext):
+    # Ansible holds a byte that is not valid UTF-8 as U+DC80 to U+DCFF; rclone obscure accepts the byte itself
+    data = plaintext.encode("utf-8", "surrogateescape")
+    assert rclone.obscure(plaintext) == rclone.obscure(data)
+    assert rclone_obscure.rclone_obscure(plaintext) == rclone.obscure(data)
+
+
+def test_obscure_reveals_original_bytes():
+    # rclone reveal decrypts with the IV that leads the value, giving back a, 0xFF, b
+    decoded = rclone.base64_urlsafe_decode(rclone.obscure("a\udcffb"))
+    crypter = rclone.AES.new(key=rclone.SECRET_KEY, mode=rclone.AES.MODE_CTR, initial_value=decoded[:16], nonce=b"")
+    assert crypter.decrypt(decoded[16:]) == b"a\xffb"
+
+
+@pytest.mark.parametrize("plaintext", ["\ud800", "a\udc7fb", "x\udbff"])
+@pytest.mark.parametrize("function", [rclone.obscure, rclone_obscure.rclone_obscure])
+def test_obscure_rejects_surrogate_that_is_no_byte(function, plaintext):
+    error = AnsibleFilterError if function is rclone_obscure.rclone_obscure else ValueError
+    with pytest.raises(error, match=r"character U\+D[89ABC][0-9A-F]{2} is a surrogate, which is not valid UTF-8"):
+        function(plaintext)
+
+
 @pytest.mark.parametrize("function", [rclone.obscure, rclone.deobscure])
 @pytest.mark.parametrize("value", ["", b""])
 def test_empty_input_returns_empty_string(function, value):

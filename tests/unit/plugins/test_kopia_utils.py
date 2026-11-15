@@ -41,6 +41,20 @@ def test_invalid_utf8_names_the_first_text_that_is_not_utf8(value, expected):
 
 
 @pytest.mark.parametrize(
+    "value,expected",
+    [
+        ("\udc80\udcff", None),
+        ({"a": ["b", "c\udce9"], "\udc80": "d"}, None),
+        ("a\ud800b", "name"),
+        ("\udc7f", "name"),
+        ({"a": {"b": ["c", "d\udbff"]}}, "name.a.b[1]"),
+    ],
+)
+def test_invalid_utf8_surrogateescape_accepts_only_escaped_bytes(value, expected):
+    assert kopia.invalid_utf8(value, "name", "surrogateescape") == expected
+
+
+@pytest.mark.parametrize(
     "function,args,output,expected",
     [
         (kopia.repository_status, (), '{"storageType":"filesystem"}', {"storageType": "filesystem"}),

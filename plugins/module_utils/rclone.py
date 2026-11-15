@@ -80,7 +80,16 @@ def obscure(plaintext):
     if not plaintext:
         return ""
 
-    data = plaintext.encode("utf-8") if isinstance(plaintext, str) else plaintext
+    data = plaintext
+
+    if isinstance(plaintext, str):
+        # U+DC80 to U+DCFF stand for the bytes that are not valid UTF-8, such as in registered command output, which
+        # rclone obscure accepts; another lone surrogate stands for no byte
+        try:
+            data = plaintext.encode("utf-8", "surrogateescape")
+        except UnicodeEncodeError as error:
+            character = plaintext[error.start]
+            raise ValueError(f"character U+{ord(character):04X} is a surrogate, which is not valid UTF-8") from error
 
     iv = hashlib.sha256(data).digest()[: AES.block_size]
 

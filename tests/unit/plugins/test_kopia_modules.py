@@ -4,6 +4,7 @@ from unittest.mock import Mock
 import pytest
 
 from ansible.module_utils import basic
+from ansible.module_utils.common.text.converters import to_bytes
 
 from ansible_collections.linuxhq.linux.plugins.module_utils import kopia as kopia_utils
 from ansible_collections.linuxhq.linux.plugins.modules import (
@@ -1168,7 +1169,12 @@ SURROGATE = "\udc80"
         (kopia_policy_info, {"target": "/srv/\ud800"}, "target"),
         (kopia_maintenance, {"owner": f"root@{SURROGATE}"}, "owner"),
         (kopia_repository, repository_params(options={"path": f"/srv/{SURROGATE}"}), "options.path"),
-        (kopia_repository, repository_params(options={"tag": ["a", SURROGATE]}), "options.tag[1]"),
+        (kopia_repository, repository_params(options={"path": "/srv/\udce9"}), "options.path"),
+        (
+            kopia_repository,
+            repository_params(secrets={"bucket": SURROGATE}, storage="s3", options={}),
+            "secrets.bucket",
+        ),
         (kopia_snapshot, {"path": f"/srv/{SURROGATE}"}, "path"),
         (kopia_snapshot, {"path": "/srv", "description": SURROGATE}, "description"),
         (kopia_snapshot, {"path": "/srv", "tags": {"env": SURROGATE}}, "tags.env"),
@@ -1186,9 +1192,33 @@ def test_text_kopia_records_differently_is_rejected(monkeypatch, run_module, plu
 
 
 @pytest.mark.parametrize("check_mode", [False, True])
-def test_repository_secret_kopia_records_differently_omits_value(monkeypatch, run_module, check_mode):
+@pytest.mark.parametrize(
+    "params,name",
+    [
+        (repository_params(options={"path": "/srv", "tag": ["a", "\ud800"]}), "options.tag[1]"),
+        (repository_params(options={"path": "/srv/\udbff"}), "options.path"),
+        ({"storage": "from-config", "password": "secret", "options": {"file": "/c\udc7f"}}, "options.file"),
+        (repository_params(secrets={"secret_access_key": "hunter2\ud800xyz"}), "secrets.secret_access_key"),
+    ],
+)
+def test_repository_surrogate_kopia_cannot_receive_is_rejected(monkeypatch, run_module, params, name, check_mode):
+    # U+D800 to U+DC7F cannot be encoded, so run_command would fail with a traceback; a failure omits the value
     must_not_run_kopia(monkeypatch, kopia_repository)
-    params = repository_params(secrets={"secret_access_key": f"hunter2{SURROGATE}xyz"})
-    result = run_module(kopia_repository, params, check_mode)
-    assert result["failed"] and result["msg"].startswith("invalid secrets.secret_access_key: it must be valid UTF-8")
+    result = run_module(kopia_repository, dict(params, _ansible_no_log=True), check_mode)
+    assert result["failed"]
+    assert result["msg"].startswith(f"invalid {name}: it must not contain a lone surrogate code point other than")
     assert "hunter2" not in result["msg"] and "xyz" not in result["msg"]
+
+
+@pytest.mark.parametrize("param", ["options", "secrets"])
+def test_repository_non_identifying_option_passes_raw_bytes(monkeypatch, run_module, param):
+    # kopia only reads the from-config file path, so the byte Ansible stands for with U+DCE9 reaches it unchanged
+    monkeypatch.setattr(kopia_repository, "repository_status", Mock(side_effect=[None, {"storageType": "x"}]))
+    command = Mock(return_value=(0, "", ""))
+    monkeypatch.setattr(kopia_repository, "kopia_command", command)
+    params = {"storage": "from-config", "password": "secret", param: {"file": "/etc/kopia/r\udce9.config"}}
+    result = run_module(kopia_repository, dict(params, _ansible_no_log=True))
+    assert result["changed"] and not result.get("failed")
+    flag = command.call_args.args[1][-1]
+    assert flag == "--file=/etc/kopia/r\udce9.config"
+    assert to_bytes(flag, errors="surrogate_or_strict") == b"--file=/etc/kopia/r\xe9.config"
