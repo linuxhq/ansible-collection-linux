@@ -132,3 +132,74 @@ def test_systemd_version_unreadable(monkeypatch, module_factory, invoke, proxy):
     monkeypatch.setattr(systemd, "systemd_proxy", Mock(return_value=proxy))
     result = invoke(systemd.systemd_version, module_factory())
     assert result["failed"] and "unable to read the systemd version" in result["msg"]
+
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        ("KEY=plain", "plain"),
+        ("KEY=  padded value  ", "padded value"),
+        ('KEY="quoted value "', "quoted value "),
+        ("KEY='single \\ quoted'", "single \\ quoted"),
+        ('KEY="a\\$b\\x"', "a$b\\x"),
+        ("KEY=escaped\\ space", "escaped space"),
+        ("KEY=", ""),
+        ("KEY=Taylor's Laptop", "Taylor's Laptop"),
+        ('KEY=a"b c"', 'a"b c"'),
+        ('KEY="a" "b"', "ab"),
+        ("KEY='a' b  ", "ab"),
+        ("KEY=nbsp\u00a0", "nbsp\u00a0"),
+        ("KEY=tab\t \n", "tab"),
+        ("KEY=con\\\ntinued", "continued"),
+        ('KEY="con\\\ntinued"', "continued"),
+        ("KEY='multi\nline'", "multi\nline"),
+        ("KEY=crlf\r\nOTHER=x", "crlf"),
+        ("KEY=cr\rOTHER=x", "cr"),
+        ("  KEY  =spaced key", "spaced key"),
+        ("KEY=first\nKEY=second\n", "second"),
+        ("# KEY=comment\n; KEY=comment\nKEY=value", "value"),
+        ("# comment ending in a backslash \\\nKEY=value", "value"),
+        ("NOKEY\nKEY=value", "value"),
+    ],
+)
+def test_parse_env_file(text, expected):
+    assert systemd.parse_env_file(text, 262)[0].get("KEY", "") == expected
+
+
+@pytest.mark.parametrize(
+    "text,loadable",
+    [
+        ("KEY=value\n# caf\udce9\nJUNK\udce9\n", True),
+        ("KEY=caf\udce9\nOTHER=x\n", False),
+        ("K\udce9Y=1\n", False),
+        ("KEY=\ufdd0\n", False),
+        ("KEY=value\nOTHER=\udcff", False),
+        ("KEY='\udcff", False),
+    ],
+)
+def test_parse_env_file_reports_whether_systemd_loads_it(text, loadable):
+    assert systemd.parse_env_file(text, 262)[1] is loadable
+
+
+@pytest.mark.parametrize("version,expected", [(252, ""), (253, ""), (254, "Foo"), (257, "Foo"), (262, "Foo")])
+def test_parse_env_file_escaped_comment_follows_version(version, expected):
+    text = "# note \\\nPRETTY_HOSTNAME=Foo\n"
+    assert systemd.parse_env_file(text, version)[0].get("PRETTY_HOSTNAME", "") == expected
+
+
+@pytest.mark.parametrize(
+    "content,error",
+    [
+        (b"", None),
+        (b"KEYMAP=us\nFONT=eurlatgr\n", None),
+        (b"KEYMAP=us\n# caf\xe9\n", None),
+        (b"KEYMAP=us\nFONT=caf\xe9\n", "contains a setting that is not valid UTF-8"),
+        (b"KEYMAP=us\nFONT=ca\x00f\n", "contains a NUL byte"),
+    ],
+)
+def test_load_env_file_reports_why_systemd_refuses_it(content, error):
+    assert systemd.load_env_file(content, 262)[1] == error
+
+
+def test_load_env_file_keeps_entries_before_an_invalid_one():
+    assert systemd.load_env_file(b"KEYMAP=us\nFONT=caf\xe9\nKEYMAP_TOGGLE=de\n", 262)[0] == {"KEYMAP": "us"}

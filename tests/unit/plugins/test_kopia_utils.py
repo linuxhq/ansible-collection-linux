@@ -148,7 +148,10 @@ CLIENT = {"clientOptions": {"hostname": "host", "username": "root"}}
         ("//srv//a@b/./", "root@host:/srv/a@b"),
         ("/srv/other/../a@b", "root@host:/srv/a@b"),
         ("data@x", "root@host:/work/data@x"),
-        # a path without "@" is passed absolute, without a user and host
+        ("/srv/a@b:c", "root@host:/srv/a@b:c"),
+        ("/srv/a@", "root@host:/srv/a@"),
+        # a path without "@", or with a ":" before its first "@", is passed absolute, without a user and host
+        ("/srv/a:b@c", "/srv/a:b@c"),
         ("/srv/data/", "/srv/data"),
         ("data", "/work/data"),
         ("--all", "/work/--all"),
@@ -159,6 +162,25 @@ def test_snapshot_source_is_qualified_as_kopia_records_it(monkeypatch, module_fa
     monkeypatch.setattr(kopia, "working_directory", lambda: "/work")
     monkeypatch.setattr(kopia, "repository_status", lambda module, password=None: CLIENT)
     assert kopia.snapshot_source(module_factory({"password": None}), path, "list") == source
+
+
+@pytest.mark.parametrize(
+    "path,expected",
+    [
+        ("/srv/data", False),
+        ("/home/alice@example.com", True),
+        ("/x@h:/y", True),
+        ("/srv/a@", True),
+        ("/srv/a:b@c", False),
+        ("/srv/a:b", False),
+        ("root@host", True),
+        ("@host", True),
+        ("@host:/data", False),
+        ("", False),
+    ],
+)
+def test_reads_as_user_host_follows_parse_source_info(path, expected):
+    assert kopia.reads_as_user_host(path) is expected
 
 
 @pytest.mark.parametrize(
