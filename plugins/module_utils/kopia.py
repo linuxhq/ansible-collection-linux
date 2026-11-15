@@ -121,8 +121,8 @@ def reads_as_user_host(path):
 
 def snapshot_source(module, path, operation):
     # the path is passed absolute, so a name such as "--all" or "(global)" stays a path, and kopia adds its own client
-    # user and host; kopia reads an absolute path in which an "@" comes before any ":" as user@host, so only such a
-    # path is qualified with the client user and host
+    # user and host; kopia reads an absolute path in which an "@" comes before any ":" as user@host or
+    # user@host:path, so only such a path is qualified with the client user and host
     absolute = absolute_path(path)
 
     if not reads_as_user_host(absolute):
