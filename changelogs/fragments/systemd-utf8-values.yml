@@ -2,11 +2,18 @@
 bugfixes:
   - systemd_locale - fail before any setting is written, also in check mode,
     when a locale or keyboard value is not valid UTF-8, such as one with a
-    lone surrogate code point, or contains a Unicode noncharacter. Such a
-    keyboard value failed with a traceback after the locale was written.
+    lone surrogate code point, or contains a NUL character or a Unicode
+    noncharacter. A keyboard value that was not valid UTF-8 failed with a
+    traceback after the locale was written, and one with a noncharacter
+    failed with a D-Bus error from ``systemd-localed`` after the locale was
+    written. A value with a NUL character was cut at the NUL, so a different
+    value was sent and the task reported a change on every run.
   - systemd_timedate - fail before any setting is written, also in check mode,
-    when ``time`` or ``timezone`` is not valid UTF-8 or contains a Unicode
-    noncharacter, instead of failing with a traceback.
+    when ``time`` or ``timezone`` is not valid UTF-8 or contains a NUL
+    character or a Unicode noncharacter. A value that was not valid UTF-8
+    failed with a traceback, and a ``timezone`` with a NUL character was cut
+    at the NUL, so a different value was sent and the task reported a change
+    on every run.
   - systemd_hostname - refuse ``icon_name``, ``location`` and
     ``pretty_hostname`` values holding escaped bytes, such as ``\udcc3\udca9``,
     before any setting is written, as for other values that are not valid
