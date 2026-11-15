@@ -373,7 +373,7 @@ def test_snapshot_info(monkeypatch, run_module, path):
 @pytest.mark.parametrize(
     "path,source",
     [
-        # kopia reads a bare path containing "@" as user@host, or user@host:path, and lists nothing or another source
+        # kopia reads a bare path with "@" before any ":" as user@host or user@host:path, listing nothing or another source
         ("/home/alice@example.com", "root@host:/home/alice@example.com"),
         ("/x@h:/y", "root@host:/x@h:/y"),
         # qualified as kopia records the source, absolute and cleaned

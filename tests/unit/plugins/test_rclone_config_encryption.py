@@ -336,6 +336,31 @@ def test_unsupported_encryption_message_names_path(tmp_path, run_module):
     assert result["failed"] and "unsupported" in result["msg"] and str(path) in result["msg"]
 
 
+@pytest.mark.parametrize("header", ["RCLONE_ENCRYPT_V0:", "RCLONE_ENCRYPT_V1:"])
+@pytest.mark.parametrize("with_content", [False, True])
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_absent_plain_text_with_encryption_header_fails_before_writing(
+    tmp_path, run_module, header, with_content, check_mode
+):
+    path = tmp_path / "rclone.conf"
+    plain = f"# comment\n\n{header}\nAAAA\n"
+    params = {"path": str(path), "state": "absent", "password": "secret"}
+    if with_content:
+        params["content"] = plain
+        original = None
+    else:
+        original = rclone.encrypt_config(plain.encode(), "secret")
+        path.write_text(original)
+
+    result = run_module(plugin, params, check_mode)
+    assert result["failed"] and "encryption header" in result["msg"] and str(path) in result["msg"]
+    if original is None:
+        assert sorted(tmp_path.iterdir()) == []
+    else:
+        assert sorted(tmp_path.iterdir()) == [path]
+        assert path.read_text() == original
+
+
 @pytest.mark.parametrize("state", ["present", "absent"])
 @pytest.mark.parametrize("mode, expected", [(None, 0o600), ("0640", 0o640)])
 def test_created_file_mode(tmp_path, run_module, state, mode, expected):
