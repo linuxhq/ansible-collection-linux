@@ -59,6 +59,17 @@ notes:
   - Only C(systemd-localed) can tell whether a console keymap or an X11 layout
     exists, so one it refuses is reported after the earlier settings in the
     same task, such as O(locale), are applied.
+  - C(systemd-localed) refuses to rewrite C(/etc/vconsole.conf) when it
+    contains a NUL byte or a setting that is not valid UTF-8, and on Debian 12
+    likewise C(/etc/default/keyboard), where it keeps the X11 keyboard
+    settings. A keyboard change that would rewrite such a file then fails
+    before any setting is written, also in check mode.
+  - The console settings rewrite C(/etc/vconsole.conf), and so do the X11
+    keyboard settings when they are converted into the console keymap and, on
+    systemd 253 and later, always. On Debian 12 the X11 keyboard settings, and
+    a console keymap converted into them, rewrite C(/etc/default/keyboard).
+  - Reads the running systemd version from the C(Version) property of
+    C(org.freedesktop.systemd1) when it changes a setting.
 options:
   locale:
     description:
@@ -219,15 +230,18 @@ locale:
     x11_variant: ''
 """
 
+from ansible.module_utils import distro
 from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.linux.plugins.module_utils.systemd import (
     HAS_DASBUS,
     LOCALE_VARIABLES,
+    load_env_file,
     locale_present,
     locale_setting,
     locale_simplify,
     locale_status,
+    read_bytes,
     systemd_call,
     systemd_proxy,
     systemd_version,
@@ -235,6 +249,14 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.systemd import (
 
 # the first systemd-localed whose SetLocale keeps the variables a request leaves out
 LOCALE_MERGE_VERSION = 239
+
+# the first systemd-localed whose SetX11Keyboard also rewrites /etc/vconsole.conf, which then holds the X11 settings
+X11_VCONSOLE_VERSION = 253
+
+VCONSOLE_CONF = "/etc/vconsole.conf"
+
+# Debian's systemd-localed before 253 keeps the X11 settings in this file instead of the X11 configuration
+DEBIAN_KEYBOARD = "/etc/default/keyboard"
 
 VCONSOLE_SETTINGS = ["vconsole_keymap", "vconsole_keymap_toggle"]
 X11_SETTINGS = ["x11_layout", "x11_model", "x11_variant", "x11_options"]
@@ -286,6 +308,33 @@ def keyboard_change(module, current, names):
     return desired
 
 
+def first_requested(module, names):
+    return next(name for name in names if module.params[name] is not None)
+
+
+def debian_family():
+    return distro.id() == "debian" or "debian" in distro.like().split()
+
+
+def keyboard_rewrites(module, version, keymap, convert_keymap, keyboard):
+    """Return the environment files systemd-localed rewrites for the keyboard changes, with the option causing it."""
+    rewrites = []
+    convert_x11 = all(module.params[name] is None for name in VCONSOLE_SETTINGS)
+
+    if keymap is not None:
+        rewrites.append((VCONSOLE_CONF, first_requested(module, VCONSOLE_SETTINGS)))
+    elif keyboard is not None and (convert_x11 or version >= X11_VCONSOLE_VERSION):
+        # SetX11Keyboard stores the converted console keymap there, and from systemd 253 always the X11 settings too
+        rewrites.append((VCONSOLE_CONF, first_requested(module, X11_SETTINGS)))
+
+    if (keyboard is not None or convert_keymap) and version < X11_VCONSOLE_VERSION and debian_family():
+        # SetVConsoleKeyboard stores the converted X11 settings there too
+        option = first_requested(module, X11_SETTINGS) if keyboard is not None else "vconsole_keymap"
+        rewrites.append((DEBIAN_KEYBOARD, option))
+
+    return rewrites
+
+
 def ensure_present(module):
     if module.check_mode and not HAS_DASBUS:
         keyboard = VCONSOLE_SETTINGS + X11_SETTINGS
@@ -303,24 +352,34 @@ def ensure_present(module):
     pending = []
 
     locale = locale_change(module, current)
-    if locale is not None:
-        version = systemd_version(module)
-        if version < LOCALE_MERGE_VERSION:
-            module.fail_json(
-                msg=f"unable to set locale: systemd >= {LOCALE_MERGE_VERSION} is required, found {version}"
-            )
+    keymap = vconsole_change(module, current)
+    keyboard = keyboard_change(module, current, X11_SETTINGS)
 
+    # localed converts even an unchanged keymap, which would replace X11 settings a toggle change leaves alone
+    convert_keymap = keymap is not None and keymap["vconsole_keymap"] != (current["vconsole_keymap"] or "")
+
+    version = None
+    if locale is not None or keymap is not None or keyboard is not None:
+        version = systemd_version(module)
+
+    if locale is not None and version < LOCALE_MERGE_VERSION:
+        module.fail_json(msg=f"unable to set locale: systemd >= {LOCALE_MERGE_VERSION} is required, found {version}")
+
+    # localed refuses to rewrite such a file only after the earlier settings are written, so check it first
+    for path, option in keyboard_rewrites(module, version, keymap, convert_keymap, keyboard):
+        content = read_bytes(module, path)
+        error = None if content is None else load_env_file(content, version)[1]
+
+        if error:
+            module.fail_json(msg=f"unable to set {option}: {path} {error}, which systemd-localed refuses to rewrite")
+
+    if locale is not None:
         simplified = locale_simplify(locale)
 
         predicted["locale"] = {name: simplified.get(name) for name in LOCALE_VARIABLES}
         pending.append(("SetLocale", (locale_setting(locale_present(module.params["locale"])), False)))
 
-    keymap = vconsole_change(module, current)
-    convert_keymap = False
     if keymap is not None:
-        # localed converts even an unchanged keymap, which would replace X11 settings a toggle change leaves alone
-        convert_keymap = keymap["vconsole_keymap"] != (current["vconsole_keymap"] or "")
-
         predicted.update(keymap)
         pending.append(
             (
@@ -329,7 +388,6 @@ def ensure_present(module):
             )
         )
 
-    keyboard = keyboard_change(module, current, X11_SETTINGS)
     if keyboard is not None:
         predicted.update(keyboard)
 

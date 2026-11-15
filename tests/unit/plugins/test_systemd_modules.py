@@ -15,6 +15,7 @@ from ansible_collections.linuxhq.linux.plugins.modules import (
 )
 
 RUN_COMMAND = basic.AnsibleModule.run_command
+DEBIAN_FAMILY = systemd_locale.debian_family
 
 HOSTNAME = {
     "default_hostname": "localhost",
@@ -74,6 +75,16 @@ def hostname_files(monkeypatch, tmp_path):
     files = {"hostname": tmp_path / "hostname", "machine_info": tmp_path / "machine-info"}
     monkeypatch.setattr(systemd_hostname, "HOSTNAME_FILE", str(files["hostname"]))
     monkeypatch.setattr(systemd_hostname, "MACHINE_INFO", str(files["machine_info"]))
+    return files
+
+
+@pytest.fixture(autouse=True)
+def keyboard_files(monkeypatch, tmp_path):
+    """Point the locale module at keyboard files under tmp_path that do not exist until a test writes them."""
+    files = {"vconsole": tmp_path / "vconsole.conf", "keyboard": tmp_path / "keyboard"}
+    monkeypatch.setattr(systemd_locale, "VCONSOLE_CONF", str(files["vconsole"]))
+    monkeypatch.setattr(systemd_locale, "DEBIAN_KEYBOARD", str(files["keyboard"]))
+    monkeypatch.setattr(systemd_locale, "debian_family", Mock(return_value=False))
     return files
 
 
@@ -289,14 +300,46 @@ def test_locale_proceeds_on_systemd_239(monkeypatch, run_module, systemd_version
         assert mutate.call_args.args[2:] == ("SetLocale", ["LC_TIME=en_GB.UTF-8"], False)
 
 
-def test_locale_version_not_read_without_locale_change(monkeypatch, run_module, systemd_version):
+def test_locale_version_checked_only_for_locale_change(monkeypatch, run_module, systemd_version):
     systemd_version.return_value = 238
     monkeypatch.setattr(systemd_locale, "systemd_proxy", Mock())
     monkeypatch.setattr(systemd_locale, "locale_status", Mock(return_value=LOCALE))
     mutate = Mock()
     monkeypatch.setattr(systemd_locale, "systemd_call", mutate)
     assert run_module(systemd_locale, {"vconsole_keymap": "de"})["changed"]
+    assert [entry.args[2] for entry in mutate.call_args_list] == ["SetVConsoleKeyboard"]
+
+
+def test_locale_version_not_read_without_change(monkeypatch, run_module, systemd_version):
+    monkeypatch.setattr(systemd_locale, "systemd_proxy", Mock())
+    monkeypatch.setattr(systemd_locale, "locale_status", Mock(return_value=LOCALE))
+    monkeypatch.setattr(systemd_locale, "systemd_call", Mock(side_effect=AssertionError("must not write")))
+    params = {"locale": {"lang": "en_US.UTF-8"}, "vconsole_keymap": "us", "x11_layout": "us"}
+    assert run_module(systemd_locale, params)["changed"] is False
     systemd_version.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "params,read",
+    [
+        # a console change on a host that is not Debian rewrites only /etc/vconsole.conf
+        ({"vconsole_keymap": "de"}, ["vconsole"]),
+        # X11 settings that are not converted leave it alone on systemd 252
+        ({"vconsole_keymap": "us", "x11_layout": "de"}, []),
+    ],
+)
+def test_locale_reads_only_keyboard_files_rewritten(
+    monkeypatch, run_module, keyboard_files, systemd_version, params, read
+):
+    # an unrelated file that cannot be read, such as a root-only /etc/default/keyboard, must not block the change
+    systemd_version.return_value = 252
+    monkeypatch.setattr(systemd_locale, "systemd_proxy", Mock())
+    monkeypatch.setattr(systemd_locale, "locale_status", Mock(return_value=LOCALE))
+    monkeypatch.setattr(systemd_locale, "systemd_call", Mock())
+    opened = []
+    monkeypatch.setattr(systemd_locale, "read_bytes", lambda module, path: opened.append(path))
+    assert run_module(systemd_locale, params)["changed"]
+    assert opened == [str(keyboard_files[name]) for name in read]
 
 
 def test_vconsole_reset_toggle_when_keymap_changes(module_factory):
@@ -401,6 +444,102 @@ def test_x11_keyboard_converts_only_without_console_settings(monkeypatch, run_mo
     assert calls[-1][0] == "SetX11Keyboard" and calls[-1][-2:] == (convert, False)
 
 
+VCONSOLE_UTF8 = b"KEYMAP=us\nFONT=caf\xe9\n"
+VCONSOLE_NUL = b"KEYMAP=us\nFONT=ca\x00f\n"
+KEYBOARD_UTF8 = b'XKBMODEL="pc105"\nXKBLAYOUT="us"\nBACKSPACE="caf\xe9"\n'
+
+
+def locale_module(monkeypatch, keyboard_files, systemd_version, file, content, version, debian):
+    keyboard_files[file].write_bytes(content)
+    systemd_version.return_value = version
+    monkeypatch.setattr(systemd_locale, "HAS_DASBUS", True)
+    monkeypatch.setattr(systemd_locale, "systemd_proxy", Mock())
+    monkeypatch.setattr(systemd_locale, "locale_status", Mock(return_value=LOCALE))
+    monkeypatch.setattr(systemd_locale, "debian_family", Mock(return_value=debian))
+    mutate = Mock()
+    monkeypatch.setattr(systemd_locale, "systemd_call", mutate)
+    return mutate
+
+
+@pytest.mark.parametrize(
+    "file,content,version,debian,params,option,error",
+    [
+        # SetVConsoleKeyboard rewrites /etc/vconsole.conf
+        ("vconsole", VCONSOLE_UTF8, 252, False, {"vconsole_keymap": "de"}, "vconsole_keymap", "not valid UTF-8"),
+        ("vconsole", VCONSOLE_NUL, 257, False, {"vconsole_keymap": "de"}, "vconsole_keymap", "NUL byte"),
+        ("vconsole", VCONSOLE_UTF8, 257, False, {"vconsole_keymap_toggle": "de"}, "vconsole_keymap_toggle", "UTF-8"),
+        # SetX11Keyboard rewrites it to store the converted keymap
+        ("vconsole", VCONSOLE_UTF8, 252, False, {"x11_layout": "de"}, "x11_layout", "not valid UTF-8"),
+        # and from systemd 253 to copy the X11 settings, also without a conversion
+        ("vconsole", VCONSOLE_NUL, 253, False, {"vconsole_keymap": "us", "x11_layout": "de"}, "x11_layout", "NUL"),
+        # Debian 12 keeps the X11 settings in /etc/default/keyboard, also for a converted console keymap
+        ("keyboard", KEYBOARD_UTF8, 252, True, {"x11_layout": "de"}, "x11_layout", "not valid UTF-8"),
+        ("keyboard", KEYBOARD_UTF8, 252, True, {"vconsole_keymap": "de"}, "vconsole_keymap", "not valid UTF-8"),
+    ],
+)
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_locale_unloadable_keyboard_file_fails_before_any_write(
+    monkeypatch,
+    run_module,
+    keyboard_files,
+    systemd_version,
+    file,
+    content,
+    version,
+    debian,
+    params,
+    option,
+    error,
+    check_mode,
+):
+    mutate = locale_module(monkeypatch, keyboard_files, systemd_version, file, content, version, debian)
+    result = run_module(systemd_locale, {"locale": {"lang": "C.UTF-8"}, **params}, check_mode)
+    assert result["failed"]
+    assert result["msg"].startswith(f"unable to set {option}: {keyboard_files[file]} contains ")
+    assert error in result["msg"] and result["msg"].endswith("which systemd-localed refuses to rewrite")
+    mutate.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "file,content,version,debian,params,methods",
+    [
+        # no keyboard change is pending
+        ("vconsole", VCONSOLE_UTF8, 257, False, {}, ["SetLocale"]),
+        ("vconsole", VCONSOLE_NUL, 257, False, {"vconsole_keymap": "us", "x11_layout": "us"}, ["SetLocale"]),
+        # systemd 252 leaves /etc/vconsole.conf alone for X11 settings that are not converted
+        (
+            "vconsole",
+            VCONSOLE_UTF8,
+            252,
+            False,
+            {"vconsole_keymap": "us", "x11_layout": "de"},
+            ["SetLocale", "SetX11Keyboard"],
+        ),
+        # /etc/default/keyboard holds the X11 settings only for Debian's systemd before 253
+        ("keyboard", KEYBOARD_UTF8, 252, False, {"x11_layout": "de"}, ["SetLocale", "SetX11Keyboard"]),
+        ("keyboard", KEYBOARD_UTF8, 257, True, {"x11_layout": "de"}, ["SetLocale", "SetX11Keyboard"]),
+        # a toggle-only change is not converted into the X11 settings
+        ("keyboard", KEYBOARD_UTF8, 252, True, {"vconsole_keymap_toggle": "de"}, ["SetLocale", "SetVConsoleKeyboard"]),
+    ],
+)
+def test_locale_unloadable_keyboard_file_without_rewrite(
+    monkeypatch, run_module, keyboard_files, systemd_version, file, content, version, debian, params, methods
+):
+    mutate = locale_module(monkeypatch, keyboard_files, systemd_version, file, content, version, debian)
+    assert run_module(systemd_locale, {"locale": {"lang": "C.UTF-8"}, **params})["changed"]
+    assert [entry.args[2] for entry in mutate.call_args_list] == methods
+
+
+@pytest.mark.parametrize(
+    "os_id,like,expected",
+    [("debian", "", True), ("ubuntu", "debian", True), ("almalinux", "rhel centos fedora", False)],
+)
+def test_debian_family_reads_os_release(monkeypatch, os_id, like, expected):
+    monkeypatch.setattr(systemd_locale.distro, "id", lambda: os_id)
+    monkeypatch.setattr(systemd_locale.distro, "like", lambda: like)
+    assert DEBIAN_FAMILY() is expected
+
+
 @pytest.mark.parametrize("ntp", [False, True])
 def test_ntp_change_is_reported_before_time_is_set(monkeypatch, run_module, analyze, ntp):
     calls = Mock()
@@ -502,59 +641,6 @@ def test_hostname_machine_info_values_are_compared(monkeypatch, tmp_path, run_mo
     }
     assert not run_module(systemd_hostname, params)["changed"]
     mutate.assert_not_called()
-
-
-@pytest.mark.parametrize(
-    "text,expected",
-    [
-        ("KEY=plain", "plain"),
-        ("KEY=  padded value  ", "padded value"),
-        ('KEY="quoted value "', "quoted value "),
-        ("KEY='single \\ quoted'", "single \\ quoted"),
-        ('KEY="a\\$b\\x"', "a$b\\x"),
-        ("KEY=escaped\\ space", "escaped space"),
-        ("KEY=", ""),
-        ("KEY=Taylor's Laptop", "Taylor's Laptop"),
-        ('KEY=a"b c"', 'a"b c"'),
-        ('KEY="a" "b"', "ab"),
-        ("KEY='a' b  ", "ab"),
-        ("KEY=nbsp\u00a0", "nbsp\u00a0"),
-        ("KEY=tab\t \n", "tab"),
-        ("KEY=con\\\ntinued", "continued"),
-        ('KEY="con\\\ntinued"', "continued"),
-        ("KEY='multi\nline'", "multi\nline"),
-        ("KEY=crlf\r\nOTHER=x", "crlf"),
-        ("KEY=cr\rOTHER=x", "cr"),
-        ("  KEY  =spaced key", "spaced key"),
-        ("KEY=first\nKEY=second\n", "second"),
-        ("# KEY=comment\n; KEY=comment\nKEY=value", "value"),
-        ("# comment ending in a backslash \\\nKEY=value", "value"),
-        ("NOKEY\nKEY=value", "value"),
-    ],
-)
-def test_parse_env_file(text, expected):
-    assert systemd_hostname.parse_env_file(text, 262)[0].get("KEY", "") == expected
-
-
-@pytest.mark.parametrize(
-    "text,loadable",
-    [
-        ("KEY=value\n# caf\udce9\nJUNK\udce9\n", True),
-        ("KEY=caf\udce9\nOTHER=x\n", False),
-        ("K\udce9Y=1\n", False),
-        ("KEY=\ufdd0\n", False),
-        ("KEY=value\nOTHER=\udcff", False),
-        ("KEY='\udcff", False),
-    ],
-)
-def test_parse_env_file_reports_whether_systemd_loads_it(text, loadable):
-    assert systemd_hostname.parse_env_file(text, 262)[1] is loadable
-
-
-@pytest.mark.parametrize("version,expected", [(252, ""), (253, ""), (254, "Foo"), (257, "Foo"), (262, "Foo")])
-def test_parse_env_file_escaped_comment_follows_version(version, expected):
-    text = "# note \\\nPRETTY_HOSTNAME=Foo\n"
-    assert systemd_hostname.parse_env_file(text, version)[0].get("PRETTY_HOSTNAME", "") == expected
 
 
 @pytest.mark.parametrize("version,changed", [(252, True), (257, False)])

@@ -1,0 +1,9 @@
+---
+bugfixes:
+  - systemd_locale - fail before writing any setting, also in check mode, when
+    a keyboard change would make systemd-localed rewrite ``/etc/vconsole.conf``
+    or, on Debian 12, ``/etc/default/keyboard`` while it contains a NUL byte or
+    a setting that is not valid UTF-8. systemd-localed refuses to rewrite such
+    a file, so the module applied ``locale`` and then failed, or reported a
+    console keymap or a converted keyboard setting as changed although
+    systemd-localed did not store it.

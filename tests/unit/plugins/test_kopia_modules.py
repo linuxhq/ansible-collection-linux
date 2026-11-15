@@ -854,6 +854,29 @@ def test_snapshot_without_at_sign_lists_bare_path(monkeypatch, run_module, kopia
     kopia_client.assert_not_called()
 
 
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_snapshot_path_with_colon_before_at_sign_lists_bare_path(monkeypatch, run_module, kopia_client, check_mode):
+    # kopia reads /srv/a:b@c as a path, as its ":" comes before the first "@", so any client user can list it
+    kopia_client.return_value = FQDN_CLIENT
+    created = '{"id":"new","source":{"host":"host","userName":"alice@corp.example.com","path":"/srv/a:b@c"}}'
+    command = Mock(side_effect=[(0, created, ""), (0, '[{"id":"new"}]', "")])
+    monkeypatch.setattr(kopia_snapshot, "kopia_command", command)
+    monkeypatch.setattr(kopia_snapshot, "kopia_available", lambda module: True)
+    result = run_module(kopia_snapshot, {"path": "/srv/a:b@c"}, check_mode=check_mode)
+    assert not result.get("failed") and result["changed"]
+    if check_mode:
+        command.assert_not_called()
+    else:
+        assert result["snapshot"] == {"id": "new"}
+        assert command.call_args_list[1].args[1] == ["snapshot", "list", "/srv/a:b@c", "--json"]
+
+    command = Mock(return_value=(0, '[{"id":"new"}]', ""))
+    monkeypatch.setattr(kopia_snapshot_info, "kopia_command", command)
+    assert run_module(kopia_snapshot_info, {"path": "/srv/a:b@c"}) == {"changed": False, "snapshots": [{"id": "new"}]}
+    assert command.call_args.args[1] == ["snapshot", "list", "--json", "/srv/a:b@c"]
+    kopia_client.assert_not_called()
+
+
 def test_snapshot_info_without_at_sign_lists_bare_path(monkeypatch, run_module, kopia_client):
     kopia_client.return_value = FQDN_CLIENT
     command = Mock(return_value=(0, '[{"id":"old"}]', ""))

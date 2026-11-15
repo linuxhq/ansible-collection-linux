@@ -30,15 +30,18 @@ description:
     been saved, with an empty RV(snapshot).
   - O(path) is made absolute and cleaned, as kopia does, and its snapshots
     are listed by that path, to which kopia adds the client user and host.
-    kopia reads a bare path containing V(@) as C(user@host), so when the
-    absolute path contains V(@), such as V(/home/alice@example.com), it is
-    listed by the source kopia records, C(user@host:/path), taken from the
-    snapshot kopia printed or, when it printed none, from the client user and
-    host reported by C(kopia repository status).
+    kopia reads a bare path in which an V(@) comes before any V(:) as
+    C(user@host), so when the absolute path is such a path, such as
+    V(/home/alice@example.com), it is listed by the source kopia records,
+    C(user@host:/path), taken from the snapshot kopia printed or, when it
+    printed none, from the client user and host reported by
+    C(kopia repository status). A path with a V(:) before its first V(@), such
+    as V(/srv/a:b@c), is read as a path.
   - kopia splits C(user@host:/path) at the first V(@) and the first V(:), so an
-    absolute path containing V(@) cannot be listed when the client user
-    contains V(@) or V(:), such as V(alice@corp.example.com), or the host
-    contains V(:). The module then fails before taking the snapshot.
+    absolute path in which an V(@) comes before any V(:) cannot be listed when
+    the client user contains V(@) or V(:), such as V(alice@corp.example.com),
+    or the host contains V(:). The module then fails before taking the
+    snapshot.
 notes:
   - A failure reported by kopia after it saved the snapshot without printing
     it, such as applying the retention policy, cannot be told apart from a
@@ -142,6 +145,7 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
     absolute_path,
     kopia_available,
     kopia_command,
+    reads_as_user_host,
     snapshot_source,
 )
 
@@ -163,7 +167,7 @@ def listed_source(manifest, source):
     recorded = manifest.get("source")
 
     if (
-        "@" in source
+        reads_as_user_host(source)
         and isinstance(recorded, dict)
         and all(isinstance(recorded.get(key), str) and recorded[key] for key in SOURCE_KEYS)
     ):
@@ -211,7 +215,7 @@ def ensure_present(module):
             module.fail_json(msg=f"invalid tag key {key!r}: kopia splits tags at the first ':'")
 
     if module.check_mode:
-        if "@" in absolute_path(path) and kopia_available(module):
+        if reads_as_user_host(absolute_path(path)) and kopia_available(module):
             snapshot_source(module, path, OPERATION)
 
         module.exit_json(changed=True, snapshot={})

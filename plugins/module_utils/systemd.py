@@ -5,6 +5,7 @@ import re
 import traceback
 
 from ansible.module_utils.basic import missing_required_lib
+from ansible.module_utils.common.text.converters import to_native
 
 DASBUS_IMPORT_ERROR = None
 
@@ -92,6 +93,11 @@ LOCALE_VARIABLES = [
     "lc_telephone",
     "lc_time",
 ]
+
+ENV_COMMENTS = "#;"
+ENV_NEWLINE = "\n\r"
+ENV_SHELL_NEED_ESCAPE = '"\\`$'
+ENV_WHITESPACE = " \t\n\r"
 
 TIMEDATE_PROPERTIES = [
     ("can_ntp", "CanNTP"),
@@ -198,3 +204,167 @@ def locale_simplify(variables):
 
 def locale_setting(variables):
     return [f"{name.upper()}={value}" for name, value in sorted(variables.items())]
+
+
+def utf8_text(text):
+    """Return text decoded with surrogateescape as the UTF-8 systemd's utf8_is_valid() accepts, or None."""
+    # bytes split by a continuation line are joined before systemd checks them
+    try:
+        text = text.encode("utf-8", "surrogateescape").decode("utf-8")
+    except UnicodeError:
+        return None
+
+    # systemd also refuses noncharacters
+    if any(0xFDD0 <= ord(char) <= 0xFDEF or ord(char) & 0xFFFE == 0xFFFE for char in text):
+        return None
+
+    return text
+
+
+def parse_env_file(text, version):
+    """Parse an environment file as systemd's parse_env_file_internal() does, the last assignment winning.
+
+    Return the entries and whether systemd's load_env_file() accepts the file, which it does not when an entry is
+    not valid UTF-8.
+    """
+    entries = {}
+    state = "pre_key"
+    key = value = ""
+    key_space = value_space = None
+
+    def push():
+        name = key if key_space is None else key[:key_space]
+        entry = value if state != "value" or value_space is None else value[:value_space]
+
+        name = utf8_text(name)
+        entry = utf8_text(entry)
+
+        # systemd stops parsing at the first entry that is not valid UTF-8, keeping the entries before it
+        if name is None or entry is None:
+            return False
+
+        entries[name] = entry
+        return True
+
+    for character in text:
+        if state == "pre_key":
+            if character in ENV_COMMENTS:
+                state = "comment"
+            elif character not in ENV_WHITESPACE:
+                state = "key"
+                key = character
+                key_space = None
+
+        elif state == "key":
+            if character in ENV_NEWLINE:
+                state = "pre_key"
+            elif character == "=":
+                state = "pre_value"
+                value = ""
+                value_space = None
+            else:
+                if character not in ENV_WHITESPACE:
+                    key_space = None
+                elif key_space is None:
+                    key_space = len(key)
+
+                key += character
+
+        elif state == "pre_value":
+            if character in ENV_NEWLINE:
+                if not push():
+                    return entries, False
+
+                state = "pre_key"
+            elif character == "'":
+                state = "single_quote"
+            elif character == '"':
+                state = "double_quote"
+            elif character == "\\":
+                state = "value_escape"
+            elif character not in ENV_WHITESPACE:
+                state = "value"
+                value += character
+
+        elif state == "value":
+            if character in ENV_NEWLINE:
+                if not push():
+                    return entries, False
+
+                state = "pre_key"
+            elif character == "\\":
+                state = "value_escape"
+                value_space = None
+            else:
+                if character not in ENV_WHITESPACE:
+                    value_space = None
+                elif value_space is None:
+                    value_space = len(value)
+
+                value += character
+
+        elif state == "value_escape":
+            state = "value"
+            if character not in ENV_NEWLINE:
+                value += character
+
+        elif state == "single_quote":
+            if character == "'":
+                state = "pre_value"
+            else:
+                value += character
+
+        elif state == "double_quote":
+            if character == '"':
+                state = "pre_value"
+            elif character == "\\":
+                state = "double_quote_escape"
+            else:
+                value += character
+
+        elif state == "double_quote_escape":
+            state = "double_quote"
+            if character in ENV_SHELL_NEED_ESCAPE:
+                value += character
+            elif character != "\n":
+                value += "\\" + character
+
+        elif state == "comment":
+            if character == "\\":
+                state = "comment_escape"
+            elif character in ENV_NEWLINE:
+                state = "pre_key"
+
+        elif state == "comment_escape":
+            # systemd 253 and earlier continue an escaped comment onto the next line
+            state = "pre_key" if character in ENV_NEWLINE and version >= 254 else "comment"
+
+    if state not in ("pre_key", "key", "comment", "comment_escape") and not push():
+        return entries, False
+
+    return entries, True
+
+
+def read_bytes(module, path):
+    try:
+        with open(path, "rb") as handle:
+            return handle.read()
+    except FileNotFoundError:
+        return None
+    except OSError as error:
+        module.fail_json(msg=f"unable to read {path}: {to_native(error)}")
+
+
+def load_env_file(content, version):
+    """Parse environment file bytes as systemd's load_env_file() does.
+
+    Return the entries and why systemd refuses to load the file, or None when it loads it.
+    """
+    # systemd refuses to read a file containing a NUL byte, so none of its settings are stored; undecodable bytes
+    # are kept as surrogates for the UTF-8 check
+    if b"\x00" in content:
+        return {}, "contains a NUL byte"
+
+    entries, loadable = parse_env_file(content.decode("utf-8", errors="surrogateescape"), version)
+
+    return entries, None if loadable else "contains a setting that is not valid UTF-8"

@@ -111,13 +111,21 @@ def absolute_path(path):
     return clean_path(path if path.startswith("/") else os.path.join(working_directory(), path))
 
 
+def reads_as_user_host(path):
+    """Return whether kopia's ParseSourceInfo reads path as user@host or user@host:path rather than a local path."""
+    at = path.find("@")
+    colon = path.find(":")
+
+    return 0 < at < colon or (at >= 0 and colon < 0)
+
+
 def snapshot_source(module, path, operation):
     # the path is passed absolute, so a name such as "--all" or "(global)" stays a path, and kopia adds its own client
-    # user and host; kopia reads an absolute path containing "@" as user@host, so only such a path is qualified with
-    # the client user and host
+    # user and host; kopia reads an absolute path in which an "@" comes before any ":" as user@host, so only such a
+    # path is qualified with the client user and host
     absolute = absolute_path(path)
 
-    if "@" not in absolute:
+    if not reads_as_user_host(absolute):
         return absolute
 
     status = repository_status(module, password=module.params["password"])
@@ -137,7 +145,8 @@ def snapshot_source(module, path, operation):
     if "@" in username or ":" in username or ":" in hostname:
         module.fail_json(
             msg=(
-                f"unable to {operation} of {path}: kopia cannot list {absolute}, a path containing '@', for client "
+                f"unable to {operation} of {path}: kopia cannot list {absolute}, a path in which an '@' comes before "
+                f"any ':', for client "
                 f"user {username!r} on host {hostname!r}, as it splits user@host:/path at the first '@' and ':'"
             )
         )

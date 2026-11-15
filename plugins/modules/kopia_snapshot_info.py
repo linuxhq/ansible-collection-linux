@@ -35,15 +35,17 @@ options:
         more than one source.
       - All sources are listed when unset.
       - Made absolute and cleaned, as kopia does, and listed by that path, to
-        which kopia adds the client user and host. kopia reads a bare path
-        containing V(@) as C(user@host), so when the absolute path contains
-        V(@), such as V(/home/alice@example.com), it is listed as the source
-        C(user@host:/path), with the client user and host reported by
-        C(kopia repository status), as kopia records it.
+        which kopia adds the client user and host. kopia reads a bare path in
+        which an V(@) comes before any V(:) as C(user@host), so when the
+        absolute path is such a path, such as V(/home/alice@example.com), it is
+        listed as the source C(user@host:/path), with the client user and host
+        reported by C(kopia repository status), as kopia records it. A path
+        with a V(:) before its first V(@), such as V(/srv/a:b@c), is read as a
+        path.
       - kopia splits C(user@host:/path) at the first V(@) and the first V(:), so
-        the module fails when the absolute path contains V(@) and the client
-        user contains V(@) or V(:), such as V(alice@corp.example.com), or the
-        host contains V(:).
+        the module fails when the absolute path is one in which an V(@) comes
+        before any V(:) and the client user contains V(@) or V(:), such as
+        V(alice@corp.example.com), or the host contains V(:).
       - Ansible expands a leading V(~) and environment variables in it, as for
         any C(path) option, before it is passed to kopia.
     type: path
