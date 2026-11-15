@@ -284,6 +284,61 @@ def test_locale_requires_systemd_239_before_any_write(monkeypatch, run_module, s
     mutate.assert_not_called()
 
 
+@pytest.mark.parametrize(
+    "params,option",
+    [
+        ({"locale": {"lang": "de_DE.UTF-8"}, "x11_layout": "\udc80"}, "x11_layout"),
+        ({"locale": {"lang": "de_DE.UTF-8"}, "x11_layout": "d\udcc3\udca9"}, "x11_layout"),
+        ({"locale": {"lang": "de_DE.UTF-8"}, "vconsole_keymap_toggle": "\ud800"}, "vconsole_keymap_toggle"),
+        ({"locale": {"lang": "de_DE.UTF-8"}, "x11_options": "grp:\ufffe"}, "x11_options"),
+        ({"locale": {"lang": "de_DE.UTF-8", "lc_time": "\udc80"}}, "locale.lc_time"),
+    ],
+)
+@pytest.mark.parametrize("dasbus", [False, True])
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_locale_value_not_valid_utf8_fails_before_any_call(
+    monkeypatch, run_module, systemd_version, params, option, dasbus, check_mode
+):
+    monkeypatch.setattr(systemd_locale, "HAS_DASBUS", dasbus)
+    proxy = Mock(side_effect=AssertionError("must not connect to systemd-localed"))
+    monkeypatch.setattr(systemd_locale, "systemd_proxy", proxy)
+    mutate = Mock()
+    monkeypatch.setattr(systemd_locale, "systemd_call", mutate)
+    # task-level no_log is what lets such a value past AnsibleModule's invocation logging
+    result = run_module(systemd_locale, dict(params, _ansible_no_log=True), check_mode)
+    assert (
+        result["failed"] and result["msg"] == f"invalid {option}: it must be valid UTF-8 without Unicode noncharacters"
+    )
+    proxy.assert_not_called()
+    systemd_version.assert_not_called()
+    mutate.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "params,option",
+    [
+        ({"ntp": False, "timezone": "\udc80"}, "timezone"),
+        ({"ntp": False, "time": "2026-07-26 14:30 \udc80"}, "time"),
+    ],
+)
+@pytest.mark.parametrize("dasbus", [False, True])
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_timedate_value_not_valid_utf8_fails_before_any_call(
+    monkeypatch, run_module, params, option, dasbus, check_mode
+):
+    monkeypatch.setattr(systemd_timedate, "HAS_DASBUS", dasbus)
+    proxy = Mock(side_effect=AssertionError("must not connect to systemd-timedated"))
+    monkeypatch.setattr(systemd_timedate, "systemd_proxy", proxy)
+    mutate = Mock()
+    monkeypatch.setattr(systemd_timedate, "systemd_call", mutate)
+    result = run_module(systemd_timedate, dict(params, _ansible_no_log=True), check_mode)
+    assert (
+        result["failed"] and result["msg"] == f"invalid {option}: it must be valid UTF-8 without Unicode noncharacters"
+    )
+    proxy.assert_not_called()
+    mutate.assert_not_called()
+
+
 @pytest.mark.parametrize("check_mode", [False, True])
 def test_locale_proceeds_on_systemd_239(monkeypatch, run_module, systemd_version, check_mode):
     systemd_version.return_value = 239
@@ -752,6 +807,9 @@ def test_hostname_machine_info_parsed_as_systemd(monkeypatch, tmp_path, run_modu
         {"chassis": "vm", "location": "rack\ufffe"},
         {"chassis": "vm", "pretty_hostname": "Laptop\ufdd0"},
         {"chassis": "vm", "pretty_hostname": "Laptop\U0001ffff"},
+        # escaped bytes, even ones that form valid UTF-8, cannot be sent by dasbus; no_log lets them reach the module
+        {"chassis": "vm", "pretty_hostname": "Caf\udcc3\udca9", "_ansible_no_log": True},
+        {"chassis": "vm", "location": "rack\ud800", "_ansible_no_log": True},
         {"chassis": "vm", "static_hostname": "-bad"},
         {"chassis": "vm", "static_hostname": "bad-"},
         {"chassis": "vm", "static_hostname": "a..b"},

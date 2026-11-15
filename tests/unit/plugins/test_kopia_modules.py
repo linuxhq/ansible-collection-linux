@@ -324,6 +324,7 @@ def test_snapshot_rejects_non_string_tag_values(monkeypatch, run_module, check_m
     monkeypatch.setattr(kopia_snapshot, "kopia_available", Mock(side_effect=AssertionError("must not look up kopia")))
     result = run_module(kopia_snapshot, {"path": "/data", "tags": {"env": value, "role": "db"}}, check_mode)
     assert result["failed"] and "'env'" in result["msg"] and "not a string" in result["msg"]
+    assert "string filter" in result["msg"]
 
 
 def test_snapshot_records_quoted_tag_values_as_given(monkeypatch, run_module):
@@ -748,6 +749,40 @@ def test_repository_connected_same_storage(monkeypatch, run_module, params, stor
     monkeypatch.setattr(kopia_repository, "repository_status", lambda module, password=None: {"storage": storage})
     monkeypatch.setattr(kopia_repository, "kopia_command", Mock(side_effect=AssertionError("must not reconnect")))
     assert run_module(kopia_repository, params)["changed"] is False
+
+
+@pytest.mark.parametrize(
+    "param,option,value,message",
+    [
+        ("options", "region", {"name": "us-west-1"}, "invalid options value for region: a dictionary"),
+        ("secrets", "access_key", {"id": "key"}, "invalid secrets value for access_key: a dictionary"),
+        ("options", "bucket", ["first", "second"], "invalid options value for bucket: it identifies the repository"),
+        ("secrets", "path", ["/a", "/b"], "invalid secrets value for path: it identifies the repository"),
+    ],
+)
+@pytest.mark.parametrize("connected", [False, True])
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_repository_rejects_values_kopia_cannot_take(
+    monkeypatch, run_module, param, option, value, message, connected, check_mode
+):
+    status = Mock(side_effect=AssertionError("must not query kopia"))
+    monkeypatch.setattr(kopia_repository, "repository_status", status)
+    monkeypatch.setattr(kopia_repository, "kopia_available", lambda module: connected)
+    monkeypatch.setattr(kopia_repository, "kopia_command", Mock(side_effect=AssertionError("must not run kopia")))
+    params = {"storage": "s3", "password": "secret", "options": {"bucket": "b"}, param: {option: value}}
+    result = run_module(kopia_repository, params, check_mode)
+    assert result["failed"] and message in result["msg"]
+    status.assert_not_called()
+    assert repr(value) not in result["msg"]
+
+
+def test_repository_passes_lists_for_other_options(monkeypatch, run_module):
+    monkeypatch.setattr(kopia_repository, "repository_status", Mock(side_effect=[None, {"storage": {}}]))
+    command = Mock(return_value=(0, "", ""))
+    monkeypatch.setattr(kopia_repository, "kopia_command", command)
+    params = {"storage": "s3", "password": "secret", "options": {"bucket": "b", "tag": ["a", "b"]}}
+    assert run_module(kopia_repository, params)["changed"]
+    assert command.call_args_list[0].args[1] == ["repository", "connect", "s3", "--bucket=b", "--tag=a", "--tag=b"]
 
 
 def test_repository_home_path_matches_resolved_path(monkeypatch, run_module):

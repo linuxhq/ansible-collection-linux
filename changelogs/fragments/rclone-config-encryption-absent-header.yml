@@ -5,3 +5,5 @@ bugfixes:
     encryption header such as ``RCLONE_ENCRYPT_V0:``, which rclone would read
     as encrypted rather than as the plain text written, instead of writing it
     and then reporting a change on every later run or failing on the next run.
+    A ``content`` beginning with such a header is refused in check mode too,
+    even without pycryptodome.

@@ -289,12 +289,61 @@ def test_atomic_move_writes_complete_content(tmp_path, module_factory):
     assert list(tmp_path.iterdir()) == [path]
 
 
-def test_write_failure_is_reported(monkeypatch, tmp_path, module_factory, invoke):
-    module = module_factory({"path": str(tmp_path / "config")})
+@pytest.mark.parametrize("unsafe_writes", [False, True])
+def test_write_failure_is_reported(monkeypatch, tmp_path, module_factory, invoke, unsafe_writes):
+    module = module_factory({"path": str(tmp_path / "config"), "unsafe_writes": unsafe_writes})
     monkeypatch.setattr(plugin.tempfile, "mkstemp", Mock(side_effect=OSError("permission denied")))
     result = invoke(plugin.write_config, module, str(tmp_path / "config"), b"data")
     assert result["failed"] and "permission denied" in result["msg"]
     module.atomic_move.assert_not_called()
+
+
+@pytest.fixture
+def unwritable_directory(monkeypatch, tmp_path):
+    """Refuse temporary files in the configuration directory only, like a directory the user cannot write."""
+    directory = tmp_path / "config"
+    directory.mkdir()
+    mkstemp = plugin.tempfile.mkstemp
+
+    def refuse_config_directory(*args, **kwargs):
+        if os.path.realpath(kwargs.get("dir", "")) == os.path.realpath(directory):
+            raise PermissionError(13, "Permission denied", str(directory))
+
+        return mkstemp(*args, **kwargs)
+
+    monkeypatch.setattr(plugin.tempfile, "mkstemp", refuse_config_directory)
+    return directory
+
+
+def test_unsafe_writes_stages_the_file_outside_an_unwritable_directory(tmp_path, module_factory, unwritable_directory):
+    path = unwritable_directory / "rclone.conf"
+    path.write_text("original")
+    staging = tmp_path / "staging"
+    staging.mkdir()
+    module = module_factory({"path": str(path), "unsafe_writes": True})
+    module.tmpdir = str(staging)
+    moves = []
+
+    def move(src, dest, **kwargs):
+        moves.append((os.path.dirname(src), kwargs))
+        with open(src, "rb") as source, open(dest, "wb") as target:
+            target.write(source.read())
+
+    module.atomic_move.side_effect = move
+    plugin.write_config(module, str(path), b"replacement")
+    assert moves == [(str(staging), {"unsafe_writes": True})]
+    assert path.read_bytes() == b"replacement"
+    assert list(staging.iterdir()) == []
+
+
+def test_unwritable_directory_without_unsafe_writes_fails(module_factory, invoke, unwritable_directory):
+    path = unwritable_directory / "rclone.conf"
+    path.write_text("original")
+    module = module_factory({"path": str(path), "unsafe_writes": False})
+    result = invoke(plugin.write_config, module, str(path), b"replacement")
+    assert result["failed"] and "Permission denied" in result["msg"] and str(path) in result["msg"]
+    module.atomic_move.assert_not_called()
+    assert path.read_text() == "original"
 
 
 @pytest.mark.parametrize("payload", ["AAAA", "!!!!", "AAAA AAAA", ""])
@@ -337,11 +386,12 @@ def test_unsupported_encryption_message_names_path(tmp_path, run_module):
 
 
 @pytest.mark.parametrize("header", ["RCLONE_ENCRYPT_V0:", "RCLONE_ENCRYPT_V1:"])
-@pytest.mark.parametrize("with_content", [False, True])
+@pytest.mark.parametrize("with_content, crypto", [(False, True), (True, True), (True, False)])
 @pytest.mark.parametrize("check_mode", [False, True])
 def test_absent_plain_text_with_encryption_header_fails_before_writing(
-    tmp_path, run_module, header, with_content, check_mode
+    monkeypatch, tmp_path, run_module, header, with_content, crypto, check_mode
 ):
+    monkeypatch.setattr(plugin, "HAS_PYCRYPTODOME", crypto)
     path = tmp_path / "rclone.conf"
     plain = f"# comment\n\n{header}\nAAAA\n"
     params = {"path": str(path), "state": "absent", "password": "secret"}

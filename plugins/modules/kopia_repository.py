@@ -23,7 +23,8 @@ description:
     C(endpoint), C(folder_id), C(host), C(path), C(prefix), C(remote_path),
     C(storage_account) or C(url) differs from the connected storage
     configuration. A number in these options is compared as the text passed
-    to kopia, so V(20261115) matches a stored V("20261115"). A leading V(~)
+    to kopia, so V(20261115) matches a stored V("20261115"), and that text is
+    the number as Python formats it, as described in O(options). A leading V(~)
     in the C(path) of V(filesystem) storage is resolved to the home directory
     first, as kopia does, and that C(path) is compared as a normalized path,
     so V(/srv/kopia/) and V(//srv/kopia) match V(/srv/kopia). Disconnect it
@@ -46,10 +47,17 @@ options:
         C(--bucket) and V(storage_account) becomes C(--storage-account).
       - Booleans toggle the flag, V(true) emits C(--flag) and V(false) emits
         C(--no-flag), and a list repeats the flag once per element.
+      - A dictionary value is rejected before kopia runs, and so is a list for
+        one of the options that identify the repository, listed in the
+        description, such as C(bucket) or C(path).
       - Put credential-carrying flags in O(secrets) instead so they stay out of
         logs.
       - Values are passed to kopia as given, so the module does not expand V(~)
         or environment variables in them.
+      - A number is passed as Python formats it, so a value that YAML reads as
+        a number changes, such as an unquoted V(0755), V(12:30) or V(1.10),
+        which reach kopia as C(493), C(750) and C(1.1). Quote such values to
+        pass them as written.
     type: dict
     default: {}
   password:
@@ -65,7 +73,8 @@ options:
     description:
       - Storage provider flags whose values are secrets, such as
         V(secret_access_key) or V(key).
-      - Converted to CLI flags exactly like O(options), but kept out of logs.
+      - Converted to CLI flags exactly like O(options), with the same rejected
+        values and number formatting, but kept out of logs.
     type: dict
     default: {}
   storage:
@@ -185,6 +194,19 @@ STORAGE_KEYS = {
 STORAGE_TYPES = {"azure": "azureBlob"}
 
 
+def check_option_values(module):
+    for param in ("options", "secrets"):
+        for option, value in sorted(module.params[param].items()):
+            # kopia_flags would send a dictionary as Python text and a list as one flag per element
+            if isinstance(value, dict):
+                module.fail_json(msg=f"invalid {param} value for {option}: a dictionary cannot be passed to kopia")
+
+            if option in STORAGE_KEYS and isinstance(value, (list, tuple)):
+                module.fail_json(
+                    msg=f"invalid {param} value for {option}: it identifies the repository, so it takes one value, not a list"
+                )
+
+
 def storage_description(module):
     options = module.params["options"]
     details = [f"{option}={options[option]}" for option in sorted(STORAGE_KEYS) if options.get(option) is not None]
@@ -222,7 +244,7 @@ def storage_mismatch(module, status):
         value = module.params["options"].get(option)
 
         # kopia_flags sends any other value as --name=value, so compare it as text
-        if value is None or isinstance(value, (bool, list, tuple, dict)):
+        if value is None or isinstance(value, bool):
             continue
 
         value = str(value)
@@ -245,6 +267,8 @@ def not_initialized(storage, stderr):
 
 
 def ensure_present(module):
+    check_option_values(module)
+
     if module.check_mode and not kopia_available(module):
         module.exit_json(changed=True, repository={})
 
