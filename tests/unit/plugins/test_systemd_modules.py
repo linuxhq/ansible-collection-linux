@@ -300,14 +300,46 @@ def test_locale_proceeds_on_systemd_239(monkeypatch, run_module, systemd_version
         assert mutate.call_args.args[2:] == ("SetLocale", ["LC_TIME=en_GB.UTF-8"], False)
 
 
-def test_locale_version_not_read_without_locale_change(monkeypatch, run_module, systemd_version):
+def test_locale_version_checked_only_for_locale_change(monkeypatch, run_module, systemd_version):
     systemd_version.return_value = 238
     monkeypatch.setattr(systemd_locale, "systemd_proxy", Mock())
     monkeypatch.setattr(systemd_locale, "locale_status", Mock(return_value=LOCALE))
     mutate = Mock()
     monkeypatch.setattr(systemd_locale, "systemd_call", mutate)
     assert run_module(systemd_locale, {"vconsole_keymap": "de"})["changed"]
+    assert [entry.args[2] for entry in mutate.call_args_list] == ["SetVConsoleKeyboard"]
+
+
+def test_locale_version_not_read_without_change(monkeypatch, run_module, systemd_version):
+    monkeypatch.setattr(systemd_locale, "systemd_proxy", Mock())
+    monkeypatch.setattr(systemd_locale, "locale_status", Mock(return_value=LOCALE))
+    monkeypatch.setattr(systemd_locale, "systemd_call", Mock(side_effect=AssertionError("must not write")))
+    params = {"locale": {"lang": "en_US.UTF-8"}, "vconsole_keymap": "us", "x11_layout": "us"}
+    assert run_module(systemd_locale, params)["changed"] is False
     systemd_version.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "params,read",
+    [
+        # a console change on a host that is not Debian rewrites only /etc/vconsole.conf
+        ({"vconsole_keymap": "de"}, ["vconsole"]),
+        # X11 settings that are not converted leave it alone on systemd 252
+        ({"vconsole_keymap": "us", "x11_layout": "de"}, []),
+    ],
+)
+def test_locale_reads_only_keyboard_files_rewritten(
+    monkeypatch, run_module, keyboard_files, systemd_version, params, read
+):
+    # an unrelated file that cannot be read, such as a root-only /etc/default/keyboard, must not block the change
+    systemd_version.return_value = 252
+    monkeypatch.setattr(systemd_locale, "systemd_proxy", Mock())
+    monkeypatch.setattr(systemd_locale, "locale_status", Mock(return_value=LOCALE))
+    monkeypatch.setattr(systemd_locale, "systemd_call", Mock())
+    opened = []
+    monkeypatch.setattr(systemd_locale, "read_bytes", lambda module, path: opened.append(path))
+    assert run_module(systemd_locale, params)["changed"]
+    assert opened == [str(keyboard_files[name]) for name in read]
 
 
 def test_vconsole_reset_toggle_when_keymap_changes(module_factory):

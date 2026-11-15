@@ -69,8 +69,7 @@ notes:
     systemd 253 and later, always. On Debian 12 the X11 keyboard settings, and
     a console keymap converted into them, rewrite C(/etc/default/keyboard).
   - Reads the running systemd version from the C(Version) property of
-    C(org.freedesktop.systemd1) when it changes O(locale) or checks a keyboard
-    file.
+    C(org.freedesktop.systemd1) when it changes a setting.
 options:
   locale:
     description:
@@ -359,27 +358,20 @@ def ensure_present(module):
     # localed converts even an unchanged keymap, which would replace X11 settings a toggle change leaves alone
     convert_keymap = keymap is not None and keymap["vconsole_keymap"] != (current["vconsole_keymap"] or "")
 
-    # files localed refuses to load are found after earlier settings are written, so check them first
-    keyboard_files = {}
-    if keymap is not None or keyboard is not None:
-        keyboard_files = {path: read_bytes(module, path) for path in (VCONSOLE_CONF, DEBIAN_KEYBOARD)}
-
     version = None
-    if locale is not None or any(content is not None for content in keyboard_files.values()):
+    if locale is not None or keymap is not None or keyboard is not None:
         version = systemd_version(module)
 
     if locale is not None and version < LOCALE_MERGE_VERSION:
         module.fail_json(msg=f"unable to set locale: systemd >= {LOCALE_MERGE_VERSION} is required, found {version}")
 
-    if version is not None:
-        for path, option in keyboard_rewrites(module, version, keymap, convert_keymap, keyboard):
-            content = keyboard_files.get(path)
-            error = None if content is None else load_env_file(content, version)[1]
+    # localed refuses to rewrite such a file only after the earlier settings are written, so check it first
+    for path, option in keyboard_rewrites(module, version, keymap, convert_keymap, keyboard):
+        content = read_bytes(module, path)
+        error = None if content is None else load_env_file(content, version)[1]
 
-            if error:
-                module.fail_json(
-                    msg=f"unable to set {option}: {path} {error}, which systemd-localed refuses to rewrite"
-                )
+        if error:
+            module.fail_json(msg=f"unable to set {option}: {path} {error}, which systemd-localed refuses to rewrite")
 
     if locale is not None:
         simplified = locale_simplify(locale)
