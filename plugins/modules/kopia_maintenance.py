@@ -82,6 +82,9 @@ options:
       - Must not be empty.
       - kopia resolves the special value V(me) to the current user and host at
         set time, so V(me) always reports a change, prefer the explicit form.
+      - An owner that is not valid UTF-8, such as one with a lone surrogate
+        code point, is rejected before kopia runs, also in check mode, because
+        kopia records it with U+FFFD in its place.
     type: str
   quick_interval:
     description:
@@ -118,7 +121,11 @@ EXAMPLES = r"""
 
 RETURN = r"""
 maintenance:
-  description: Maintenance settings reported by C(kopia maintenance info).
+  description:
+    - Maintenance settings reported by C(kopia maintenance info).
+    - In check mode, when a change would be made, the settings reported by
+      kopia with the requested changes applied, as the module predicts them.
+    - Empty when kopia is unavailable in check mode.
   returned: always
   type: dict
   sample:
@@ -146,6 +153,7 @@ from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.common.dict_transformations import camel_dict_to_snake_dict
 
 from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
+    check_utf8,
     kopia_available,
     kopia_command,
     maintenance_info,
@@ -258,6 +266,8 @@ def validate_settings(module):
 
     if module.params["owner"] == "":
         module.fail_json(msg="invalid owner: it must not be empty")
+
+    check_utf8(module, [("owner", module.params["owner"])])
 
 
 def ensure_present(module):

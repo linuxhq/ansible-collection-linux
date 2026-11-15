@@ -58,6 +58,9 @@ options:
   description:
     description:
       - Description recorded on the snapshot.
+      - A description that is not valid UTF-8, such as one with a lone
+        surrogate code point, is rejected before kopia runs, also in check
+        mode, because kopia records it with U+FFFD in its place.
     type: str
   password:
     description:
@@ -71,6 +74,10 @@ options:
       - Local path to snapshot.
       - Ansible expands a leading V(~) and environment variables in it, as for
         any C(path) option, before it is passed to kopia.
+      - A path that is not valid UTF-8, such as one with a lone surrogate code
+        point, which Ansible uses for a byte that is not valid UTF-8, is
+        rejected before kopia runs, also in check mode, because kopia records
+        it with U+FFFD in its place and cannot list its snapshots.
     type: path
     required: true
   tags:
@@ -87,6 +94,9 @@ options:
         value can still be a number, because Ansible keeps the type a template
         renders, so convert it with C(| string), as in
         V("{{ build_number | string }}").
+      - A key or value that is not valid UTF-8, such as one with a lone
+        surrogate code point, is rejected before kopia runs, also in check
+        mode, because kopia records it with U+FFFD in its place.
     type: dict
 requirements:
   - kopia
@@ -151,6 +161,7 @@ from ansible.module_utils.common.dict_transformations import camel_dict_to_snake
 
 from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
     absolute_path,
+    check_utf8,
     kopia_available,
     kopia_command,
     reads_as_user_host,
@@ -217,6 +228,8 @@ def latest_snapshot(module, source, snapshot_id=None):
 
 def ensure_present(module):
     path = module.params["path"]
+
+    check_utf8(module, [(name, module.params[name]) for name in ("path", "description", "tags")])
 
     for key, value in (module.params["tags"] or {}).items():
         if ":" in key:

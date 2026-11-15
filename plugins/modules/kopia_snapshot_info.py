@@ -19,6 +19,10 @@ options:
       - Defaults to kopia's own configuration path when unset.
       - Ansible expands a leading V(~) and environment variables in it, as for
         any C(path) option, before it is passed to kopia.
+      - A path that is not valid UTF-8, such as one with a lone surrogate code
+        point, which Ansible uses for a byte that is not valid UTF-8, fails
+        before kopia runs, also in check mode, because kopia records a path
+        with U+FFFD in its place.
     type: path
   password:
     description:
@@ -101,6 +105,7 @@ from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.common.dict_transformations import camel_dict_to_snake_dict
 
 from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
+    check_utf8,
     kopia_available,
     kopia_command,
     snapshot_source,
@@ -108,6 +113,8 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
 
 
 def list_snapshots(module):
+    check_utf8(module, [("path", module.params["path"])])
+
     if module.check_mode and not kopia_available(module):
         module.exit_json(changed=False, snapshots=[])
 

@@ -1118,3 +1118,77 @@ def test_relative_path_in_directory_with_at_sign_is_qualified(monkeypatch, run_m
         assert command.call_args.args[1] == ["snapshot", "list", "--json", source]
     else:
         command.assert_not_called()
+
+
+def must_not_run_kopia(monkeypatch, plugin):
+    for name in ("kopia_available", "kopia_command", "policy_export", "repository_status", "maintenance_info"):
+        if hasattr(plugin, name):
+            monkeypatch.setattr(plugin, name, Mock(side_effect=AssertionError(f"must not call {name}")))
+
+
+@pytest.mark.parametrize("check_mode", [False, True])
+@pytest.mark.parametrize(
+    "policy,key",
+    [
+        ({"Retention": {"keep_latest": 2}}, "policy.Retention: kopia reads it as Retention,"),
+        ({"retention": {"KEEP_LATEST": 2}}, "policy.retention.KEEP_LATEST: kopia reads it as KEEPLatest,"),
+        ({"retention": {"keepLatesT": 2}}, "policy.retention.keepLatesT:"),
+        ({"scheduling": {"time_of_day": [{"Hour": 1}]}}, "policy.scheduling.time_of_day[0].Hour:"),
+    ],
+)
+def test_policy_rejects_keys_kopia_reports_differently(monkeypatch, run_module, policy, key, check_mode):
+    # kopia matches field names ignoring case, stores the policy, then exports camelCase keys that never match
+    must_not_run_kopia(monkeypatch, kopia_policy)
+    result = run_module(kopia_policy, {"target": "/data", "policy": policy}, check_mode)
+    assert result["failed"] and result["msg"].startswith(f"invalid policy key {key}")
+    assert "keep_latest" in result["msg"] and "keepLatest" in result["msg"]
+
+
+@pytest.mark.parametrize("check_mode", [False, True])
+@pytest.mark.parametrize("key", ["keep_latest", "keepLatest", "keep_LATEST"])
+def test_policy_accepts_snake_and_camel_case_keys(monkeypatch, run_module, key, check_mode):
+    monkeypatch.setattr(kopia_policy, "kopia_available", lambda module: True)
+    monkeypatch.setattr(kopia_policy, "policy_export", lambda *args: {"retention": {"keepLatest": 2}})
+    monkeypatch.setattr(kopia_policy, "kopia_command", Mock(side_effect=AssertionError("must not mutate")))
+    result = run_module(kopia_policy, {"target": "/data", "policy": {"retention": {key: 2}}}, check_mode)
+    assert result == {"changed": False, "policy": {"retention": {"keep_latest": 2}}}
+
+
+SURROGATE = "\udc80"
+
+
+@pytest.mark.parametrize("check_mode", [False, True])
+@pytest.mark.parametrize(
+    "plugin,params,name",
+    [
+        (kopia_policy, {"target": f"/srv/{SURROGATE}", "policy": {}}, "target"),
+        (kopia_policy, {"target": f"/srv/{SURROGATE}", "state": "absent"}, "target"),
+        (kopia_policy, {"target": "/srv", "policy": {"files": {"ignore": ["a", SURROGATE]}}}, "policy.files.ignore[1]"),
+        (kopia_policy, {"target": "/srv", "policy": {"actions": {SURROGATE: {}}}}, "policy.actions.\\udc80"),
+        (kopia_policy_info, {"target": "/srv/\ud800"}, "target"),
+        (kopia_maintenance, {"owner": f"root@{SURROGATE}"}, "owner"),
+        (kopia_repository, repository_params(options={"path": f"/srv/{SURROGATE}"}), "options.path"),
+        (kopia_repository, repository_params(options={"tag": ["a", SURROGATE]}), "options.tag[1]"),
+        (kopia_snapshot, {"path": f"/srv/{SURROGATE}"}, "path"),
+        (kopia_snapshot, {"path": "/srv", "description": SURROGATE}, "description"),
+        (kopia_snapshot, {"path": "/srv", "tags": {"env": SURROGATE}}, "tags.env"),
+        (kopia_snapshot, {"path": "/srv", "tags": {SURROGATE: "prod"}}, "tags.\\udc80"),
+        (kopia_snapshot_info, {"path": "/srv/\ud800"}, "path"),
+    ],
+)
+def test_text_kopia_records_differently_is_rejected(monkeypatch, run_module, plugin, params, name, check_mode):
+    # kopia receives a lone surrogate as a raw byte, or not at all, and records text that is not UTF-8 with U+FFFD;
+    # Ansible logs the invocation by encoding each text option, which only a task with no_log skips
+    must_not_run_kopia(monkeypatch, plugin)
+    result = run_module(plugin, dict(params, _ansible_no_log=True), check_mode)
+    assert result["failed"]
+    assert result["msg"].startswith(f"invalid {name}: it must be valid UTF-8")
+
+
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_repository_secret_kopia_records_differently_omits_value(monkeypatch, run_module, check_mode):
+    must_not_run_kopia(monkeypatch, kopia_repository)
+    params = repository_params(secrets={"secret_access_key": f"hunter2{SURROGATE}xyz"})
+    result = run_module(kopia_repository, params, check_mode)
+    assert result["failed"] and result["msg"].startswith("invalid secrets.secret_access_key: it must be valid UTF-8")
+    assert "hunter2" not in result["msg"] and "xyz" not in result["msg"]

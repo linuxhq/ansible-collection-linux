@@ -26,6 +26,21 @@ def test_command_keeps_password_out_of_argv(module_factory):
 
 
 @pytest.mark.parametrize(
+    "value,expected",
+    [
+        ("text", None),
+        ({"a": ["b", 1, None, True], "c": {"d": "é"}}, None),
+        ("\udc80", "name"),
+        ("a\ud800b", "name"),
+        ({"a": {"b": ["c", "d\udcff"]}}, "name.a.b[1]"),
+        ({"a": {"\udc80": "b"}}, "name.a.\\udc80"),
+    ],
+)
+def test_invalid_utf8_names_the_first_text_that_is_not_utf8(value, expected):
+    assert kopia.invalid_utf8(value, "name") == expected
+
+
+@pytest.mark.parametrize(
     "function,args,output,expected",
     [
         (kopia.repository_status, (), '{"storageType":"filesystem"}', {"storageType": "filesystem"}),

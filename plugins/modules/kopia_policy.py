@@ -28,7 +28,20 @@ options:
         mirroring the JSON structure of C(kopia policy export), for example
         V(retention.keep_latest) or V(compression.compressor_name).
       - Keys are converted to kopia's camelCase, so V(keep_latest) becomes
-        C(keepLatest).
+        C(keepLatest). Write keys in snake_case, such as V(keep_latest), or in
+        kopia's camelCase, such as V(keepLatest).
+      - kopia matches keys to its fields ignoring case, but reports them in
+        camelCase, so a key that converts to other capitalization, such as
+        V(Retention) or V(KEEP_LATEST), would never match. Such a key, one that
+        starts with an upper-case letter, contains two upper-case letters in a
+        row, ends with an upper-case letter or contains a character other than
+        an ASCII letter or digit once converted, is rejected before kopia runs,
+        also in check mode. A key written without its word breaks, such as
+        V(keeplatest), cannot be told apart from a field name and reports a
+        change on every run.
+      - Text that is not valid UTF-8, such as a lone surrogate code point, in a
+        key or value is rejected before kopia runs, also in check mode, because
+        kopia records it with U+FFFD in its place.
       - Fields left out are removed from the defined policy and fall back to
         inherited values.
       - kopia does not store V(false), V(0), an empty string or an empty list
@@ -76,6 +89,9 @@ options:
         reads every target as a path.
       - Passed to kopia as given, so V(~) and environment variables are not
         expanded.
+      - A target that is not valid UTF-8, such as one with a lone surrogate
+        code point, is rejected before kopia runs, also in check mode, because
+        kopia records it with U+FFFD in its place.
     type: str
     required: true
 requirements:
@@ -123,7 +139,11 @@ EXAMPLES = r"""
 
 RETURN = r"""
 policy:
-  description: Defined policy reported by C(kopia policy export).
+  description:
+    - Defined policy reported by C(kopia policy export).
+    - In check mode, when a change would be made, the desired policy from
+      O(policy), without the values kopia does not store.
+    - Empty when kopia is unavailable in check mode.
   returned: when O(state=present)
   type: dict
   sample:
@@ -138,6 +158,7 @@ policy:
 
 import json
 import os
+import re
 
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.common.dict_transformations import (
@@ -146,6 +167,7 @@ from ansible.module_utils.common.dict_transformations import (
 )
 
 from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
+    check_utf8,
     kopia_available,
     kopia_command,
     policy_export,
@@ -154,8 +176,41 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
     same_value,
 )
 
+# kopia's field names are camelCase words, each capital followed by a lower-case letter or digit
+POLICY_KEY = re.compile(r"[a-z][a-z0-9]*(?:[A-Z][a-z0-9]+)*")
+
+
+def camel_key(key):
+    return next(iter(snake_dict_to_camel_dict({key: None})))
+
+
+def check_policy_keys(module, value, name):
+    """Fail naming the first key that converts to a capitalization kopia does not report."""
+    if isinstance(value, dict):
+        for key, item in value.items():
+            child = f"{name}.{key}"
+
+            # kopia matches field names ignoring case, so it accepts such a key, then reports the field in camelCase
+            if not POLICY_KEY.fullmatch(camel_key(key)):
+                module.fail_json(
+                    msg=(
+                        f"invalid policy key {child}: kopia reads it as {camel_key(key)}, which kopia matches ignoring "
+                        "case but reports in camelCase, so the policy would never match; write it in snake_case, "
+                        "such as keep_latest, or in kopia's camelCase, such as keepLatest"
+                    )
+                )
+
+            check_policy_keys(module, item, child)
+
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            check_policy_keys(module, item, f"{name}[{index}]")
+
 
 def ensure_present(module):
+    check_utf8(module, [("target", module.params["target"]), ("policy", module.params["policy"])])
+    check_policy_keys(module, module.params["policy"], "policy")
+
     if module.check_mode and not kopia_available(module):
         module.exit_json(changed=True, policy={})
 
@@ -184,6 +239,8 @@ def ensure_present(module):
 
 
 def ensure_absent(module):
+    check_utf8(module, [("target", module.params["target"])])
+
     if module.check_mode and not kopia_available(module):
         module.exit_json(changed=False)
 
