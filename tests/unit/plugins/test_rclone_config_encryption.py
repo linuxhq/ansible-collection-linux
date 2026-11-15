@@ -5,6 +5,7 @@ from unittest.mock import Mock
 import pytest
 
 from ansible.module_utils import basic
+from ansible.module_utils.common.parameters import remove_values
 
 from ansible_collections.linuxhq.linux.plugins.module_utils import rclone
 from ansible_collections.linuxhq.linux.plugins.modules import rclone_config_encryption as plugin
@@ -521,3 +522,24 @@ def test_diff_of_non_utf8_configuration_is_valid_text(tmp_path, run_module, stat
     for side in ("before", "after"):
         assert result["diff"][side] == "[remote]\nkey = \ufffd\n"
         result["diff"][side].encode("utf-8")
+
+
+@pytest.mark.parametrize(
+    "content,after",
+    [
+        ("[remote]\nkey = sensitive\n", "VALUE_SPECIFIED_IN_NO_LOG_PARAMETER"),
+        ("[remote]\nkey = \udce9\n", "[remote]\nkey = \ufffd\n"),
+    ],
+)
+def test_diff_after_side_masks_content_unless_it_holds_escaped_bytes(monkeypatch, tmp_path, run_module, content, after):
+    # Ansible masks the no_log content where it appears, which U+FFFD in place of a byte no longer matches
+    original = basic.AnsibleModule.exit_json
+    monkeypatch.setattr(
+        basic.AnsibleModule,
+        "exit_json",
+        lambda self, **values: original(self, **remove_values(values, self.no_log_values)),
+    )
+    path = tmp_path / "rclone.conf"
+    params = {"path": str(path), "password": "secret", "content": content, "_ansible_diff": True}
+    result = run_module(plugin, params, True)
+    assert result["changed"] and result["diff"]["after"] == after

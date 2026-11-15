@@ -51,10 +51,14 @@ options:
         or a list for one of the options that identify the repository, listed
         in the description, such as C(bucket) or C(path). Quote a value such as
         V(no) that YAML reads as a Boolean.
-      - Text that is not valid UTF-8, such as a lone surrogate code point, is
-        rejected before kopia runs, also in check mode, because kopia records
-        it with U+FFFD in its place, so the connected repository would never
-        match.
+      - A lone surrogate code point from U+D800 to U+DC7F cannot be passed to
+        kopia, so it is rejected before kopia runs, also in check mode.
+      - U+DC80 to U+DCFF, which Ansible uses for bytes that are not valid
+        UTF-8, are passed to kopia as those bytes, such as for a file path that
+        kopia only reads. In the options that identify the repository, listed
+        in the description, they are rejected before kopia runs, also in check
+        mode, because kopia records them with U+FFFD in their place, so the
+        connected repository would never match.
       - Put credential-carrying flags in O(secrets) instead so they stay out of
         logs.
       - Values are passed to kopia as given, so the module does not expand V(~)
@@ -206,7 +210,18 @@ STORAGE_TYPES = {"azure": "azureBlob"}
 
 
 def check_option_values(module):
-    check_utf8(module, [(param, module.params[param]) for param in ("options", "secrets")])
+    # kopia only reads most options, such as a credentials file path, which run_command passes as the original bytes,
+    # but records the identifying options, which the module compares, with U+FFFD in place of bytes that are not UTF-8
+    check_utf8(module, [(param, module.params[param]) for param in ("options", "secrets")], errors="surrogateescape")
+    check_utf8(
+        module,
+        [
+            (f"{param}.{option}", value)
+            for param in ("options", "secrets")
+            for option, value in sorted(module.params[param].items())
+            if option in STORAGE_KEYS
+        ],
+    )
 
     for param in ("options", "secrets"):
         for option, value in sorted(module.params[param].items()):

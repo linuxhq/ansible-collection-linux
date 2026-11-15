@@ -19,10 +19,6 @@ options:
       - Defaults to kopia's own configuration path when unset.
       - Ansible expands a leading V(~) and environment variables in it, as for
         any C(path) option, before it is passed to kopia.
-      - A path that is not valid UTF-8, such as one with a lone surrogate code
-        point, which Ansible uses for a byte that is not valid UTF-8, fails
-        before kopia runs, also in check mode, because kopia records a path
-        with U+FFFD in its place.
     type: path
   password:
     description:
@@ -52,6 +48,10 @@ options:
         V(alice@corp.example.com), or the host contains V(:).
       - Ansible expands a leading V(~) and environment variables in it, as for
         any C(path) option, before it is passed to kopia.
+      - A path that is not valid UTF-8, such as one with a lone surrogate code
+        point, which Ansible uses for a byte that is not valid UTF-8, is
+        rejected before kopia runs, also in check mode, because kopia records
+        it with U+FFFD in its place and cannot list its snapshots.
     type: path
 requirements:
   - kopia

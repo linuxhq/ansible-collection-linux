@@ -7,3 +7,10 @@ bugfixes:
     is invalid.
   - rclone_deobscure - report a value that reveals invalid UTF-8 as such
     instead of with a codec error.
+  - rclone_obscure - obscure U+DC80 to U+DCFF, which Ansible uses for bytes
+    that are not valid UTF-8, such as in registered command output, as those
+    bytes, as ``rclone obscure`` does, instead of failing with a codec error.
+    Another lone surrogate code point fails with an error saying it is not
+    valid UTF-8.
+  - rclone_config_encryption - document that the after side of the diff shows
+    the full new configuration when ``content`` contains U+DC80 to U+DCFF.
