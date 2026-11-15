@@ -34,11 +34,15 @@ options:
         directory of the path, since they contain it, so the result can hold
         more than one source.
       - All sources are listed when unset.
-      - Listed as the source C(user@host:/path), with the user and host of the
-        connection reported by C(kopia repository status) and the path made
-        absolute and cleaned, as kopia records it. kopia reads a bare path
-        containing V(@) as C(user@host), so a path such as
-        V(/home/alice@example.com) is listed correctly.
+      - Made absolute and cleaned, as kopia does, and listed by that path, to
+        which kopia adds the client user and host. kopia reads a bare path
+        containing V(@) as C(user@host), so when the absolute path contains
+        V(@), such as V(/home/alice@example.com), it is listed as the source
+        C(user@host:/path), with the client user and host reported by
+        C(kopia repository status), as kopia records it.
+      - kopia splits C(user@host:/path) at the first V(@) and the first V(:), so
+        the module fails when the absolute path contains V(@) and the client
+        user or host contains V(@) or V(:), such as V(alice@corp.example.com).
       - Ansible expands a leading V(~) and environment variables in it, as for
         any C(path) option, before it is passed to kopia.
     type: path
@@ -96,7 +100,6 @@ from ansible.module_utils.common.dict_transformations import camel_dict_to_snake
 from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
     kopia_available,
     kopia_command,
-    repository_status,
     snapshot_source,
 )
 
@@ -110,19 +113,7 @@ def list_snapshots(module):
 
     if module.params["path"]:
         source = f" of {module.params['path']}"
-        status = repository_status(module, password=module.params["password"])
-
-        if status is None:
-            module.fail_json(msg=f"unable to list kopia snapshots{source}: repository is not connected")
-
-        listed = snapshot_source(status, module.params["path"])
-
-        if listed is None:
-            module.fail_json(
-                msg=f"unable to list kopia snapshots{source}: kopia did not report the client user and host"
-            )
-
-        command.append(listed)
+        command.append(snapshot_source(module, module.params["path"], "list kopia snapshots"))
 
     rc, stdout, stderr = kopia_command(module, command, password=module.params["password"])
 

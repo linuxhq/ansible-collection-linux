@@ -93,15 +93,56 @@ def clean_path(path):
     return path
 
 
-def snapshot_source(status, path):
-    # kopia reads a path containing "@" as user@host, so a local path is qualified with the client user and host
-    options = (status or {}).get("clientOptions") or {}
+def working_directory():
+    # Go's os.Getwd prefers $PWD when it is absolute and names the working directory
+    pwd = os.environ.get("PWD", "")
 
-    if not options.get("username") or not options.get("hostname"):
-        return None
+    try:
+        if pwd.startswith("/") and os.path.samefile(pwd, "."):
+            return pwd
+    except OSError:
+        pass
 
-    # kopia records a local source as filepath.Abs does: absolute and cleaned
-    return f"{options['username']}@{options['hostname']}:{clean_path(os.path.abspath(path))}"
+    return os.getcwd()
+
+
+def absolute_path(path):
+    # kopia records a local source as filepath.Abs does: joined to the working directory and cleaned
+    return clean_path(path if path.startswith("/") else os.path.join(working_directory(), path))
+
+
+def snapshot_source(module, path, operation):
+    # the path is passed absolute, so a name such as "--all" or "(global)" stays a path, and kopia adds its own client
+    # user and host; kopia reads an absolute path containing "@" as user@host, so only such a path is qualified with
+    # the client user and host
+    absolute = absolute_path(path)
+
+    if "@" not in absolute:
+        return absolute
+
+    status = repository_status(module, password=module.params["password"])
+
+    if status is None:
+        module.fail_json(msg=f"unable to {operation} of {path}: repository is not connected")
+
+    options = status.get("clientOptions") if isinstance(status, dict) else None
+    options = options if isinstance(options, dict) else {}
+    username = options.get("username")
+    hostname = options.get("hostname")
+
+    if not isinstance(username, str) or not username or not isinstance(hostname, str) or not hostname:
+        module.fail_json(msg=f"unable to {operation} of {path}: kopia did not report the client user and host")
+
+    # kopia splits user@host:/path at the first "@" and the first ":"
+    if any(char in username + hostname for char in "@:"):
+        module.fail_json(
+            msg=(
+                f"unable to {operation} of {path}: kopia cannot list {absolute}, a path containing '@', for client "
+                f"user {username!r} on host {hostname!r}, as it splits user@host:/path at the first '@' and ':'"
+            )
+        )
+
+    return f"{username}@{hostname}:{absolute}"
 
 
 def repository_status(module, password=None):

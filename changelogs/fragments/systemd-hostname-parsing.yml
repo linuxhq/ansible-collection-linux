@@ -7,6 +7,11 @@ bugfixes:
     values with an apostrophe or quote inside, such as ``Taylor's Laptop``,
     quoted parts, trailing non-breaking spaces and continuation lines no
     longer report a change on every run.
+  - systemd_hostname - read ``/etc/machine-info`` as storing no settings when
+    it contains a NUL byte, and stop reading it at the first setting that is
+    not valid UTF-8, as systemd does. The module replaced such bytes and kept
+    reading, so a setting systemd ignores was compared as stored and reported
+    no change while systemd-hostnamed reported its fallback.
   - systemd_hostname - reject an ``icon_name`` containing ``\``, a quote, ``*``,
     ``?`` or ``[``, which systemd 262 and later refuse, before writing any
     setting.
