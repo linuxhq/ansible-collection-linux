@@ -43,10 +43,13 @@ notes:
     and C(systemd-localed) ignores a failure to write
     C(/etc/X11/xorg.conf.d/00-keyboard.conf). Debian 13 makes that directory
     read-only for C(systemd-localed) once it exists, so the file keeps the
-    earlier settings while the new ones are reported as applied. On Debian
-    13, C(/etc/vconsole.conf) is at first a link to C(/etc/default/keyboard),
-    which C(systemd-localed) replaces with a file of its own, leaving
-    C(/etc/default/keyboard) unchanged.
+    earlier settings while the new ones are reported as applied. Clearing all
+    of the X11 keyboard settings is not kept either, as C(systemd-localed)
+    reports the settings in that file again once it restarts, as it does after
+    exiting when idle, so such a task reports a change on every later run. On
+    Debian 13, C(/etc/vconsole.conf) is at first a link to
+    C(/etc/default/keyboard), which C(systemd-localed) replaces with a file of
+    its own, leaving C(/etc/default/keyboard) unchanged.
   - A console keymap that changes is converted into the X11 keyboard settings,
     as C(localectl set-keymap) does by default, and the C(x11_*) options that
     are set are then applied over the converted values without converting them
