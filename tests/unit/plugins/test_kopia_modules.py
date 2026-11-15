@@ -316,6 +316,31 @@ def test_snapshot_rejects_tag_key_with_colon(monkeypatch, run_module, check_mode
     assert result["failed"] and "'app:tier'" in result["msg"]
 
 
+@pytest.mark.parametrize("check_mode", [False, True])
+@pytest.mark.parametrize("value", [None, True, False])
+def test_snapshot_rejects_null_and_boolean_tag_values(monkeypatch, run_module, check_mode, value):
+    # str() would record them as "None", "True" or "False"
+    monkeypatch.setattr(kopia_snapshot, "kopia_command", Mock(side_effect=AssertionError("must not run kopia")))
+    monkeypatch.setattr(kopia_snapshot, "kopia_available", Mock(side_effect=AssertionError("must not look up kopia")))
+    result = run_module(kopia_snapshot, {"path": "/data", "tags": {"env": value, "role": "db"}}, check_mode)
+    assert result["failed"] and "'env'" in result["msg"] and "null or Boolean" in result["msg"]
+
+
+def test_snapshot_records_number_tag_values_as_text(monkeypatch, run_module):
+    command = Mock(side_effect=[(0, '{"id":"new"}\n', ""), (0, '[{"id":"new"}]', "")])
+    monkeypatch.setattr(kopia_snapshot, "kopia_command", command)
+    result = run_module(kopia_snapshot, {"path": "/data", "tags": {"build": 42, "ratio": 1.5}})
+    assert result == {"changed": True, "snapshot": {"id": "new"}}
+    assert command.call_args_list[0].args[1] == [
+        "snapshot",
+        "create",
+        "/data",
+        "--json",
+        "--tags=build:42",
+        "--tags=ratio:1.5",
+    ]
+
+
 def test_snapshot_creates_with_tags_and_returns_latest(monkeypatch, run_module):
     created = '{"id":"new","startTime":"new"}\n'
     command = Mock(side_effect=[(0, created, ""), (0, '[{"startTime":"old"},{"startTime":"new"}]', "")])

@@ -1,0 +1,5 @@
+---
+bugfixes:
+  - kopia_snapshot - fail before running kopia when a ``tags`` value is null or
+    Boolean, which was recorded on the snapshot as the text ``None``, ``True``
+    or ``False``. Quote such values to record them as text.

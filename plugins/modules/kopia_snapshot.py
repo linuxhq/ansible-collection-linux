@@ -80,6 +80,9 @@ options:
         given.
       - kopia splits each flag at its first V(:), so a key containing V(:) is
         rejected before kopia runs. Values may contain V(:).
+      - Values are recorded as text. Null and Boolean values are rejected
+        before kopia runs, so quote them to record them as text, such as
+        V("true").
     type: dict
 requirements:
   - kopia
@@ -211,9 +214,12 @@ def latest_snapshot(module, source, snapshot_id=None):
 def ensure_present(module):
     path = module.params["path"]
 
-    for key in module.params["tags"] or {}:
+    for key, value in (module.params["tags"] or {}).items():
         if ":" in key:
             module.fail_json(msg=f"invalid tag key {key!r}: kopia splits tags at the first ':'")
+
+        if value is None or isinstance(value, bool):
+            module.fail_json(msg=f"tag {key!r} has a null or Boolean value; quote it to record it as text")
 
     if module.check_mode:
         if reads_as_user_host(absolute_path(path)) and kopia_available(module):
