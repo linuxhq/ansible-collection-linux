@@ -161,6 +161,7 @@ from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.common.dict_transformations import camel_dict_to_snake_dict
 
 from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
+    clean_path,
     kopia_available,
     kopia_command,
     kopia_flags,
@@ -199,13 +200,7 @@ def storage_value(storage, option, value):
     if value.startswith("~") and home:
         value = home + value[1:]
 
-    value = os.path.normpath(value)
-
-    # normpath keeps a leading "//", which Linux resolves like "/"
-    if value.startswith("//"):
-        value = "/" + value.lstrip("/")
-
-    return value
+    return clean_path(value)
 
 
 def storage_mismatch(module, status):

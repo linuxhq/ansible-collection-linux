@@ -22,3 +22,7 @@ bugfixes:
     module refused, such as a fraction of seconds with more than six digits,
     ``Jul 26 14:30:00``, ``++5min``, and on systemd 257 a time zone name
     suffix (``2026-07-26 14:30 Europe/Berlin``).
+  - systemd_timedate - run ``systemd-analyze timestamp`` with
+    ``SYSTEMD_COLORS=0``. On systemd 257 and later, ``SYSTEMD_COLORS`` set in
+    the task environment coloured its output, so every ``time`` failed with
+    unexpected output.

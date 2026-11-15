@@ -24,9 +24,15 @@ description:
     example fatal errors found while snapshotting or automatic maintenance
     failing afterwards, the module fails. It reports RV(ignore:changed) as
     V(true) and returns the snapshot in RV(snapshot) when kopia lists it, and
-    fails without reporting a change when kopia does not list it. When the
-    snapshots cannot be listed, it reports RV(ignore:changed) as V(true), as
-    the snapshot may have been saved, with an empty RV(snapshot).
+    fails without reporting a change when kopia does not list it, for example
+    because its final repository flush failed. When the snapshots cannot be
+    listed, it reports RV(ignore:changed) as V(true), as the snapshot may have
+    been saved, with an empty RV(snapshot).
+  - Snapshots are listed by the source kopia records, C(user@host:/path), taken
+    from the snapshot kopia printed or, when it printed none, from the user and
+    host reported by C(kopia repository status) and the path made absolute and
+    cleaned. kopia reads a bare path containing V(@) as C(user@host), so a path
+    such as V(/home/alice@example.com) is listed correctly.
 notes:
   - A failure reported by kopia after it saved the snapshot without printing
     it, such as applying the retention policy, cannot be told apart from a
@@ -124,20 +130,41 @@ import json
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.common.dict_transformations import camel_dict_to_snake_dict
 
-from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import kopia_command
+from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
+    kopia_command,
+    repository_status,
+    snapshot_source,
+)
+
+SOURCE_KEYS = ("userName", "host", "path")
 
 
-def created_snapshot_id(stdout):
+def created_manifest(stdout):
     try:
         manifest = json.loads(stdout)
     except ValueError:
+        return {}
+
+    return manifest if isinstance(manifest, dict) else {}
+
+
+def listed_source(module, manifest, path):
+    # list the source kopia recorded, as a path containing "@" is read as user@host by kopia snapshot list
+    source = manifest.get("source")
+
+    if isinstance(source, dict) and all(isinstance(source.get(key), str) and source[key] for key in SOURCE_KEYS):
+        return "{userName}@{host}:{path}".format(**source)
+
+    return snapshot_source(repository_status(module, password=module.params["password"]), path)
+
+
+def list_snapshots(module, source):
+    if source is None:
         return None
 
-    return manifest.get("id") if isinstance(manifest, dict) else None
-
-
-def list_snapshots(module, path):
-    rc, stdout, _dummy = kopia_command(module, ["snapshot", "list", path, "--json"], password=module.params["password"])
+    rc, stdout, _dummy = kopia_command(
+        module, ["snapshot", "list", source, "--json"], password=module.params["password"]
+    )
 
     if rc != 0:
         return None
@@ -156,8 +183,8 @@ def snapshot_result(snapshot):
     return camel_dict_to_snake_dict(snapshot, ignore_list=["tags"]) if snapshot else {}
 
 
-def latest_snapshot(module, path, snapshot_id=None):
-    snapshots = list_snapshots(module, path) or []
+def latest_snapshot(module, source, snapshot_id=None):
+    snapshots = list_snapshots(module, source) or []
 
     # another snapshot of the path, such as a scheduled one, can be newer than the one just created
     snapshot = find_snapshot(snapshots, snapshot_id) or (snapshots[-1] if snapshots else None)
@@ -184,13 +211,14 @@ def ensure_present(module):
         command.append(f"--tags={key}:{value}")
 
     rc, stdout, stderr = kopia_command(module, command, password=module.params["password"])
-    snapshot_id = created_snapshot_id(stdout)
+    manifest = created_manifest(stdout)
+    snapshot_id = manifest.get("id")
 
     if rc != 0 and snapshot_id:
         # kopia prints the manifest once the snapshot is saved, then can fail on
         # fatal errors found while snapshotting or in automatic maintenance, but
         # also in the final repository flush, which leaves the snapshot unsaved
-        snapshots = list_snapshots(module, path)
+        snapshots = list_snapshots(module, listed_source(module, manifest, path))
         if snapshots is None:
             module.fail_json(
                 msg=(
@@ -215,9 +243,9 @@ def ensure_present(module):
     # kopia prints the new manifest only when it saves a snapshot; nothing is
     # printed when ignore_identical_snapshots skips an unchanged source.
     if not stdout.strip():
-        module.exit_json(changed=False, snapshot=latest_snapshot(module, path))
+        module.exit_json(changed=False, snapshot=latest_snapshot(module, listed_source(module, {}, path)))
 
-    module.exit_json(changed=True, snapshot=latest_snapshot(module, path, snapshot_id))
+    module.exit_json(changed=True, snapshot=latest_snapshot(module, listed_source(module, manifest, path), snapshot_id))
 
 
 def main():

@@ -152,6 +152,19 @@ def test_config_payload_rejects_excess_padding(suffix):
         rclone.decrypt_config(RCLONE_CONFIG + suffix, RCLONE_CONFIG_PASSWORD)
 
 
+@pytest.mark.parametrize("padding_end", [4096, 4092])
+def test_config_payload_rejects_padding_before_its_end(padding_end):
+    # rclone decodes each read on its own, so it accepts padding ending at byte 4096, where its buffer is refilled,
+    # and rejects the same payload 4 bytes earlier (checked with rclone 1.75.1); both are treated as damaged
+    raw = base64.b64decode(RCLONE_CONFIG.rsplit("\n", 1)[1])
+    first, rest = base64.b64encode(raw[:61]).decode(), base64.b64encode(raw[61:]).decode()
+    marker = "RCLONE_ENCRYPT_V0:\n"
+    text = "#" + "x" * (padding_end - len(first) - len(marker) - 2) + "\n" + marker + first + rest
+    assert first.endswith("==") and text.index(first) + len(first) == padding_end
+    with pytest.raises(ValueError, match="not valid base64"):
+        rclone.decrypt_config(text, RCLONE_CONFIG_PASSWORD)
+
+
 def test_config_payload_accepts_nonzero_trailing_bits():
     # Go's base64.StdEncoding, unlike its Strict variant, ignores the unused bits before the padding
     content = b"[remote]\ntype = local\n"

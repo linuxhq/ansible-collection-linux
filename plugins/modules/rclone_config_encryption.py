@@ -15,6 +15,9 @@ description:
   - The configuration key is the SHA256 digest of the NFKC normalized password,
     and the body is sealed with XSalsa20-Poly1305, so rclone reads back what this
     module writes and the module reads back what rclone writes.
+  - An encrypted payload with base64 padding before its end is treated as
+    damaged, although rclone may accept it where the padding falls on one of
+    its internal read boundaries.
   - Supply O(content) to manage the configuration body as well as its encryption,
     which keeps the plaintext off disk entirely. Omit it to encrypt or decrypt a
     file that is already in place.

@@ -2,6 +2,7 @@
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 import json
+import os
 
 ACTION_COMMAND_OMITEMPTY = {"args": [], "mode": "", "path": "", "script": "", "timeout": 0}
 
@@ -80,6 +81,27 @@ def kopia_command(module, args, password=None):
         environ["KOPIA_PASSWORD"] = password
 
     return module.run_command(command, environ_update=environ, expand_user_and_vars=False)
+
+
+def clean_path(path):
+    path = os.path.normpath(path)
+
+    # normpath keeps a leading "//", which Linux resolves like "/" and Go's filepath.Clean reduces to "/"
+    if path.startswith("//"):
+        path = "/" + path.lstrip("/")
+
+    return path
+
+
+def snapshot_source(status, path):
+    # kopia reads a path containing "@" as user@host, so a local path is qualified with the client user and host
+    options = (status or {}).get("clientOptions") or {}
+
+    if not options.get("username") or not options.get("hostname"):
+        return None
+
+    # kopia records a local source as filepath.Abs does: absolute and cleaned
+    return f"{options['username']}@{options['hostname']}:{clean_path(os.path.abspath(path))}"
 
 
 def repository_status(module, password=None):

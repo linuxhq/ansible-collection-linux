@@ -150,8 +150,9 @@ SETTINGS = ["local_rtc", "ntp", "time", "timezone"]
 
 
 def parse_time(module, analyze, value, zone):
-    # parse as timedatectl set-time does, in the time zone the host ends up with
-    environ = {"LC_ALL": "C"}
+    # parse as timedatectl set-time does, in the time zone the host ends up with;
+    # SYSTEMD_COLORS from the task environment would colour the output even on a pipe
+    environ = {"LC_ALL": "C", "SYSTEMD_COLORS": "0"}
     if zone:
         environ["TZ"] = f":{zone}"
 

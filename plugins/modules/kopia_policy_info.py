@@ -24,6 +24,9 @@ options:
     description:
       - Policy target, a directory path, C(user@host), C(user@host:/path), or
         V((global)) for the global policy.
+      - kopia reads a target containing V(@) as C(user@host) or
+        C(user@host:/path), so a directory whose path contains V(@), such as
+        V(/home/alice@example.com), must be written as C(user@host:/path).
       - When set, RV(policy) and RV(effective_policy) are returned for the
         single target instead of RV(policies).
       - Passed to kopia as given, so V(~) and environment variables are not

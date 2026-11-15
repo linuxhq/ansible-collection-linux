@@ -34,6 +34,11 @@ options:
         directory of the path, since they contain it, so the result can hold
         more than one source.
       - All sources are listed when unset.
+      - Listed as the source C(user@host:/path), with the user and host of the
+        connection reported by C(kopia repository status) and the path made
+        absolute and cleaned, as kopia records it. kopia reads a bare path
+        containing V(@) as C(user@host), so a path such as
+        V(/home/alice@example.com) is listed correctly.
       - Ansible expands a leading V(~) and environment variables in it, as for
         any C(path) option, before it is passed to kopia.
     type: path
@@ -91,6 +96,8 @@ from ansible.module_utils.common.dict_transformations import camel_dict_to_snake
 from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
     kopia_available,
     kopia_command,
+    repository_status,
+    snapshot_source,
 )
 
 
@@ -102,8 +109,20 @@ def list_snapshots(module):
     source = ""
 
     if module.params["path"]:
-        command.append(module.params["path"])
         source = f" of {module.params['path']}"
+        status = repository_status(module, password=module.params["password"])
+
+        if status is None:
+            module.fail_json(msg=f"unable to list kopia snapshots{source}: repository is not connected")
+
+        listed = snapshot_source(status, module.params["path"])
+
+        if listed is None:
+            module.fail_json(
+                msg=f"unable to list kopia snapshots{source}: kopia did not report the client user and host"
+            )
+
+        command.append(listed)
 
     rc, stdout, stderr = kopia_command(module, command, password=module.params["password"])
 
