@@ -640,6 +640,25 @@ def test_maintenance_rejects_negative_values(monkeypatch, run_module, param, che
     assert result["failed"] and param in result["msg"]
 
 
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_maintenance_rejects_log_size_beyond_kopia_limit(monkeypatch, run_module, check_mode):
+    monkeypatch.setattr(kopia_maintenance, "kopia_available", lambda module: True)
+    monkeypatch.setattr(kopia_maintenance, "maintenance_info", Mock(side_effect=AssertionError("must not query")))
+    command = Mock(side_effect=AssertionError("must not run kopia"))
+    monkeypatch.setattr(kopia_maintenance, "kopia_command", command)
+    result = run_module(kopia_maintenance, {"max_retained_log_size_mb": 8796093022208}, check_mode)
+    assert result["failed"]
+    assert result["msg"] == "invalid max_retained_log_size_mb 8796093022208: it must not exceed 8796093022207"
+
+
+def test_maintenance_accepts_log_size_at_kopia_limit(monkeypatch, run_module):
+    monkeypatch.setattr(kopia_maintenance, "kopia_available", lambda module: True)
+    monkeypatch.setattr(kopia_maintenance, "maintenance_info", lambda module: {})
+    result = run_module(kopia_maintenance, {"max_retained_log_size_mb": 8796093022207}, True)
+    assert result["changed"]
+    assert result["maintenance"]["log_retention"]["max_total_size"] == 8796093022207 << 20
+
+
 def repository_params(**params):
     return {"storage": "filesystem", "password": "secret", "options": {"path": "/backup"}, **params}
 

@@ -1,0 +1,8 @@
+---
+bugfixes:
+  - kopia_maintenance - fail before running kopia, also in check mode, when
+    ``max_retained_log_size_mb`` exceeds 8796093022207, the largest size in
+    megabytes kopia stores in bytes without overflowing. A larger value was
+    stored wrapped around, such as 1 megabyte for 17592186044417, so log
+    cleanup deleted almost every log and the task reported a change on every
+    run.

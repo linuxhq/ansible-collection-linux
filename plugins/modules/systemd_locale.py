@@ -220,6 +220,9 @@ locale:
     - The C(locale) field holds the locale variables, and variables that are not
       configured are returned as V(none), so it can be fed straight back into
       O(locale).
+    - In check mode, the settings that would change are predicted from the
+      options.
+    - Empty when dasbus is unavailable in check mode.
   returned: always
   type: dict
   sample:
