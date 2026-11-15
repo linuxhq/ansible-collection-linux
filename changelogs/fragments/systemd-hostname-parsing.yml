@@ -12,6 +12,16 @@ bugfixes:
     not valid UTF-8, as systemd does. The module replaced such bytes and kept
     reading, so a setting systemd ignores was compared as stored and reported
     no change while systemd-hostnamed reported its fallback.
+  - systemd_hostname - fail before writing any setting, also in check mode,
+    when ``chassis``, ``deployment``, ``icon_name``, ``location`` or
+    ``pretty_hostname`` would change and ``/etc/machine-info`` contains a NUL
+    byte or a setting that is not valid UTF-8, which systemd-hostnamed refuses
+    to rewrite. The module wrote ``static_hostname`` first, then failed with
+    ``Invalid argument`` or ``Bad message``, and check mode predicted success.
+  - systemd_hostname - reject an ``icon_name``, ``location`` or
+    ``pretty_hostname`` containing a Unicode noncharacter, such as U+FDD0,
+    which the system bus refuses, before writing any setting. The module wrote
+    ``static_hostname`` first, then failed with ``Bad message``.
   - systemd_hostname - reject an ``icon_name`` containing ``\``, a quote, ``*``,
     ``?`` or ``[``, which systemd 262 and later refuse, before writing any
     setting.

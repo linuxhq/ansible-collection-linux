@@ -42,7 +42,8 @@ options:
         C(kopia repository status), as kopia records it.
       - kopia splits C(user@host:/path) at the first V(@) and the first V(:), so
         the module fails when the absolute path contains V(@) and the client
-        user or host contains V(@) or V(:), such as V(alice@corp.example.com).
+        user contains V(@) or V(:), such as V(alice@corp.example.com), or the
+        host contains V(:).
       - Ansible expands a leading V(~) and environment variables in it, as for
         any C(path) option, before it is passed to kopia.
     type: path

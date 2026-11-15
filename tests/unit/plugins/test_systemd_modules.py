@@ -533,13 +533,28 @@ def test_hostname_machine_info_values_are_compared(monkeypatch, tmp_path, run_mo
     ],
 )
 def test_parse_env_file(text, expected):
-    assert systemd_hostname.parse_env_file(text, 262).get("KEY", "") == expected
+    assert systemd_hostname.parse_env_file(text, 262)[0].get("KEY", "") == expected
+
+
+@pytest.mark.parametrize(
+    "text,loadable",
+    [
+        ("KEY=value\n# caf\udce9\nJUNK\udce9\n", True),
+        ("KEY=caf\udce9\nOTHER=x\n", False),
+        ("K\udce9Y=1\n", False),
+        ("KEY=\ufdd0\n", False),
+        ("KEY=value\nOTHER=\udcff", False),
+        ("KEY='\udcff", False),
+    ],
+)
+def test_parse_env_file_reports_whether_systemd_loads_it(text, loadable):
+    assert systemd_hostname.parse_env_file(text, 262)[1] is loadable
 
 
 @pytest.mark.parametrize("version,expected", [(252, ""), (253, ""), (254, "Foo"), (257, "Foo"), (262, "Foo")])
 def test_parse_env_file_escaped_comment_follows_version(version, expected):
     text = "# note \\\nPRETTY_HOSTNAME=Foo\n"
-    assert systemd_hostname.parse_env_file(text, version).get("PRETTY_HOSTNAME", "") == expected
+    assert systemd_hostname.parse_env_file(text, version)[0].get("PRETTY_HOSTNAME", "") == expected
 
 
 @pytest.mark.parametrize("version,changed", [(252, True), (257, False)])
@@ -647,6 +662,10 @@ def test_hostname_machine_info_parsed_as_systemd(monkeypatch, tmp_path, run_modu
         {"chassis": "vm", "icon_name": "glob[0]"},
         {"chassis": "vm", "location": "rack\n4"},
         {"chassis": "vm", "pretty_hostname": "bad\tname"},
+        {"chassis": "vm", "icon_name": "computer\ufdd0"},
+        {"chassis": "vm", "location": "rack\ufffe"},
+        {"chassis": "vm", "pretty_hostname": "Laptop\ufdd0"},
+        {"chassis": "vm", "pretty_hostname": "Laptop\U0001ffff"},
         {"chassis": "vm", "static_hostname": "-bad"},
         {"chassis": "vm", "static_hostname": "bad-"},
         {"chassis": "vm", "static_hostname": "a..b"},
@@ -908,33 +927,68 @@ def test_hostname_check_mode_predicts_default_after_clearing_static(monkeypatch,
 
 
 @pytest.mark.parametrize(
-    "machine_info,written",
+    "machine_info,error",
     [
-        # systemd stops at the first entry that is not valid UTF-8, keeping the entries before it
-        (b"PRETTY_HOSTNAME=Old\nLOCATION=caf\xe9\nCHASSIS=vm\n", {"SetChassis"}),
-        (b"PRETTY_HOSTNAME=Old\nK\xe9Y=1\nCHASSIS=vm\n", {"SetChassis"}),
-        (b"PRETTY_HOSTNAME=Old\nLOCATION='\xed\xa0\x80'\nCHASSIS=vm\n", {"SetChassis"}),
-        (b"PRETTY_HOSTNAME=Old\nLOCATION=\xc0\xaf\nCHASSIS=vm\n", {"SetChassis"}),
-        ("PRETTY_HOSTNAME=Old\nLOCATION=﷐\nCHASSIS=vm\n".encode(), {"SetChassis"}),
-        ("PRETTY_HOSTNAME=Old\nLOCATION=\U0001fffe\nCHASSIS=vm\n".encode(), {"SetChassis"}),
-        (b"PRETTY_HOSTNAME=Old\nCHASSIS=vm\nLOCATION=\xff", set()),
-        # comments and lines without an assignment are not checked
-        (b"PRETTY_HOSTNAME=Old\n# caf\xe9\nJUNK\xe9\nCHASSIS=vm\n", set()),
-        # valid multi-byte values are kept, also when a continuation line splits them
-        ("PRETTY_HOSTNAME=Old\nLOCATION=café \U0001f600\nCHASSIS=vm\n".encode(), set()),
-        (b"PRETTY_HOSTNAME=Old\nLOCATION=\xc3\\\n\xa9\nCHASSIS=vm\n", set()),
-        (b'PRETTY_HOSTNAME=Old\nLOCATION="\xc3\\\n\xa9"\nCHASSIS=vm\n', set()),
+        # systemd stops reading at the first entry that is not valid UTF-8, keeping the entries before it, but
+        # refuses to rewrite the file
+        (b"PRETTY_HOSTNAME=Old\nLOCATION=caf\xe9\nCHASSIS=vm\n", "not valid UTF-8"),
+        (b"PRETTY_HOSTNAME=Old\nK\xe9Y=1\nCHASSIS=vm\n", "not valid UTF-8"),
+        (b"PRETTY_HOSTNAME=Old\nLOCATION='\xed\xa0\x80'\nCHASSIS=vm\n", "not valid UTF-8"),
+        (b"PRETTY_HOSTNAME=Old\nLOCATION=\xc0\xaf\nCHASSIS=vm\n", "not valid UTF-8"),
+        ("PRETTY_HOSTNAME=Old\nLOCATION=\ufdd0\nCHASSIS=vm\n".encode(), "not valid UTF-8"),
+        ("PRETTY_HOSTNAME=Old\nLOCATION=\U0001fffe\nCHASSIS=vm\n".encode(), "not valid UTF-8"),
+        (b"PRETTY_HOSTNAME=Old\nLOCATION=\xff", "not valid UTF-8"),
         # systemd refuses to read a file containing a NUL byte
-        (b"PRETTY_HOSTNAME=Old\nLOCATION=x\x00\nCHASSIS=vm\n", {"SetChassis", "SetPrettyHostname"}),
-        (b"PRETTY_HOSTNAME=Old\nCHASSIS=vm\n\x00", {"SetChassis", "SetPrettyHostname"}),
+        (b"PRETTY_HOSTNAME=Old\nLOCATION=x\x00\nCHASSIS=vm\n", "NUL byte"),
+        (b"PRETTY_HOSTNAME=Old\nCHASSIS=vm\n\x00", "NUL byte"),
     ],
 )
-def test_hostname_machine_info_read_as_systemd_bytes(monkeypatch, tmp_path, run_module, machine_info, written):
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_hostname_unloadable_machine_info_fails_before_any_write(
+    monkeypatch, tmp_path, run_module, machine_info, error, check_mode
+):
+    (tmp_path / "machine-info").write_bytes(machine_info)
+    mutate = hostname_module(monkeypatch, tmp_path, HOSTNAME, etc_hostname="old\n")
+    result = run_module(systemd_hostname, {"static_hostname": "new", "chassis": "vm"}, check_mode)
+    assert result["failed"] and "chassis" in result["msg"] and "machine-info" in result["msg"]
+    assert error in result["msg"]
+    mutate.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "machine_info,params",
+    [
+        # no machine-info setting differs, so the file is not rewritten
+        (b"PRETTY_HOSTNAME=Old\nCHASSIS=vm\nLOCATION=\xff", {"chassis": "vm", "pretty_hostname": "Old"}),
+        (b"PRETTY_HOSTNAME=Old\nLOCATION=caf\xe9\nCHASSIS=vm\n", {"pretty_hostname": "Old", "chassis": ""}),
+        (b"CHASSIS=vm\n\x00", {"chassis": ""}),
+    ],
+)
+def test_hostname_unloadable_machine_info_without_machine_info_change(
+    monkeypatch, tmp_path, run_module, machine_info, params
+):
+    (tmp_path / "machine-info").write_bytes(machine_info)
+    mutate = hostname_module(monkeypatch, tmp_path, HOSTNAME, etc_hostname="old\n")
+    assert run_module(systemd_hostname, {**params, "static_hostname": "new"})["changed"]
+    assert [entry.args[2] for entry in mutate.call_args_list] == ["SetStaticHostname"]
+
+
+@pytest.mark.parametrize(
+    "machine_info",
+    [
+        # comments and lines without an assignment are not checked
+        b"PRETTY_HOSTNAME=Old\n# caf\xe9\nJUNK\xe9\nCHASSIS=vm\n",
+        # valid multi-byte values are kept, also when a continuation line splits them
+        "PRETTY_HOSTNAME=Old\nLOCATION=caf\u00e9 \U0001f600\nCHASSIS=vm\n".encode(),
+        b"PRETTY_HOSTNAME=Old\nLOCATION=\xc3\\\n\xa9\nCHASSIS=vm\n",
+        b'PRETTY_HOSTNAME=Old\nLOCATION="\xc3\\\n\xa9"\nCHASSIS=vm\n',
+    ],
+)
+def test_hostname_machine_info_read_as_systemd_bytes(monkeypatch, tmp_path, run_module, machine_info):
     (tmp_path / "machine-info").write_bytes(machine_info)
     mutate = hostname_module(monkeypatch, tmp_path, HOSTNAME)
-    result = run_module(systemd_hostname, {"chassis": "vm", "pretty_hostname": "Old"})
-    assert result["changed"] is bool(written)
-    assert {entry.args[2] for entry in mutate.call_args_list} == written
+    assert run_module(systemd_hostname, {"chassis": "vm", "pretty_hostname": "Old", "location": "x"})["changed"]
+    assert [entry.args[2] for entry in mutate.call_args_list] == ["SetLocation"]
 
 
 @pytest.mark.parametrize(
