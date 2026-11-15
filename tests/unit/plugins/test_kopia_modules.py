@@ -1175,6 +1175,23 @@ SURROGATE = "\udc80"
             repository_params(secrets={"bucket": SURROGATE}, storage="s3", options={}),
             "secrets.bucket",
         ),
+        (kopia_repository, repository_params(options={"path": "/\udbff"}), "options.path"),
+        (kopia_repository, repository_params(options={"path": "/srv", "tag": ["a", "\ud800"]}), "options.tag[1]"),
+        (
+            kopia_repository,
+            repository_params(storage="sftp", options={"keyfile": "/root/.ssh/id_\udce9"}),
+            "options.keyfile",
+        ),
+        (
+            kopia_repository,
+            repository_params(storage="sftp", secrets={"password": "hunter2\udce9xyz"}),
+            "secrets.password",
+        ),
+        (
+            kopia_repository,
+            {"storage": "from-config", "password": "secret", "options": {"token": "\udce9"}},
+            "options.token",
+        ),
         (kopia_snapshot, {"path": f"/srv/{SURROGATE}"}, "path"),
         (kopia_snapshot, {"path": "/srv", "description": SURROGATE}, "description"),
         (kopia_snapshot, {"path": "/srv", "tags": {"env": SURROGATE}}, "tags.env"),
@@ -1189,16 +1206,18 @@ def test_text_kopia_records_differently_is_rejected(monkeypatch, run_module, plu
     result = run_module(plugin, dict(params, _ansible_no_log=True), check_mode)
     assert result["failed"]
     assert result["msg"].startswith(f"invalid {name}: it must be valid UTF-8")
+    assert "hunter2" not in result["msg"] and "xyz" not in result["msg"]
 
 
 @pytest.mark.parametrize("check_mode", [False, True])
 @pytest.mark.parametrize(
     "params,name",
     [
-        (repository_params(options={"path": "/srv", "tag": ["a", "\ud800"]}), "options.tag[1]"),
-        (repository_params(options={"path": "/srv/\udbff"}), "options.path"),
         ({"storage": "from-config", "password": "secret", "options": {"file": "/c\udc7f"}}, "options.file"),
-        (repository_params(secrets={"secret_access_key": "hunter2\ud800xyz"}), "secrets.secret_access_key"),
+        (
+            {"storage": "from-config", "password": "secret", "secrets": {"token_file": "/t\ud800xyz"}},
+            "secrets.token_file",
+        ),
     ],
 )
 def test_repository_surrogate_kopia_cannot_receive_is_rejected(monkeypatch, run_module, params, name, check_mode):
@@ -1210,15 +1229,17 @@ def test_repository_surrogate_kopia_cannot_receive_is_rejected(monkeypatch, run_
     assert "hunter2" not in result["msg"] and "xyz" not in result["msg"]
 
 
+@pytest.mark.parametrize("option", ["file", "token_file"])
 @pytest.mark.parametrize("param", ["options", "secrets"])
-def test_repository_non_identifying_option_passes_raw_bytes(monkeypatch, run_module, param):
-    # kopia only reads the from-config file path, so the byte Ansible stands for with U+DCE9 reaches it unchanged
+def test_repository_unsaved_option_passes_raw_bytes(monkeypatch, run_module, param, option):
+    # kopia only reads the from-config file paths, so the byte Ansible stands for with U+DCE9 reaches it unchanged
     monkeypatch.setattr(kopia_repository, "repository_status", Mock(side_effect=[None, {"storageType": "x"}]))
     command = Mock(return_value=(0, "", ""))
     monkeypatch.setattr(kopia_repository, "kopia_command", command)
-    params = {"storage": "from-config", "password": "secret", param: {"file": "/etc/kopia/r\udce9.config"}}
+    params = {"storage": "from-config", "password": "secret", param: {option: "/etc/kopia/r\udce9.config"}}
     result = run_module(kopia_repository, dict(params, _ansible_no_log=True))
     assert result["changed"] and not result.get("failed")
     flag = command.call_args.args[1][-1]
-    assert flag == "--file=/etc/kopia/r\udce9.config"
-    assert to_bytes(flag, errors="surrogate_or_strict") == b"--file=/etc/kopia/r\xe9.config"
+    flag_name = option.replace("_", "-")
+    assert flag == f"--{flag_name}=/etc/kopia/r\udce9.config"
+    assert to_bytes(flag, errors="surrogate_or_strict") == f"--{flag_name}=/etc/kopia/r".encode() + b"\xe9.config"
