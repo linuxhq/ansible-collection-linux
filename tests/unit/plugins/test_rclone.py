@@ -145,6 +145,24 @@ def test_config_payload_rejects_other_whitespace(separator):
         rclone.decrypt_config(f"{header}\n{payload[:40]}{separator}{payload[40:]}", RCLONE_CONFIG_PASSWORD)
 
 
+@pytest.mark.parametrize("suffix", ["=", "==", "=\n="])
+def test_config_payload_rejects_excess_padding(suffix):
+    # Go's base64.StdEncoding refuses data after a complete quantum, which Python 3.11 and older accept
+    with pytest.raises(ValueError, match="not valid base64"):
+        rclone.decrypt_config(RCLONE_CONFIG + suffix, RCLONE_CONFIG_PASSWORD)
+
+
+def test_config_payload_accepts_nonzero_trailing_bits():
+    # Go's base64.StdEncoding, unlike its Strict variant, ignores the unused bits before the padding
+    content = b"[remote]\ntype = local\n"
+    encrypted = rclone.encrypt_config(content, "secret", nonce=bytes(range(24)))
+    assert encrypted.endswith("=") and not encrypted.endswith("==")
+    last = encrypted[-2]
+    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+    changed = alphabet[alphabet.index(last) ^ 1]
+    assert rclone.decrypt_config(encrypted[:-2] + changed + "=", "secret") == content
+
+
 def test_config_lines_split_on_newline_only():
     assert not rclone.is_encrypted("# comment\x0bRCLONE_ENCRYPT_V0:\nAAAA")
 

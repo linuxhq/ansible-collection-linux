@@ -1,0 +1,24 @@
+---
+breaking_changes:
+  - systemd_timedate - ``time`` is now parsed by ``systemd-analyze timestamp``
+    on the managed node, so exactly what ``timedatectl set-time`` accepts on
+    that host is accepted. ``systemd-analyze`` is now required when ``time``
+    is set, and the module fails before writing any setting when it is not
+    installed. Spellings the module accepted but systemd refuses now fail
+    before any setting is written, such as ``now UTC``, ``UTC`` without a
+    space before it (``14:30UTC``), a comma after the weekday
+    (``Sun, 2026-07-26 14:30``), ``TODAY`` or another case of ``today``,
+    ``yesterday`` and ``tomorrow``, surrounding whitespace, ``12.34.56``, and
+    on systemd 257 a lowercase ``utc`` suffix.
+bugfixes:
+  - systemd_timedate - reject digits other than ASCII ``0`` to ``9`` and
+    whitespace other than ASCII in a ``time`` timestamp, such as
+    ``2026-07-2٦ 14:30``, which systemd refuses but the module turned into a
+    change of the clock.
+  - systemd_timedate - set a ``time`` with a fractional span to the exact
+    microsecond, such as ``+1.000001s``, which the module rounded down by one
+    microsecond.
+  - systemd_timedate - accept the ``time`` forms systemd accepts that the
+    module refused, such as a fraction of seconds with more than six digits,
+    ``Jul 26 14:30:00``, ``++5min``, and on systemd 257 a time zone name
+    suffix (``2026-07-26 14:30 Europe/Berlin``).

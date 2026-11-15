@@ -425,6 +425,29 @@ def test_snapshot_saved_with_errors_reports_change(monkeypatch, run_module):
     assert command.call_args_list[1].args[1] == ["snapshot", "list", "/data", "--json"]
 
 
+@pytest.mark.parametrize("listing", ['[{"id":"other","startTime":"later"}]', "[]", "null"])
+def test_snapshot_printed_but_not_saved_is_unchanged(monkeypatch, run_module, listing):
+    # kopia prints the manifest before its final flush, so a flush error leaves the printed snapshot unsaved
+    created = '{"id":"new"}\n'
+    command = Mock(side_effect=[(1, created, "flush error: disk full\n"), (0, listing, "")])
+    monkeypatch.setattr(kopia_snapshot, "kopia_command", command)
+    result = run_module(kopia_snapshot, {"path": "/data"})
+    assert result["failed"] and not result.get("changed")
+    assert result["snapshot"] == {}
+    assert result["msg"] == "unable to create kopia snapshot of /data: flush error: disk full"
+
+
+@pytest.mark.parametrize("listing", [(1, "", "denied"), (0, "not json", "")])
+def test_snapshot_printed_with_errors_and_listing_failed_may_be_changed(monkeypatch, run_module, listing):
+    created = '{"id":"new"}\n'
+    command = Mock(side_effect=[(1, created, "flush error: disk full\n"), listing])
+    monkeypatch.setattr(kopia_snapshot, "kopia_command", command)
+    result = run_module(kopia_snapshot, {"path": "/data"})
+    assert result["failed"] and result["changed"]
+    assert result["snapshot"] == {}
+    assert "may have been created" in result["msg"] and "new" in result["msg"] and "disk full" in result["msg"]
+
+
 @pytest.mark.parametrize("response", [(1, "", "denied"), (0, "not json", ""), (0, "[]", "")])
 def test_latest_snapshot_unavailable(monkeypatch, module_factory, response):
     monkeypatch.setattr(kopia_snapshot, "kopia_command", Mock(return_value=response))

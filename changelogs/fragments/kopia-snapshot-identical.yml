@@ -9,6 +9,11 @@ bugfixes:
     listed for the path, which could be one created by a scheduled snapshot or
     another run in between.
   - kopia_snapshot - report a change and return the saved snapshot when kopia
-    saves the snapshot but then fails because it found fatal errors while
-    snapshotting, such as a file it cannot read. The module failed without a
-    change or snapshot, so a retry took another snapshot.
+    printed the snapshot it saved, then exited with an error, for example fatal
+    errors found while snapshotting, such as a file it cannot read, or
+    automatic maintenance failing afterwards. The module failed without a
+    change or snapshot, so a retry took another snapshot. When kopia does not
+    list the printed snapshot, because its final repository flush failed, the
+    module still fails without a change, and when the snapshots cannot be
+    listed, it reports a change, as the snapshot may have been saved, with an
+    empty ``snapshot``.

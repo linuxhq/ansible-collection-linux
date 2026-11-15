@@ -48,18 +48,18 @@ options:
   time:
     description:
       - System time to set, as C(timedatectl set-time) accepts.
-      - Understood forms match C(systemd.time(7)), that is V(now), V(today),
-        V(yesterday), V(tomorrow), V(@) followed by a span since the epoch
-        such as V(@1784083200) or V(@20434d), relative spans such as
-        V(+3h30min), V(-1w), V(+.5s), V(5min ago) or V(5min left), and
-        timestamps such as V(2026-07-26 14:30:00.5), V(Sun 2026-07-26 14:30),
-        V(26-07-26), V(2026-07-26), V(14:30:00) or V(14:30), each optionally
-        suffixed with V(UTC).
-      - V(now) sets the clock to the current time read by the module right
-        before it sets the clock, after the other settings in the same task are
-        applied, as C(timedatectl set-time now) does.
-      - A weekday prefix must name the weekday of the date, otherwise the
-        module fails, as C(timedatectl) does.
+      - The value is parsed by C(systemd-analyze timestamp) on the managed node,
+        so exactly the forms that C(timedatectl set-time) accepts on that host
+        are accepted, as described in
+        L(systemd.time(7),https://www.freedesktop.org/software/systemd/man/latest/systemd.time.html).
+      - Examples are V(now), V(today), V(@1784083200), V(+3h30min), V(-1w),
+        V(5min ago), V(2026-07-26 14:30), V(Sun 2026-07-26 14:30) and
+        V(2026-07-26 14:30 UTC). Newer systemd releases also accept a time
+        zone name suffix, such as V(2026-07-26 14:30 Europe/Berlin), which
+        systemd 252 refuses.
+      - V(now) and relative times are resolved right before the module sets
+        the clock, after the other settings in the same task are applied, as
+        C(timedatectl set-time now) does.
       - Timestamps without a zone are read in the time zone the host ends up
         with, so one set by O(timezone) in the same task applies to them.
       - Setting the clock can never be idempotent, so this always reports a
@@ -68,14 +68,12 @@ options:
         enabled, so pair it with O(ntp=false) on a host that has it on. The
         module fails before writing any setting when network time
         synchronization would still be enabled.
-      - A time at or before the epoch, or outside the range of a signed 64-bit
-        count of microseconds, is rejected before any setting is written. This
-        applies to absolute times and to relative times, which are resolved
-        against the current time.
-      - systemd 258 and later also refuse a time, absolute or relative, before
-        the date systemd was built. Only C(systemd-timedated) knows that date,
-        so the refusal is reported after the other settings in the same task
-        are applied.
+      - A value C(systemd-analyze) cannot parse, or a time at or before the
+        epoch or beyond the range of a signed 64-bit count of microseconds, is
+        rejected before any setting is written.
+      - systemd 258 and later also refuse a time before the date systemd was
+        built. Only C(systemd-timedated) knows that date, so the refusal is
+        reported after the other settings in the same task are applied.
     type: str
   timezone:
     description:
@@ -84,6 +82,7 @@ options:
     type: str
 requirements:
   - dasbus
+  - systemd-analyze, when O(time) is set
 attributes:
   check_mode:
     description: Predicts changes without modifying the target.
@@ -126,11 +125,8 @@ timedate:
     timezone: America/Los_Angeles
 """
 
-import os
 import re
-from datetime import datetime, timedelta, timezone
-from math import isfinite
-from time import monotonic, sleep, tzset
+from time import monotonic, sleep
 
 from ansible.module_utils.basic import AnsibleModule
 
@@ -144,201 +140,41 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.systemd import (
 
 INT64_MAX = 2**63 - 1
 
-INT64_MIN = -(2**63)
-
 MICROSECONDS = 1000000
 
 NTP_TIMEOUT = 30
 
-TIMESTAMPS = [
-    "%Y-%m-%d %H:%M:%S.%f",
-    "%Y-%m-%d %H:%M:%S",
-    "%Y-%m-%d %H:%M",
-    "%Y-%m-%d",
-    "%y-%m-%d %H:%M:%S.%f",
-    "%y-%m-%d %H:%M:%S",
-    "%y-%m-%d %H:%M",
-    "%y-%m-%d",
-    "%H:%M:%S.%f",
-    "%H:%M:%S",
-    "%H:%M",
-]
-
-WEEKDAYS = {
-    "mon": 0,
-    "monday": 0,
-    "tue": 1,
-    "tuesday": 1,
-    "wed": 2,
-    "wednesday": 2,
-    "thu": 3,
-    "thursday": 3,
-    "fri": 4,
-    "friday": 4,
-    "sat": 5,
-    "saturday": 5,
-    "sun": 6,
-    "sunday": 6,
-}
-
-DAYS = {"today": 0, "tomorrow": 1, "yesterday": -1}
-
-UNITS = [
-    ("usec", 1),
-    ("us", 1),
-    ("\u00b5s", 1),
-    ("\u03bcs", 1),
-    ("msec", 1000),
-    ("ms", 1000),
-    ("seconds", MICROSECONDS),
-    ("second", MICROSECONDS),
-    ("sec", MICROSECONDS),
-    ("s", MICROSECONDS),
-    ("minutes", 60 * MICROSECONDS),
-    ("minute", 60 * MICROSECONDS),
-    ("min", 60 * MICROSECONDS),
-    ("m", 60 * MICROSECONDS),
-    ("hours", 3600 * MICROSECONDS),
-    ("hour", 3600 * MICROSECONDS),
-    ("hr", 3600 * MICROSECONDS),
-    ("h", 3600 * MICROSECONDS),
-    ("days", 86400 * MICROSECONDS),
-    ("day", 86400 * MICROSECONDS),
-    ("d", 86400 * MICROSECONDS),
-    ("weeks", 604800 * MICROSECONDS),
-    ("week", 604800 * MICROSECONDS),
-    ("w", 604800 * MICROSECONDS),
-    ("months", 2629800 * MICROSECONDS),
-    ("month", 2629800 * MICROSECONDS),
-    ("M", 2629800 * MICROSECONDS),
-    ("years", 31557600 * MICROSECONDS),
-    ("year", 31557600 * MICROSECONDS),
-    ("y", 31557600 * MICROSECONDS),
-]
-
-SPAN = re.compile(r"[ \t\n\r]*([0-9]+(?:\.[0-9]+)?|\.[0-9]+)[ \t\n\r]*([^\W\d_]*)")
+SECONDS = re.compile(r"^[ \t]*UNIX seconds: @([0-9]+)(?:\.([0-9]{6}))?[ \t]*$", re.MULTILINE)
 
 SETTINGS = ["local_rtc", "ntp", "time", "timezone"]
 
 
-def current_time(utc=False):
-    now = datetime.now(timezone.utc)
-
-    return now if utc else now.astimezone()
-
-
-def parse_span(value):
-    total = 0.0
-    position = 0
-    value = value.rstrip(" \t\n\r")
-
-    while position < len(value):
-        match = SPAN.match(value, position)
-        if not match:
-            return None
-
-        amount, unit = match.group(1), match.group(2)
-        factor = MICROSECONDS
-
-        if unit:
-            factor = next((scale for name, scale in UNITS if name == unit), None)
-            if factor is None:
-                return None
-
-        total += float(amount) * factor
-        position = match.end()
-
-    return int(total) if position and isfinite(total) else None
-
-
-def parse_stamp(value, utc):
-    for stamp in TIMESTAMPS:
-        layout, full = stamp, value
-
-        if stamp.startswith("%H"):
-            today = current_time(utc)
-            layout, full = f"%Y-%m-%d {stamp}", f"{today:%Y-%m-%d} {value}"
-
-        try:
-            if utc:
-                parsed = datetime.strptime(full, layout).replace(tzinfo=timezone.utc)
-            else:
-                parsed = datetime.strptime(full, layout).astimezone()
-        except ValueError:
-            continue
-
-        return int(parsed.timestamp() * MICROSECONDS)
-
-    return None
-
-
-def parse_value(module, value):
-    if value.startswith("@"):
-        span = parse_span(value[1:])
-        if span is None:
-            module.fail_json(msg=f"unable to parse the time specification: {value}")
-
-        return span, False
-
-    sign = None
-    if value.startswith(("+", "-")):
-        sign, span = (-1 if value.startswith("-") else 1), value[1:]
-    elif value.endswith((" ago", " left")):
-        sign, span = (-1 if value.endswith(" ago") else 1), value.rpartition(" ")[0]
-
-    if sign is not None:
-        span = parse_span(span)
-        if span is None:
-            module.fail_json(msg=f"unable to parse the time specification: {value}")
-
-        return sign * span, True
-
-    utc = False
-    if value.upper().endswith("UTC"):
-        value, utc = value[:-3].strip(), True
-
-    if value == "now":
-        return int(current_time().timestamp() * MICROSECONDS), False
-
-    if value.lower() in DAYS:
-        date = current_time(utc).date() + timedelta(days=DAYS[value.lower()])
-
-        return parse_stamp(f"{date:%Y-%m-%d}", utc), False
-
-    weekday = None
-    prefix, _dummy, remainder = value.partition(" ")
-    if prefix.rstrip(",").lower() in WEEKDAYS and remainder:
-        weekday, value = WEEKDAYS[prefix.rstrip(",").lower()], remainder.strip()
-
-    usec = parse_stamp(value, utc)
-    if usec is None:
-        module.fail_json(msg=f"unable to parse the time specification: {value}")
-
-    if weekday is not None:
-        parsed = datetime.fromtimestamp(usec / MICROSECONDS, timezone.utc if utc else None)
-        if parsed.weekday() != weekday:
-            module.fail_json(msg=f"unable to parse the time specification: {prefix} does not match the date {value}")
-
-    return usec, False
-
-
-def parse_time(module, value, zone):
-    origin = os.environ.get("TZ")
-
+def parse_time(module, analyze, value, zone):
+    # parse as timedatectl set-time does, in the time zone the host ends up with
+    environ = {"LC_ALL": "C"}
     if zone:
-        os.environ["TZ"] = zone
-        tzset()
+        environ["TZ"] = f":{zone}"
 
-    try:
-        return parse_value(module, value.strip())
-    finally:
-        if zone:
-            if origin is None:
-                os.environ.pop("TZ", None)
-            else:
-                os.environ["TZ"] = origin
+    rc, stdout, stderr = module.run_command(
+        [analyze, "timestamp", "--", value],
+        environ_update=environ,
+        expand_user_and_vars=False,
+    )
+    if rc != 0:
+        module.fail_json(msg=f"unable to parse the time specification {value}: {stderr.strip()}")
 
-            tzset()
+    # the last match, as the original form echoed before it is caller input
+    matches = SECONDS.findall(stdout)
+    if not matches:
+        module.fail_json(msg=f"unable to parse the time specification {value}: unexpected output {stdout.strip()}")
+
+    seconds, fraction = matches[-1]
+    usec = int(seconds) * MICROSECONDS + int(fraction or 0)
+
+    if not 0 < usec <= INT64_MAX:
+        module.fail_json(msg=f"unable to set time: invalid time {value}")
+
+    return usec
 
 
 def wait_for_ntp(module, proxy, ntp):
@@ -396,16 +232,9 @@ def ensure_present(module):
         if predicted["ntp"]:
             module.fail_json(msg="unable to set time: network time synchronization is enabled, set ntp to false")
 
-        usec, relative = parse_time(module, value, predicted["timezone"])
-
-        now = int(current_time().timestamp() * MICROSECONDS)
-        target = now + usec if relative else usec
-
-        if not INT64_MIN <= usec <= INT64_MAX or not 0 < target <= INT64_MAX:
-            module.fail_json(msg=f"unable to set time: invalid time {value}")
-
-        predicted["time_usec"] = target
-        pending.append(("SetTime", (usec, relative, False)))
+        analyze = module.get_bin_path("systemd-analyze", required=True)
+        predicted["time_usec"] = parse_time(module, analyze, value, predicted["timezone"])
+        pending.append(("SetTime", ()))
 
     if not pending:
         module.exit_json(changed=False, timedate=current)
@@ -416,8 +245,7 @@ def ensure_present(module):
     for method, args in pending:
         if method == "SetTime":
             # parse again so a time relative to now does not lag behind the earlier changes and the NTP wait
-            usec, relative = parse_time(module, value, predicted["timezone"])
-            args = (usec, relative, False)
+            args = (parse_time(module, analyze, value, predicted["timezone"]), False, False)
 
         systemd_call(module, proxy, method, *args)
 

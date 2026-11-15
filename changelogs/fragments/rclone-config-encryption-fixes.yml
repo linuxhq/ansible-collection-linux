@@ -5,7 +5,9 @@ bugfixes:
     fails clearly instead of with a traceback.
   - rclone_config_encryption - read the encrypted payload as rclone does,
     ignoring only carriage returns and line feeds and splitting lines on line
-    feeds only.
+    feeds only, and treat padding after a complete base64 quantum, such as a
+    stray ``=``, as a damaged payload. Python 3.11 and older accepted it, so
+    the module reported no change for a file rclone cannot load.
   - rclone_config_encryption - create a new configuration file with mode
     ``0600``, as rclone does, unless ``mode`` is set.
   - rclone_config_encryption - follow a symbolic link at ``path`` and write its

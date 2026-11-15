@@ -20,15 +20,18 @@ description:
     a new snapshot. The module then reports RV(ignore:changed) as V(false) and
     returns the existing newest snapshot. Otherwise it reports
     RV(ignore:changed) as V(true).
-  - When kopia saves the snapshot but reports fatal errors found while
-    snapshotting, such as a file it cannot read, the module fails, reports
-    RV(ignore:changed) as V(true) and returns the saved snapshot in
-    RV(snapshot).
+  - When kopia printed the snapshot it saved, then exited with an error, for
+    example fatal errors found while snapshotting or automatic maintenance
+    failing afterwards, the module fails. It reports RV(ignore:changed) as
+    V(true) and returns the snapshot in RV(snapshot) when kopia lists it, and
+    fails without reporting a change when kopia does not list it. When the
+    snapshots cannot be listed, it reports RV(ignore:changed) as V(true), as
+    the snapshot may have been saved, with an empty RV(snapshot).
 notes:
   - A failure reported by kopia after it saved the snapshot without printing
-    it, such as applying the retention policy or pinning, cannot be told apart
-    from a snapshot that was not saved. The module then fails without reporting
-    a change.
+    it, such as applying the retention policy, cannot be told apart from a
+    snapshot that was not saved. The module then fails without reporting a
+    change.
 options:
   config_file:
     description:
@@ -100,8 +103,8 @@ snapshot:
       it saves it, or the existing newest snapshot when kopia skipped an
       identical snapshot. When the printed ID cannot be read or is not listed,
       the newest snapshot is returned.
-    - Also returned when the module fails because kopia reported errors after
-      saving the snapshot.
+    - Also returned when the module fails because kopia printed the snapshot
+      it saved, then exited with an error, and kopia lists that snapshot.
     - Keys under C(tags) are returned as kopia reports them, such as
       C(tag:role).
     - Empty in check mode and when the snapshot manifest cannot be read back.
@@ -133,24 +136,33 @@ def created_snapshot_id(stdout):
     return manifest.get("id") if isinstance(manifest, dict) else None
 
 
-def latest_snapshot(module, path, snapshot_id=None):
+def list_snapshots(module, path):
     rc, stdout, _dummy = kopia_command(module, ["snapshot", "list", path, "--json"], password=module.params["password"])
 
     if rc != 0:
-        return {}
+        return None
 
     try:
-        snapshots = json.loads(stdout)
+        return json.loads(stdout) or []
     except ValueError:
-        return {}
+        return None
 
-    if not snapshots:
-        return {}
+
+def find_snapshot(snapshots, snapshot_id):
+    return next((entry for entry in snapshots if snapshot_id and entry.get("id") == snapshot_id), None)
+
+
+def snapshot_result(snapshot):
+    return camel_dict_to_snake_dict(snapshot, ignore_list=["tags"]) if snapshot else {}
+
+
+def latest_snapshot(module, path, snapshot_id=None):
+    snapshots = list_snapshots(module, path) or []
 
     # another snapshot of the path, such as a scheduled one, can be newer than the one just created
-    snapshot = next((entry for entry in snapshots if snapshot_id and entry.get("id") == snapshot_id), snapshots[-1])
+    snapshot = find_snapshot(snapshots, snapshot_id) or (snapshots[-1] if snapshots else None)
 
-    return camel_dict_to_snake_dict(snapshot, ignore_list=["tags"])
+    return snapshot_result(snapshot)
 
 
 def ensure_present(module):
@@ -175,16 +187,30 @@ def ensure_present(module):
     snapshot_id = created_snapshot_id(stdout)
 
     if rc != 0 and snapshot_id:
-        # kopia prints the manifest once the snapshot is saved, then fails when
-        # it found fatal errors, such as an unreadable file, while snapshotting
-        module.fail_json(
-            msg=f"created kopia snapshot {snapshot_id} of {path}, but kopia reported errors: {stderr.strip()}",
-            changed=True,
-            snapshot=latest_snapshot(module, path, snapshot_id),
-        )
+        # kopia prints the manifest once the snapshot is saved, then can fail on
+        # fatal errors found while snapshotting or in automatic maintenance, but
+        # also in the final repository flush, which leaves the snapshot unsaved
+        snapshots = list_snapshots(module, path)
+        if snapshots is None:
+            module.fail_json(
+                msg=(
+                    f"kopia snapshot {snapshot_id} of {path} may have been created, but kopia reported errors "
+                    f"and the snapshots could not be listed: {stderr.strip()}"
+                ),
+                changed=True,
+                snapshot={},
+            )
+
+        snapshot = find_snapshot(snapshots, snapshot_id)
+        if snapshot:
+            module.fail_json(
+                msg=f"created kopia snapshot {snapshot_id} of {path}, but kopia reported errors: {stderr.strip()}",
+                changed=True,
+                snapshot=snapshot_result(snapshot),
+            )
 
     if rc != 0:
-        module.fail_json(msg=f"unable to create kopia snapshot of {path}: {stderr.strip()}")
+        module.fail_json(msg=f"unable to create kopia snapshot of {path}: {stderr.strip()}", snapshot={})
 
     # kopia prints the new manifest only when it saves a snapshot; nothing is
     # printed when ignore_identical_snapshots skips an unchanged source.
