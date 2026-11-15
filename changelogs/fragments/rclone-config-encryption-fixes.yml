@@ -7,7 +7,10 @@ bugfixes:
     ignoring only carriage returns and line feeds and splitting lines on line
     feeds only, and treat padding after a complete base64 quantum, such as a
     stray ``=``, as a damaged payload. Python 3.11 and older accepted it, so
-    the module reported no change for a file rclone cannot load.
+    the module reported no change for a file rclone cannot load. Padding
+    before the end of the payload is treated as damaged as well, although
+    rclone may accept it where it falls on one of its internal read
+    boundaries.
   - rclone_config_encryption - create a new configuration file with mode
     ``0600``, as rclone does, unless ``mode`` is set.
   - rclone_config_encryption - follow a symbolic link at ``path`` and write its

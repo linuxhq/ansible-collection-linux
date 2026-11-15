@@ -52,6 +52,9 @@ options:
     description:
       - Policy target, a directory path, C(user@host), C(user@host:/path), or
         V((global)) for the global policy.
+      - kopia reads a target containing V(@) as C(user@host) or
+        C(user@host:/path), so a directory whose path contains V(@), such as
+        V(/home/alice@example.com), must be written as C(user@host:/path).
       - Use absolute paths, kopia canonicalizes them into the policy target.
       - Policy manifest IDs are not accepted, because C(kopia policy import)
         reads every target as a path.

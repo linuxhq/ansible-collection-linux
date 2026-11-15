@@ -135,3 +135,24 @@ def test_policy_normalize_keeps_wrong_types():
 )
 def test_same_value(left, right, expected):
     assert kopia.same_value(left, right) is expected
+
+
+@pytest.mark.parametrize(
+    "path,source",
+    [
+        ("/home/a@b", "root@host:/home/a@b"),
+        ("//srv//data/./", "root@host:/srv/data"),
+        ("/srv/other/../data", "root@host:/srv/data"),
+        ("data@x", "root@host:/work/data@x"),
+        ("/", "root@host:/"),
+    ],
+)
+def test_snapshot_source_is_qualified_as_kopia_records_it(monkeypatch, path, source):
+    monkeypatch.setattr(kopia.os, "getcwd", lambda: "/work")
+    status = {"clientOptions": {"hostname": "host", "username": "root"}}
+    assert kopia.snapshot_source(status, path) == source
+
+
+@pytest.mark.parametrize("status", [None, {}, {"clientOptions": {"username": "root"}}])
+def test_snapshot_source_without_client_is_unknown(status):
+    assert kopia.snapshot_source(status, "/data") is None

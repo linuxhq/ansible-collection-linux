@@ -30,6 +30,18 @@ esac
 """
 
 
+CLIENT_STATUS = {"clientOptions": {"hostname": "host", "username": "root"}}
+
+
+@pytest.fixture(autouse=True)
+def kopia_client(monkeypatch):
+    """Report the client user and host that kopia_snapshot and kopia_snapshot_info qualify a path with."""
+    status = Mock(return_value=CLIENT_STATUS)
+    monkeypatch.setattr(kopia_snapshot, "repository_status", status, raising=False)
+    monkeypatch.setattr(kopia_snapshot_info, "repository_status", status, raising=False)
+    return status
+
+
 @pytest.mark.parametrize(
     "plugin,params,key",
     [
@@ -355,7 +367,32 @@ def test_snapshot_info(monkeypatch, run_module, path):
     monkeypatch.setattr(kopia_snapshot_info, "kopia_command", command)
     result = run_module(kopia_snapshot_info, {"path": path})
     assert result == {"changed": False, "snapshots": [{"start_time": "now"}]}
-    assert command.call_args.args[1] == ["snapshot", "list", "--json"] + ([path] if path else [])
+    assert command.call_args.args[1] == ["snapshot", "list", "--json"] + (["root@host:/data"] if path else [])
+
+
+@pytest.mark.parametrize(
+    "path,source",
+    [
+        # kopia reads a bare path containing "@" as user@host, or user@host:path, and lists nothing or another source
+        ("/home/alice@example.com", "root@host:/home/alice@example.com"),
+        ("/x@h:/y", "root@host:/x@h:/y"),
+        # qualified as kopia records the source, absolute and cleaned
+        ("//srv/./data/../data/", "root@host:/srv/data"),
+    ],
+)
+def test_snapshot_info_qualifies_path(monkeypatch, run_module, path, source):
+    command = Mock(return_value=(0, "[]", ""))
+    monkeypatch.setattr(kopia_snapshot_info, "kopia_command", command)
+    assert run_module(kopia_snapshot_info, {"path": path}) == {"changed": False, "snapshots": []}
+    assert command.call_args.args[1] == ["snapshot", "list", "--json", source]
+
+
+@pytest.mark.parametrize("status", [None, {}, {"clientOptions": {"hostname": "host"}}])
+def test_snapshot_info_path_without_client_fails(monkeypatch, run_module, kopia_client, status):
+    kopia_client.return_value = status
+    monkeypatch.setattr(kopia_snapshot_info, "kopia_command", Mock(side_effect=AssertionError("must not list")))
+    result = run_module(kopia_snapshot_info, {"path": "/data"})
+    assert result["failed"] and "unable to list kopia snapshots of /data" in result["msg"]
 
 
 @pytest.mark.parametrize("response", [(1, "", "denied"), (0, "not json", "")])
@@ -422,7 +459,43 @@ def test_snapshot_saved_with_errors_reports_change(monkeypatch, run_module):
         result["msg"]
         == "created kopia snapshot new of /data, but kopia reported errors: Found 1 fatal error(s) while snapshotting"
     )
-    assert command.call_args_list[1].args[1] == ["snapshot", "list", "/data", "--json"]
+    assert command.call_args_list[1].args[1] == ["snapshot", "list", "root@host:/data", "--json"]
+
+
+SOURCE = {"host": "client", "userName": "alice", "path": "/home/a@b"}
+
+
+@pytest.mark.parametrize(
+    "created,rc,source",
+    [
+        # the source kopia printed with the saved snapshot is listed
+        ({"id": "new", "source": SOURCE}, 0, "alice@client:/home/a@b"),
+        ({"id": "new", "source": SOURCE}, 1, "alice@client:/home/a@b"),
+        # without one, the path is qualified with the client user and host
+        ({"id": "new"}, 0, "root@host:/home/a@b"),
+        ({"id": "new", "source": {**SOURCE, "host": ""}}, 1, "root@host:/home/a@b"),
+    ],
+)
+def test_snapshot_of_path_with_at_sign_is_listed(monkeypatch, run_module, created, rc, source):
+    # kopia snapshot list reads a bare /home/a@b as user "/home/a" on host "b" and lists nothing
+    listing = '[{"id":"new","startTime":"new"}]'
+    created = (rc, json.dumps(created), "Found 1 fatal error(s) while snapshotting\n")
+    command = Mock(side_effect=[created, (0, listing, "")])
+    monkeypatch.setattr(kopia_snapshot, "kopia_command", command)
+    result = run_module(kopia_snapshot, {"path": "/home/a@b"})
+    assert result["changed"] and result["snapshot"] == {"id": "new", "start_time": "new"}
+    assert bool(result.get("failed")) is (rc != 0)
+    assert command.call_args_list[0].args[1] == ["snapshot", "create", "/home/a@b", "--json"]
+    assert command.call_args_list[1].args[1] == ["snapshot", "list", source, "--json"]
+
+
+def test_snapshot_skipped_as_identical_lists_qualified_path(monkeypatch, run_module, kopia_client):
+    command = Mock(side_effect=[(0, "", ""), (0, '[{"id":"old"}]', "")])
+    monkeypatch.setattr(kopia_snapshot, "kopia_command", command)
+    result = run_module(kopia_snapshot, {"path": "/home/a@b/./"})
+    assert result == {"changed": False, "snapshot": {"id": "old"}}
+    assert command.call_args_list[1].args[1] == ["snapshot", "list", "root@host:/home/a@b", "--json"]
+    kopia_client.assert_called_once()
 
 
 @pytest.mark.parametrize("listing", ['[{"id":"other","startTime":"later"}]', "[]", "null"])

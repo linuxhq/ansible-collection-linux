@@ -32,6 +32,9 @@ SECRET_KEY = (
 BASE64_URLSAFE_RAW = re.compile(r"[A-Za-z0-9_-]*\Z")
 
 # Go's base64.StdEncoding: padded quanta only, nothing after the padding (Python 3.11 and older accept more).
+# rclone decodes through base64.NewDecoder, which decodes each read on its own, so it also accepts padding that
+# ends exactly where a read ends, such as at its 4096-byte buffer refill. That depends on how the file is read and
+# is not emulated: padding before the end is always treated as damaged, so no file rclone rejects is accepted.
 BASE64_STD = re.compile(rb"(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?")
 
 CONFIG_HEADER = "# Encrypted rclone configuration File"

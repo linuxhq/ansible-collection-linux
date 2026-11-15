@@ -14,6 +14,8 @@ from ansible_collections.linuxhq.linux.plugins.modules import (
     systemd_timedate_info,
 )
 
+RUN_COMMAND = basic.AnsibleModule.run_command
+
 HOSTNAME = {
     "default_hostname": "localhost",
     "hostname": "old",
@@ -765,7 +767,10 @@ def test_time_parsed_by_systemd_analyze(monkeypatch, run_module, analyze, second
     result = run_module(systemd_timedate, {"time": "2026-07-26 14:30"}, check_mode)
     assert result["changed"]
     assert analyze.call_args.args == (["/usr/bin/systemd-analyze", "timestamp", "--", "2026-07-26 14:30"],)
-    assert analyze.call_args.kwargs == {"environ_update": {"LC_ALL": "C", "TZ": ":UTC"}, "expand_user_and_vars": False}
+    assert analyze.call_args.kwargs == {
+        "environ_update": {"LC_ALL": "C", "SYSTEMD_COLORS": "0", "TZ": ":UTC"},
+        "expand_user_and_vars": False,
+    }
     if check_mode:
         assert result["timedate"]["time_usec"] == usec
         mutate.assert_not_called()
@@ -779,9 +784,13 @@ def test_time_parsed_by_systemd_analyze(monkeypatch, run_module, analyze, second
     "current,params,environ",
     [
         # read in the time zone the host ends up with, as timedatectl does after set-timezone
-        (TIMEDATE, {"timezone": "Europe/Berlin"}, {"LC_ALL": "C", "TZ": ":Europe/Berlin"}),
-        ({**TIMEDATE, "timezone": "America/Los_Angeles"}, {}, {"LC_ALL": "C", "TZ": ":America/Los_Angeles"}),
-        ({**TIMEDATE, "timezone": ""}, {}, {"LC_ALL": "C"}),
+        (TIMEDATE, {"timezone": "Europe/Berlin"}, {"LC_ALL": "C", "SYSTEMD_COLORS": "0", "TZ": ":Europe/Berlin"}),
+        (
+            {**TIMEDATE, "timezone": "America/Los_Angeles"},
+            {},
+            {"LC_ALL": "C", "SYSTEMD_COLORS": "0", "TZ": ":America/Los_Angeles"},
+        ),
+        ({**TIMEDATE, "timezone": ""}, {}, {"LC_ALL": "C", "SYSTEMD_COLORS": "0"}),
     ],
 )
 @pytest.mark.parametrize("check_mode", [False, True])
@@ -790,6 +799,32 @@ def test_time_read_in_predicted_timezone(monkeypatch, run_module, analyze, curre
     assert run_module(systemd_timedate, {**params, "time": "14:30"}, check_mode)["changed"]
     for entry in analyze.call_args_list:
         assert entry.kwargs["environ_update"] == environ
+
+
+FAKE_ANALYZE = """#!/bin/sh
+# as systemd 257 prints it, colouring the field names when SYSTEMD_COLORS is set, even on a pipe
+if [ "${SYSTEMD_COLORS:-0}" = 0 ]; then on=""; off=""; else on=$(printf '\\033[0;94m'); off=$(printf '\\033[0m'); fi
+printf '%s  Original form:%s %s\\n' "$on" "$off" "$3"
+printf '%s   UNIX seconds:%s @1784083200\\n' "$on" "$off"
+"""
+
+
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_time_parsed_with_systemd_colors_set(monkeypatch, tmp_path, run_module, check_mode):
+    # SYSTEMD_COLORS from the task environment must not colour the output systemd-analyze 257 and later print
+    script = tmp_path / "systemd-analyze"
+    script.write_text(FAKE_ANALYZE)
+    script.chmod(0o755)
+    monkeypatch.setenv("SYSTEMD_COLORS", "1")
+    mutate = timedate_module(monkeypatch)
+    monkeypatch.setattr(basic.AnsibleModule, "get_bin_path", Mock(return_value=str(script)))
+    monkeypatch.setattr(basic.AnsibleModule, "run_command", RUN_COMMAND)
+    result = run_module(systemd_timedate, {"time": "2026-07-26 14:30"}, check_mode)
+    assert result["changed"] and not result.get("failed")
+    if check_mode:
+        assert result["timedate"]["time_usec"] == 1784083200000000
+    else:
+        assert mutate.call_args.args[2:] == ("SetTime", 1784083200000000, False, False)
 
 
 def test_time_parsed_again_right_before_it_is_set(monkeypatch, run_module, analyze):
