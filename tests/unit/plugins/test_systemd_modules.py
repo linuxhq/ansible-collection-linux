@@ -920,8 +920,10 @@ def test_hostname_check_mode_predicts_default_after_clearing_static(monkeypatch,
         (b"PRETTY_HOSTNAME=Old\nCHASSIS=vm\nLOCATION=\xff", set()),
         # comments and lines without an assignment are not checked
         (b"PRETTY_HOSTNAME=Old\n# caf\xe9\nJUNK\xe9\nCHASSIS=vm\n", set()),
-        # valid multi-byte values are kept
+        # valid multi-byte values are kept, also when a continuation line splits them
         ("PRETTY_HOSTNAME=Old\nLOCATION=café \U0001f600\nCHASSIS=vm\n".encode(), set()),
+        (b"PRETTY_HOSTNAME=Old\nLOCATION=\xc3\\\n\xa9\nCHASSIS=vm\n", set()),
+        (b'PRETTY_HOSTNAME=Old\nLOCATION="\xc3\\\n\xa9"\nCHASSIS=vm\n', set()),
         # systemd refuses to read a file containing a NUL byte
         (b"PRETTY_HOSTNAME=Old\nLOCATION=x\x00\nCHASSIS=vm\n", {"SetChassis", "SetPrettyHostname"}),
         (b"PRETTY_HOSTNAME=Old\nCHASSIS=vm\n\x00", {"SetChassis", "SetPrettyHostname"}),
@@ -933,3 +935,13 @@ def test_hostname_machine_info_read_as_systemd_bytes(monkeypatch, tmp_path, run_
     result = run_module(systemd_hostname, {"chassis": "vm", "pretty_hostname": "Old"})
     assert result["changed"] is bool(written)
     assert {entry.args[2] for entry in mutate.call_args_list} == written
+
+
+@pytest.mark.parametrize(
+    "machine_info", [b"LOCATION=\xc3\\\n\xa9\n", b'LOCATION="\xc3\\\n\xa9"\n', b"LOCATION=\xc3\xa9"]
+)
+def test_hostname_machine_info_joins_bytes_before_decoding(monkeypatch, tmp_path, run_module, machine_info):
+    (tmp_path / "machine-info").write_bytes(machine_info)
+    mutate = hostname_module(monkeypatch, tmp_path, HOSTNAME)
+    assert run_module(systemd_hostname, {"location": "é"})["changed"] is False
+    mutate.assert_not_called()

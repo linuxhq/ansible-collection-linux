@@ -148,9 +148,11 @@ CLIENT = {"clientOptions": {"hostname": "host", "username": "root"}}
         ("//srv//a@b/./", "root@host:/srv/a@b"),
         ("/srv/other/../a@b", "root@host:/srv/a@b"),
         ("data@x", "root@host:/work/data@x"),
-        # a path without "@" is passed bare and resolved by kopia
-        ("/srv/data/", "/srv/data/"),
-        ("data", "data"),
+        # a path without "@" is passed absolute, without a user and host
+        ("/srv/data/", "/srv/data"),
+        ("data", "/work/data"),
+        ("--all", "/work/--all"),
+        ("(global)", "/work/(global)"),
     ],
 )
 def test_snapshot_source_is_qualified_as_kopia_records_it(monkeypatch, module_factory, path, source):

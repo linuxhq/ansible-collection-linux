@@ -28,7 +28,8 @@ description:
     because its final repository flush failed. When the snapshots cannot be
     listed, it reports RV(ignore:changed) as V(true), as the snapshot may have
     been saved, with an empty RV(snapshot).
-  - Snapshots are listed by O(path) as given, which kopia resolves itself.
+  - O(path) is made absolute and cleaned, as kopia does, and its snapshots
+    are listed by that path, to which kopia adds the client user and host.
     kopia reads a bare path containing V(@) as C(user@host), so such a path,
     such as V(/home/alice@example.com), is listed by the source kopia records,
     C(user@host:/path), taken from the snapshot kopia printed or, when it
@@ -138,6 +139,7 @@ from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.common.dict_transformations import camel_dict_to_snake_dict
 
 from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
+    absolute_path,
     kopia_available,
     kopia_command,
     snapshot_source,
@@ -217,7 +219,8 @@ def ensure_present(module):
     # a path that cannot be listed fails before kopia takes the snapshot
     source = snapshot_source(module, path, OPERATION)
 
-    command = ["snapshot", "create", path, "--json"]
+    # an absolute path keeps a name such as "--all" from being read as an option
+    command = ["snapshot", "create", absolute_path(path), "--json"]
 
     if module.params["description"]:
         command.append(f"--description={module.params['description']}")

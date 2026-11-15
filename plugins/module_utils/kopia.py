@@ -113,9 +113,10 @@ def absolute_path(path):
 
 def snapshot_source(module, path, operation):
     # kopia reads a bare path containing "@" as user@host, so only such a path is qualified with the client user
-    # and host; any other path is passed bare and resolved by kopia itself
+    # and host; any other path is passed absolute, so a name such as "--all" or "(global)" stays a path, and kopia
+    # adds its own client user and host
     if "@" not in path:
-        return path
+        return absolute_path(path)
 
     status = repository_status(module, password=module.params["password"])
 

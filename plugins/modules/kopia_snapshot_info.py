@@ -34,8 +34,9 @@ options:
         directory of the path, since they contain it, so the result can hold
         more than one source.
       - All sources are listed when unset.
-      - Passed to kopia as given, which resolves it itself. kopia reads a bare
-        path containing V(@) as C(user@host), so such a path, such as
+      - Made absolute and cleaned, as kopia does, and listed by that path, to
+        which kopia adds the client user and host. kopia reads a bare path
+        containing V(@) as C(user@host), so such a path, such as
         V(/home/alice@example.com), is listed as the source
         C(user@host:/path), with the client user and host reported by
         C(kopia repository status) and the path made absolute and cleaned, as

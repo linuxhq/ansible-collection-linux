@@ -283,11 +283,19 @@ def validate_settings(module):
         module.fail_json(msg=f"invalid transient_hostname {params['transient_hostname']!r}: it is not a valid hostname")
 
 
-def utf8_valid(text):
-    """Whether text decoded with surrogateescape passes systemd's utf8_is_valid(), which also refuses noncharacters."""
-    return not any(
-        0xD800 <= ord(char) <= 0xDFFF or 0xFDD0 <= ord(char) <= 0xFDEF or ord(char) & 0xFFFE == 0xFFFE for char in text
-    )
+def utf8_text(text):
+    """Return text decoded with surrogateescape as the UTF-8 systemd's utf8_is_valid() accepts, or None."""
+    # bytes split by a continuation line are joined before systemd checks them
+    try:
+        text = text.encode("utf-8", "surrogateescape").decode("utf-8")
+    except UnicodeError:
+        return None
+
+    # systemd also refuses noncharacters
+    if any(0xFDD0 <= ord(char) <= 0xFDEF or ord(char) & 0xFFFE == 0xFFFE for char in text):
+        return None
+
+    return text
 
 
 def parse_env_file(text, version):
@@ -301,8 +309,11 @@ def parse_env_file(text, version):
         name = key if key_space is None else key[:key_space]
         entry = value if state != "value" or value_space is None else value[:value_space]
 
+        name = utf8_text(name)
+        entry = utf8_text(entry)
+
         # systemd stops parsing at the first entry that is not valid UTF-8, keeping the entries before it
-        if not utf8_valid(name) or not utf8_valid(entry):
+        if name is None or entry is None:
             return False
 
         entries[name] = entry

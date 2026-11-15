@@ -890,3 +890,19 @@ def test_snapshot_check_mode_with_at_sign_for_unlistable_client(monkeypatch, run
     result = run_module(kopia_snapshot, {"path": "/home/a@b"}, check_mode=True)
     assert bool(result.get("failed")) is available
     assert kopia_client.called is available
+
+
+@pytest.mark.parametrize("path", ["--all", "(global)"])
+def test_snapshot_relative_path_is_passed_absolute(monkeypatch, run_module, kopia_client, path):
+    # a relative name such as "--all" would be read as an option, and "(global)" as the global source
+    monkeypatch.setattr(kopia_utils, "working_directory", lambda: "/work")
+    command = Mock(side_effect=[(0, '{"id":"new"}', ""), (0, '[{"id":"new"}]', "")])
+    monkeypatch.setattr(kopia_snapshot, "kopia_command", command)
+    assert run_module(kopia_snapshot, {"path": path}) == {"changed": True, "snapshot": {"id": "new"}}
+    assert command.call_args_list[0].args[1] == ["snapshot", "create", f"/work/{path}", "--json"]
+    assert command.call_args_list[1].args[1] == ["snapshot", "list", f"/work/{path}", "--json"]
+    command = Mock(return_value=(0, "[]", ""))
+    monkeypatch.setattr(kopia_snapshot_info, "kopia_command", command)
+    assert run_module(kopia_snapshot_info, {"path": path}) == {"changed": False, "snapshots": []}
+    assert command.call_args.args[1] == ["snapshot", "list", "--json", f"/work/{path}"]
+    kopia_client.assert_not_called()
