@@ -25,10 +25,12 @@ options:
       - Policy target, a directory path, C(user@host), C(user@host:/path), or
         V((global)) for the global policy.
       - kopia reads a target in which an V(@) comes before any V(:) as
-        C(user@host) or C(user@host:/path), so a directory whose path is such a
+        C(user@host) or C(user@host:path), so a directory whose path is such a
         path, such as V(/home/alice@example.com), must be written as
         C(user@host:/path). A path with a V(:) before its first V(@), such as
-        V(/srv/a:b@c), is read as a directory path.
+        V(/srv/a:b@c), is read as a directory path. A target that starts with
+        V(@) and contains V(:), such as V(@host:/path), is read as a relative
+        directory path.
       - kopia stores the user, host and path of C(user@host) and
         C(user@host:/path) as given. To match the snapshots of the client, the
         user and host must be the C(clientOptions.username) and

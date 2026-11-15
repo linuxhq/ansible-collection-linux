@@ -10,7 +10,8 @@ bugfixes:
   - systemd_locale - document that systemd 253 and later also keep the X11
     keyboard settings in ``/etc/vconsole.conf`` and ignore a failure to write
     ``/etc/X11/xorg.conf.d/00-keyboard.conf``, which Debian 13 makes
-    read-only for systemd-localed once the directory exists. Clearing all of
-    the X11 keyboard settings there is not kept either, as systemd-localed
-    reports the settings in that file again once it restarts, as it does after
-    exiting when idle, so such a task reports a change on every later run.
+    read-only for systemd-localed when the directory exists as systemd-localed
+    starts. Clearing all of the X11 keyboard settings there is not kept either,
+    as systemd-localed reports the settings in that file again once it
+    restarts, as it does after exiting when idle, so such a task reports a
+    change again on each run after systemd-localed restarts.

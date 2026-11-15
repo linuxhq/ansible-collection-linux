@@ -37,7 +37,7 @@ options:
       - Made absolute and cleaned, as kopia does, and listed by that path, to
         which kopia adds the client user and host. kopia reads a bare path in
         which an V(@) comes before any V(:) as C(user@host) or
-        C(user@host:/path), so when the absolute path is such a path, such as
+        C(user@host:path), so when the absolute path is such a path, such as
         V(/home/alice@example.com), it is listed as the source
         C(user@host:/path), with the client user and host reported by
         C(kopia repository status), as kopia records it. A path with a V(:)
