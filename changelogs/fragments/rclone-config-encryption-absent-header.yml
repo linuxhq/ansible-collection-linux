@@ -6,7 +6,7 @@ bugfixes:
     not read it as the plain text written. It reads it as encrypted, or
     refuses an unsupported or damaged header. The module wrote such text,
     after which later runs reported a change on every run or failed, except
-    for a file encrypted twice with the same password, which the next run
-    decrypted once more before the runs settled. A ``content`` beginning with
-    such a header is refused in check mode too, even when neither
-    pycryptodome nor pycryptodomex is available.
+    for a file encrypted more than once with the same password, from which
+    each later run removed one more layer of encryption until the runs
+    settled. A ``content`` beginning with such a header is refused in check
+    mode too, even when neither pycryptodome nor pycryptodomex is available.

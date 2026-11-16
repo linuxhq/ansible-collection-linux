@@ -96,9 +96,11 @@ notes:
     fields, including a toggle keymap cleared by that conversion, can differ
     from the ones a real run produces.
   - A locale or keyboard value that is not valid UTF-8, such as one with a
-    lone surrogate code point, or that contains a NUL character or a Unicode
-    noncharacter, such as U+FFFE, is rejected before any setting is written,
-    also in check mode.
+    lone surrogate code point, or that contains a NUL character, is rejected
+    before any setting is written, also in check mode. So is a keyboard value
+    that contains a Unicode noncharacter, such as U+FFFE, which systemd's
+    D-Bus library refuses. A locale value with a Unicode noncharacter is sent
+    first, so that refusal leaves nothing written.
   - Only C(systemd-localed) can tell whether a console keymap or an X11 layout
     exists, so one it refuses is reported after the earlier settings in the
     same task, such as O(locale), are applied.
@@ -112,7 +114,11 @@ notes:
     systemd 253 and later, always. On Debian 12 the X11 keyboard settings, and
     a console keymap converted into them, rewrite C(/etc/default/keyboard).
   - Reads the running systemd version from the C(Version) property of
-    C(org.freedesktop.systemd1) when it changes a setting.
+    C(org.freedesktop.systemd1), the service manager, when it changes a
+    setting. After systemd is upgraded without a reboot or
+    C(systemctl daemon-reexec), the service manager still reports the earlier
+    version while a restarted C(systemd-localed) runs the new one, so the
+    files are then read as the earlier version reads them.
 options:
   locale:
     description:
@@ -395,7 +401,7 @@ def map_fields(line):
     return fields
 
 
-def language_fallback(lang, version):
+def language_fallback(module, lang, version):
     """Return the LANGUAGE systemd-localed's fallback map lists for lang, or None, as find_language_fallback() does.
 
     systemd reads the map until the first line listing lang with exactly two fields, skipping empty lines, comments
@@ -424,6 +430,9 @@ def language_fallback(lang, version):
 
                 if len(fields) == 2 and fields[0] == lang:
                     return fields[1]
+    except PermissionError as error:
+        # systemd-localed runs as root, so it reads a map the module may not
+        module.fail_json(msg=f"unable to read {LANGUAGE_FALLBACK_MAP}: {error}")
     except OSError:
         # systemd-localed ignores a map it cannot read
         return None
@@ -491,12 +500,14 @@ def keyboard_rewrites(module, version, keymap, convert_keymap, keyboard):
 
 
 def ensure_present(module):
-    # a value that cannot be sent would otherwise fail only after the earlier settings are written
+    # a value that cannot be sent would otherwise fail only after the earlier settings are written; SetLocale is
+    # sent first, so a locale value with a noncharacter, which sd-bus refuses, leaves nothing written
     check_utf8(
         module,
-        [(f"locale.{name}", value) for name, value in sorted((module.params["locale"] or {}).items())]
-        + [(name, module.params[name]) for name in VCONSOLE_SETTINGS + X11_SETTINGS],
+        [(f"locale.{name}", value) for name, value in sorted((module.params["locale"] or {}).items())],
+        noncharacters=False,
     )
+    check_utf8(module, [(name, module.params[name]) for name in VCONSOLE_SETTINGS + X11_SETTINGS])
 
     if module.check_mode and not HAS_DASBUS:
         keyboard = VCONSOLE_SETTINGS + X11_SETTINGS
@@ -541,14 +552,13 @@ def ensure_present(module):
         # localed sets LANGUAGE from its fallback map when LANG is sent without LANGUAGE, before it merges the rest,
         # and keeps the configured one for an empty fallback; a real run reads the result back instead
         if "lang" in request and "language" not in request:
-            language = language_fallback(request["lang"], version)
+            language = language_fallback(module, request["lang"], version)
 
             # localed writes a fallback that is not valid UTF-8 or holds a noncharacter, then cannot report the locale
             if language and utf8_text(language) != language:
-                invalid = "that is not valid UTF-8 or contains a Unicode noncharacter"
-                listed = f"{LANGUAGE_FALLBACK_MAP} lists a LANGUAGE fallback for it {invalid}"
-                reason = "which systemd-localed would write and then fail to report; set locale.language as well"
-                module.fail_json(msg=f"unable to set locale.lang {request['lang']}: {listed}, {reason}")
+                module.fail_json(
+                    msg=f"unable to set locale.lang {request['lang']}: {LANGUAGE_FALLBACK_MAP} lists an invalid UTF-8 fallback, set locale.language as well"
+                )
 
             if module.check_mode and language:
                 locale = dict(locale, language=language)

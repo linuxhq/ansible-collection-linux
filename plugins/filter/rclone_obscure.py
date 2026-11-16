@@ -21,7 +21,7 @@ description:
   - A vault encrypted value is decrypted before it is obscured.
   - Values that are not strings or bytes raise an error.
   - Text is obscured as its UTF-8 bytes. U+DC80 to U+DCFF, which Ansible uses
-    for bytes that are not valid UTF-8, such as in registered command output,
+    for bytes that are not valid UTF-8, such as from the b64decode filter,
     are obscured as those bytes, as C(rclone obscure) accepts them. Any other
     lone surrogate code point, from U+D800 to U+DC7F, is not valid UTF-8 and
     raises an error.

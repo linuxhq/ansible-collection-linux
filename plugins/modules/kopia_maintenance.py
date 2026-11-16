@@ -39,13 +39,16 @@ options:
         C(~/.config/kopia), not in the working directory, so write V(./name)
         for a file in the working directory.
       - The module fails before kopia runs, also in check mode, when the file,
-        or kopia's default one when this is unset, exists and is not a regular
-        file, such as a directory or a FIFO, which kopia fails or waits
-        reading.
-      - A path with a NUL character, or a lone surrogate code point other than
-        U+DC80 to U+DCFF, cannot be passed to kopia, so it is rejected before
-        kopia runs, also in check mode. U+DC80 to U+DCFF, which Ansible uses
-        for bytes that are not valid UTF-8, are passed as those bytes.
+        or kopia's default one when this is unset, is a FIFO or a character
+        device, on which kopia can wait forever. So is the password file kopia
+        reads, named after the file with
+        C(.kopia-password) added. kopia reports any other file it cannot read,
+        such as a directory.
+      - A path with a NUL character, which the module cannot look up, or a
+        lone surrogate code point from U+D800 to U+DC7F, which cannot be passed
+        to kopia, is rejected before kopia runs, also in check mode. U+DC80 to
+        U+DCFF, which Ansible uses for bytes that are not valid UTF-8, are
+        passed as those bytes.
     type: path
   enable_full:
     description: Enable or disable periodic full maintenance.
@@ -59,18 +62,17 @@ options:
   full_interval:
     description:
       - Interval between full maintenance runs, in seconds.
-      - Must not be negative.
     type: int
   list_parallelism:
     description:
       - Override the list parallelism.
-      - Must not be negative, kopia reads V(-1) as leaving it unset.
+      - V(-1) is rejected before kopia runs, also in check mode, as kopia reads
+        it as leaving the setting unchanged.
       - Requires kopia 0.18.0 or later.
     type: int
   max_retained_log_age:
     description:
       - Maximum age of retained log sessions, in seconds.
-      - Must not be negative.
       - V(0) means no age limit. When O(max_retained_log_age),
         O(max_retained_log_count) and O(max_retained_log_size_mb) are all
         V(0), kopia applies its default log retention instead, 30 days, 10000
@@ -79,7 +81,8 @@ options:
   max_retained_log_count:
     description:
       - Maximum number of log sessions to retain.
-      - Must not be negative, kopia reads V(-1) as leaving it unset.
+      - V(-1) is rejected before kopia runs, also in check mode, as kopia reads
+        it as leaving the setting unchanged.
       - V(0) means no count limit. When O(max_retained_log_age),
         O(max_retained_log_count) and O(max_retained_log_size_mb) are all
         V(0), kopia applies its default log retention instead, 30 days, 10000
@@ -88,9 +91,11 @@ options:
   max_retained_log_size_mb:
     description:
       - Maximum total size of retained log sessions, in megabytes.
-      - Must not be negative, kopia reads V(-1) as leaving it unset.
-      - Must not exceed V(8796093022207), the largest size in megabytes kopia
-        stores in bytes without overflowing.
+      - V(-1) is rejected before kopia runs, also in check mode, as kopia reads
+        it as leaving the setting unchanged.
+      - Must be from V(-8796093022208) to V(8796093022207), the sizes in
+        megabytes kopia stores in bytes without overflowing, or the module
+        fails before kopia runs, also in check mode.
       - V(0) means no size limit. When O(max_retained_log_age),
         O(max_retained_log_count) and O(max_retained_log_size_mb) are all
         V(0), kopia applies its default log retention instead, 30 days, 10000
@@ -104,13 +109,11 @@ options:
         set time, so V(me) always reports a change, prefer the explicit form.
       - An owner that is not valid UTF-8, such as one with a lone surrogate
         code point, is rejected before kopia runs, also in check mode, because
-        kopia records it with U+FFFD in its place. So is one with a NUL
-        character, which cannot be passed to kopia.
+        kopia records it with U+FFFD in its place.
     type: str
   quick_interval:
     description:
       - Interval between quick maintenance runs, in seconds.
-      - Must not be negative.
     type: int
 requirements:
   - kopia
@@ -150,8 +153,10 @@ maintenance:
     - Empty when the module fails, also for an option value the module rejects
       before kopia runs. Not returned when Ansible rejects the arguments, such
       as a missing required option, a value of the wrong type or an invalid
-      choice, or when the kopia command is not found.
-  returned: unless Ansible rejects the arguments or the kopia command is not found
+      choice, or fails to log them, such as for a lone surrogate code point in
+      an option that is not secret, or when the kopia command is not found or
+      cannot be started, such as for a NUL character in a value passed to it.
+  returned: unless Ansible rejects or cannot log the arguments or start kopia
   type: dict
   sample:
     extend_object_locks: false
@@ -186,8 +191,12 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
     same_value,
 )
 
-INTEGER_KINDS = ("duration", "int", "megabytes")
+# kopia reads -1 for these flags as not given, so -1 would never be set
+UNSET_SENTINEL = ("list_parallelism", "max_retained_log_count", "max_retained_log_size_mb")
+
+# kopia stores max_retained_log_size_mb in bytes, shifting it left by 20 bits in an int64, which wraps outside these
 MAX_LOG_SIZE_MB = (2**63 - 1) // 1048576
+MIN_LOG_SIZE_MB = -(2**63) // 1048576
 MEGABYTES = 1048576
 NANOSECONDS = 1000000000
 
@@ -259,7 +268,7 @@ def log_retention_or_default(retention):
 
 def log_retention_change(module, current):
     settings = {setting[0]: setting for setting in SETTINGS}
-    stored = current.get("logRetention") or {}
+    stored = current["logRetention"]
     expected = dict(stored)
     flags = []
 
@@ -282,21 +291,23 @@ def log_retention_change(module, current):
 def validate_settings(module):
     check_connection(module, failed_result={"maintenance": {}})
 
-    for param, _dummy, _dummy, kind in SETTINGS:
-        value = module.params[param]
-
-        if kind in INTEGER_KINDS and value is not None and value < 0:
-            module.fail_json(msg=f"invalid {param} {value}: it must not be negative", maintenance={})
+    for param in UNSET_SENTINEL:
+        if module.params[param] == -1:
+            module.fail_json(msg=f"invalid {param} -1: kopia reads it as not given, so it is never set", maintenance={})
 
     size = module.params["max_retained_log_size_mb"]
-    if size is not None and size > MAX_LOG_SIZE_MB:
+    if size is not None and not MIN_LOG_SIZE_MB <= size <= MAX_LOG_SIZE_MB:
         module.fail_json(
-            msg=f"invalid max_retained_log_size_mb {size}: it must not exceed {MAX_LOG_SIZE_MB}", maintenance={}
+            msg=f"invalid max_retained_log_size_mb {size}: it must be from {MIN_LOG_SIZE_MB} to {MAX_LOG_SIZE_MB}",
+            maintenance={},
         )
 
+    # kopia ignores an empty --owner, so the owner would never be set
     if module.params["owner"] == "":
         module.fail_json(msg="invalid owner: it must not be empty", maintenance={})
 
+    # kopia stores an owner with U+FFFD in place of bytes that are not valid UTF-8, and run_command cannot pass
+    # U+D800 to U+DC7F to kopia
     check_utf8(module, [("owner", module.params["owner"])], failed_result={"maintenance": {}})
 
 

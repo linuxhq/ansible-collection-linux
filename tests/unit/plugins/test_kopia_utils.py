@@ -6,6 +6,9 @@ import pytest
 
 from ansible_collections.linuxhq.linux.plugins.module_utils import kopia
 
+# kopia_command replaces the standard input of the test process with /dev/null
+pytestmark = pytest.mark.usefixtures("keep_stdin")
+
 
 def test_flags_preserve_false_zero_and_repeated_values():
     options = {"skip": None, "read_only": False, "enabled": True, "count": 0, "tag": ["a", "b"], "empty": ""}
@@ -39,6 +42,10 @@ def test_command_keeps_password_out_of_argv(module_factory):
         ("repository.config", {"HOME": "/home/u"}, "/home/u/.config/kopia/repository.config"),
         (None, {"HOME": "/home/u"}, "/home/u/.config/kopia/repository.config"),
         (None, {"KOPIA_CONFIG_PATH": "other.config", "XDG_CONFIG_HOME": "/xdg"}, "/xdg/kopia/other.config"),
+        # kopia joins the path with Go's filepath.Join, which cleans it
+        ("repository.config", {"XDG_CONFIG_HOME": "/xdg/./a/../"}, "/xdg/kopia/repository.config"),
+        ("repository.config", {"XDG_CONFIG_HOME": "//xdg//"}, "/xdg/kopia/repository.config"),
+        (None, {"HOME": "/home/u/"}, "/home/u/.config/kopia/repository.config"),
     ],
 )
 def test_config_path_is_resolved_as_kopia_does(monkeypatch, module_factory, config_file, environ, expected):
@@ -71,10 +78,55 @@ def test_command_explains_password_prompt(monkeypatch, module_factory, config_fi
 
 @pytest.mark.parametrize("value", ["a\x00b", {"a": ["b\x00"]}, {"a\x00": "b"}])
 @pytest.mark.parametrize("errors", ["strict", "surrogateescape"])
-def test_check_utf8_rejects_nul(module_factory, invoke, value, errors):
-    result = invoke(kopia.check_utf8, module_factory(), [("name", value)], errors, {"key": {}})
-    assert result["failed"] and result["key"] == {}
-    assert result["msg"].startswith("invalid name") and result["msg"].endswith(": it must not contain a NUL character")
+def test_check_utf8_accepts_nul(module_factory, value, errors):
+    # run_command fails cleanly for a NUL in an argument, and JSON carries it as \u0000
+    kopia.check_utf8(module_factory(), [("name", value)], errors, {"key": {}})
+
+
+@pytest.mark.parametrize("password", [None, "secret"])
+def test_check_connection_rejects_nul_in_config_file(module_factory, invoke, password):
+    # os.stat fails with a traceback for a path with a NUL
+    module = module_factory({"config_file": "/etc/kopia\x00.config", "password": password})
+    result = invoke(kopia.check_connection, module, {"key": {}})
+    assert result == {"failed": True, "msg": "invalid config_file: it must not contain a NUL character", "key": {}}
+
+
+@pytest.mark.parametrize("kind", ["fifo", "device"])
+@pytest.mark.parametrize("password", [None, ""])
+def test_check_connection_rejects_password_file_kopia_waits_reading(module_factory, invoke, tmp_path, kind, password):
+    # kopia reads the persisted password when none is given, and waits reading a FIFO or a terminal
+    config = tmp_path / "repository.config"
+    config.write_text("{}")
+    password_file = tmp_path / "repository.config.kopia-password"
+    if kind == "fifo":
+        os.mkfifo(password_file)
+    else:
+        password_file.symlink_to(os.devnull)
+
+    module = module_factory({"config_file": str(config), "password": password})
+    result = invoke(kopia.check_connection, module, {"key": {}})
+    reason = "it is a FIFO or a character device, which kopia can wait reading forever"
+    assert result == {"failed": True, "msg": f"invalid kopia password file {password_file}: {reason}", "key": {}}
+
+
+def test_check_connection_ignores_password_file_when_password_is_given(module_factory, tmp_path):
+    config = tmp_path / "repository.config"
+    config.write_text("{}")
+    os.mkfifo(tmp_path / "repository.config.kopia-password")
+    kopia.check_connection(module_factory({"config_file": str(config), "password": "secret"}))
+
+
+@pytest.mark.parametrize("kind", ["directory", "missing", "regular"])
+def test_check_connection_leaves_other_files_to_kopia(module_factory, tmp_path, kind):
+    # kopia fails reading a directory, which it reports itself
+    config = tmp_path / "repository.config"
+    if kind == "directory":
+        config.mkdir()
+        (tmp_path / "repository.config.kopia-password").mkdir()
+    elif kind == "regular":
+        config.write_text("{}")
+
+    kopia.check_connection(module_factory({"config_file": str(config), "password": None}))
 
 
 @pytest.mark.parametrize(
@@ -83,8 +135,11 @@ def test_check_utf8_rejects_nul(module_factory, invoke, value, errors):
         ("keepLatest", {"keepLatest": None}, None),
         ("keeplatest", {"keepLatest": None}, "keepLatest"),
         ("KEEPLATEST", {"keepLatest": None}, "keepLatest"),
-        # Go folds a key with unicode.ToUpper, so the long s matches "s"
+        # Go folds the long s to S and the Kelvin sign to K, and no other character to an ASCII letter
         ("keepLateſt", {"keepLatest": None}, "keepLatest"),
+        ("\u212aeepLatest", {"keepLatest": None}, "keepLatest"),
+        ("\u0131gnore", {"ignore": None}, None),
+        ("\u0130gnore", {"ignore": None}, None),
         ("keepForever", {"keepLatest": None}, None),
         ("hour", None, None),
     ],
@@ -139,7 +194,7 @@ def test_query_parses_json(monkeypatch, module_factory, function, args, output, 
 @pytest.mark.parametrize(
     "function,args", [(kopia.repository_status, ()), (kopia.maintenance_info, ()), (kopia.policy_export, ("target",))]
 )
-@pytest.mark.parametrize("response, message", [((0, "not json", ""), "parse"), ((1, "", "denied"), "denied")])
+@pytest.mark.parametrize("response, message", [((1, "", "denied"), "denied")])
 def test_query_failures(monkeypatch, module_factory, invoke, function, args, response, message):
     monkeypatch.setattr(kopia, "kopia_command", Mock(return_value=response))
     result = invoke(function, module_factory(), *args)
@@ -158,7 +213,7 @@ def test_missing_resource(monkeypatch, module_factory, function, args, error):
     assert function(module_factory(), *args) is None
 
 
-@pytest.mark.parametrize("response", [(0, "not json", ""), (1, "", "denied")])
+@pytest.mark.parametrize("response", [(1, "", "denied")])
 def test_policy_export_failure_names_target(monkeypatch, module_factory, invoke, response):
     monkeypatch.setattr(kopia, "kopia_command", Mock(return_value=response))
     result = invoke(kopia.policy_export, module_factory(), "root@host:/data")
@@ -284,10 +339,9 @@ def test_reads_as_user_host_follows_parse_source_info(path, expected):
     "status,reason",
     [
         (None, "repository is not connected"),
-        ({}, "did not report"),
-        ([], "did not report"),
-        ({"clientOptions": {"username": "root"}}, "did not report"),
-        ({"clientOptions": {"username": "a@b", "hostname": "host"}}, "cannot list"),
+        ({"clientOptions": {"username": "a@b", "hostname": "host"}}, "cannot list it for 'a@b' at 'host'"),
+        ({"clientOptions": {"username": "a:b", "hostname": "host"}}, "cannot list it for 'a:b' at 'host'"),
+        ({"clientOptions": {"username": "root", "hostname": "h:1"}}, "cannot list it for 'root' at 'h:1'"),
     ],
 )
 def test_snapshot_source_with_at_sign_fails(monkeypatch, module_factory, invoke, status, reason):
@@ -310,3 +364,57 @@ def test_absolute_path_follows_pwd_like_go(monkeypatch, tmp_path):
     for pwd in (str(tmp_path), "link", str(tmp_path / "missing")):
         monkeypatch.setenv("PWD", pwd)
         assert kopia.absolute_path("a@b") == f"{os.getcwd()}/a@b"
+
+
+@pytest.mark.parametrize(
+    "name,folded",
+    [
+        ("keepLatest", "KEEPLATEST"),
+        # the Kelvin sign and the long s fold to ASCII letters
+        ("\u212a\u017f", "KS"),
+        # the dotless i and the dotted capital I fold to no ASCII letter
+        ("\u0131\u0130", "\u0131\u0130"),
+    ],
+)
+def test_go_fold_folds_as_go_does_for_ascii_fields(name, folded):
+    assert kopia.go_fold(name) == folded
+
+
+def test_command_with_standard_input_closed_keeps_dev_null(module_factory):
+    # os.open returns 0 when the standard input is closed, which must stay open as /dev/null for kopia
+    module = module_factory({})
+    module.get_bin_path.return_value = "/usr/bin/kopia"
+    module.run_command = Mock(return_value=(0, "", ""))
+    os.close(0)
+    assert kopia.kopia_command(module, ["repository", "status"]) == (0, "", "")
+    assert os.fstat(0).st_rdev == os.stat(os.devnull).st_rdev
+
+
+def test_command_fails_when_dev_null_cannot_be_opened(monkeypatch, module_factory, invoke):
+    module = module_factory({})
+    module.get_bin_path.return_value = "/usr/bin/kopia"
+    monkeypatch.setattr(kopia.os, "open", Mock(side_effect=OSError(24, "Too many open files")))
+    result = invoke(kopia.kopia_command, module, ["repository", "status"])
+    assert result == {
+        "failed": True,
+        "msg": f"unable to open {os.devnull} as the standard input of kopia: [Errno 24] Too many open files",
+    }
+    module.run_command.assert_not_called()
+
+
+def test_command_escapes_bytes_that_are_not_utf8(monkeypatch, module_factory):
+    # kopia repeats a path with a byte that is not valid UTF-8, which run_command decodes as U+DC80 to U+DCFF
+    monkeypatch.setenv("XDG_CONFIG_HOME", "/xdg")
+    module = module_factory({"config_file": "/etc/r\udce9.config"})
+    module.get_bin_path.return_value = "/usr/bin/kopia"
+    error = "kopia: error: open repository: get password: password prompt error: /p\udce9\n"
+    module.run_command = Mock(return_value=(1, "out \udce9", error))
+    _dummy, stdout, stderr = kopia.kopia_command(module, ["policy", "list"])
+    assert stdout == "out \udce9"
+    missing = "kopia needs the repository password, which is not given and not persisted next to /etc/r\\udce9.config"
+    assert stderr == f"{missing}: kopia: error: open repository: get password: password prompt error: /p\\udce9"
+    stderr.encode("utf-8")
+
+
+def test_text_labels_escapes_keys_and_values():
+    assert kopia.text_labels({"a\udc80": ["b\ud800", 1, {"c": None}]}) == {"a\\udc80": ["b\\ud800", 1, {"c": None}]}

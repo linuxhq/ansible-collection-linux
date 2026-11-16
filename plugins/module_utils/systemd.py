@@ -112,6 +112,14 @@ LINE_END_239 = re.compile(rb"[\n\0]")
 # systemd 239 reads a map line with fgets() into a LINE_MAX buffer, so at most this many bytes at a time
 FGETS_SIZE = 2048 - 1
 
+# the first systemd that refuses an environment file containing a NUL byte; systemd 239 stops parsing at the NUL
+ENV_NUL_REFUSED_VERSION = 240
+
+# systemd 239 and 240 drop the backslash before any character in a quoted value and allow escapes in single quotes;
+# systemd 241 to 246 keep it except before '"'; systemd 247 and later drop it only before SHELL_NEED_ESCAPE
+ENV_QUOTE_ESCAPE_VERSION = 241
+ENV_SHELL_ESCAPE_VERSION = 247
+
 ENV_COMMENTS = "#;"
 ENV_NEWLINE = "\n\r"
 ENV_SHELL_NEED_ESCAPE = '"\\`$'
@@ -178,7 +186,7 @@ def systemd_version(module):
     """Return the major version of the running systemd, such as 252 for "252.32-1.el9"."""
     proxy = systemd_proxy(module, "systemd1")
     version = systemd_properties(module, proxy, [("version", "Version")])["version"]
-    match = re.match(r"\d+", version) if isinstance(version, str) else None
+    match = re.match(r"\d+", version)
 
     if not match:
         module.fail_json(msg=f"unable to read the systemd version: unexpected Version property {version!r}")
@@ -203,7 +211,7 @@ def systemd_call(module, proxy, method, *args):
 def locale_status(module, proxy):
     status = systemd_properties(module, proxy, LOCALE_PROPERTIES)
 
-    variables = dict(entry.split("=", 1) for entry in status["locale"] or [] if "=" in entry)
+    variables = dict(entry.split("=", 1) for entry in status["locale"])
 
     status["locale"] = {name: variables.get(name.upper()) for name in LOCALE_VARIABLES}
 
@@ -224,6 +232,10 @@ def locale_setting(variables):
     return [f"{name.upper()}={value}" for name, value in sorted(variables.items())]
 
 
+def has_noncharacter(text):
+    return any(0xFDD0 <= ord(char) <= 0xFDEF or ord(char) & 0xFFFE == 0xFFFE for char in text)
+
+
 def utf8_text(text):
     """Return text decoded with surrogateescape as the UTF-8 systemd's utf8_is_valid() accepts, or None."""
     # bytes split by a continuation line are joined before systemd checks them
@@ -233,25 +245,32 @@ def utf8_text(text):
         return None
 
     # systemd also refuses noncharacters
-    if any(0xFDD0 <= ord(char) <= 0xFDEF or ord(char) & 0xFFFE == 0xFFFE for char in text):
+    if has_noncharacter(text):
         return None
 
     return text
 
 
-def check_utf8(module, settings):
-    """Fail naming the first (name, value) setting that cannot be sent to systemd, before any request is made."""
+def check_utf8(module, settings, noncharacters=True):
+    """Fail naming the first (name, value) setting that cannot be sent to systemd, before any request is made.
+
+    dasbus cannot encode a surrogate, and GLib cuts a D-Bus string at a NUL, so the shortened value would be written.
+    systemd's D-Bus library (sd-bus) refuses a message with a string holding a noncharacter, which is checked too
+    unless noncharacters is false, for a setting sent by the first request, whose refusal leaves nothing written.
+    """
     for name, value in settings:
-        # dasbus cannot encode a surrogate, the system bus refuses a string systemd does not accept as UTF-8, such as
-        # one with a noncharacter, and a D-Bus string cannot carry NUL, which GLib would cut the value at
-        if value and ("\x00" in value or utf8_text(value) != value):
-            module.fail_json(
-                msg=f"invalid {name}: it must be valid UTF-8 without NUL characters or Unicode noncharacters"
-            )
+        if not value:
+            continue
+
+        if "\x00" in value or any(0xD800 <= ord(char) <= 0xDFFF for char in value):
+            module.fail_json(msg=f"invalid {name}: it must be valid UTF-8 without NUL characters")
+
+        if noncharacters and has_noncharacter(value):
+            module.fail_json(msg=f"invalid {name}: it must not contain Unicode noncharacters")
 
 
 def parse_env_file(text, version):
-    """Parse an environment file as systemd's parse_env_file_internal() does, the last assignment winning.
+    """Parse an environment file as parse_env_file_internal() of the given systemd version does, the last one winning.
 
     Return the entries and whether systemd's load_env_file() accepts the file, which it does not when an entry is
     not valid UTF-8.
@@ -340,7 +359,14 @@ def parse_env_file(text, version):
         elif state == "single_quote":
             if character == "'":
                 state = "pre_value"
+            elif character == "\\" and version < ENV_QUOTE_ESCAPE_VERSION:
+                state = "single_quote_escape"
             else:
+                value += character
+
+        elif state == "single_quote_escape":
+            state = "single_quote"
+            if character not in ENV_NEWLINE:
                 value += character
 
         elif state == "double_quote":
@@ -353,7 +379,15 @@ def parse_env_file(text, version):
 
         elif state == "double_quote_escape":
             state = "double_quote"
-            if character in ENV_SHELL_NEED_ESCAPE:
+            if version < ENV_QUOTE_ESCAPE_VERSION:
+                if character not in ENV_NEWLINE:
+                    value += character
+            elif version < ENV_SHELL_ESCAPE_VERSION:
+                if character == '"':
+                    value += character
+                elif character not in ENV_NEWLINE:
+                    value += "\\" + character
+            elif character in ENV_SHELL_NEED_ESCAPE:
                 value += character
             elif character != "\n":
                 value += "\\" + character
@@ -387,9 +421,13 @@ def read_bytes(module, path):
 def open_regular(path):
     """Open path for reading as bytes, or return None when it is not a regular file, which the module does not read.
 
-    The file is opened without blocking, so a FIFO is detected rather than waited on, and without making a terminal
-    the controlling terminal. Raise OSError when it cannot be opened.
+    The path is checked before it is opened, so a device is never opened, and checked again once open in case it was
+    replaced in between. The file is opened without blocking, so a FIFO is detected rather than waited on, and without
+    making a terminal the controlling terminal. Raise OSError when it cannot be checked or opened.
     """
+    if not stat.S_ISREG(os.stat(path).st_mode):
+        return None
+
     fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_NOCTTY | os.O_CLOEXEC)
 
     try:
@@ -484,10 +522,13 @@ def load_env_file(content, version):
 
     Return the entries and why systemd refuses to load the file, or None when it loads it.
     """
-    # systemd refuses to read a file containing a NUL byte, so none of its settings are stored; undecodable bytes
-    # are kept as surrogates for the UTF-8 check
+    # systemd 240 and later refuse to read a file containing a NUL byte, so none of its settings are stored, while
+    # systemd 239 parses the file up to it; undecodable bytes are kept as surrogates for the UTF-8 check
     if b"\x00" in content:
-        return {}, "contains a NUL byte"
+        if version >= ENV_NUL_REFUSED_VERSION:
+            return {}, "contains a NUL byte"
+
+        content = content.split(b"\x00", 1)[0]
 
     entries, loadable = parse_env_file(content.decode("utf-8", errors="surrogateescape"), version)
 

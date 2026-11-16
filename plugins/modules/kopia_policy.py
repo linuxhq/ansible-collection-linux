@@ -34,13 +34,16 @@ options:
         C(~/.config/kopia), not in the working directory, so write V(./name)
         for a file in the working directory.
       - The module fails before kopia runs, also in check mode, when the file,
-        or kopia's default one when this is unset, exists and is not a regular
-        file, such as a directory or a FIFO, which kopia fails or waits
-        reading.
-      - A path with a NUL character, or a lone surrogate code point other than
-        U+DC80 to U+DCFF, cannot be passed to kopia, so it is rejected before
-        kopia runs, also in check mode. U+DC80 to U+DCFF, which Ansible uses
-        for bytes that are not valid UTF-8, are passed as those bytes.
+        or kopia's default one when this is unset, is a FIFO or a character
+        device, on which kopia can wait forever. So is the password file kopia
+        reads, named after the file with
+        C(.kopia-password) added. kopia reports any other file it cannot read,
+        such as a directory.
+      - A path with a NUL character, which the module cannot look up, or a
+        lone surrogate code point from U+D800 to U+DC7F, which cannot be passed
+        to kopia, is rejected before kopia runs, also in check mode. U+DC80 to
+        U+DCFF, which Ansible uses for bytes that are not valid UTF-8, are
+        passed as those bytes.
     type: path
   policy:
     description:
@@ -55,15 +58,15 @@ options:
         match. A key that matches one of kopia's policy fields only ignoring
         case once converted, such as V(keeplatest), V(Retention) or
         V(KEEP_LATEST), is rejected before kopia runs, also in check mode,
-        naming the field. So is any other key that starts with an upper-case
-        letter, contains two upper-case letters in a row, ends with an
-        upper-case letter or contains a character other than an ASCII letter or
-        digit once converted.
+        naming the field.
+      - Two keys that convert to the same key, such as V(keep_latest) and
+        V(keepLatest), are rejected before kopia runs, also in check mode.
       - kopia rejects a key that matches none of its policy fields when it
-        imports the policy, before it changes the policy.
-      - Text that is not valid UTF-8, such as a lone surrogate code point, in a
-        key or value is rejected before kopia runs, also in check mode, because
-        kopia records it with U+FFFD in its place.
+        imports the policy, before it changes the policy. Check mode does not
+        know kopia's fields, so it cannot predict that failure.
+      - A value that is not valid UTF-8, such as one with a lone surrogate code
+        point, is rejected before kopia runs, also in check mode, because kopia
+        records it with U+FFFD in its place.
       - Fields left out are removed from the defined policy and fall back to
         inherited values.
       - kopia does not store V(false), V(0), an empty string or an empty list
@@ -91,9 +94,9 @@ options:
         C(user@host) or C(user@host:path), so a directory whose path is such a
         path, such as V(/home/alice@example.com), must be written as
         C(user@host:/path). kopia rejects a target with no V(:) whose only V(@)
-        is its last character, such as V(/srv/backup@), so the module rejects
-        it before kopia runs, also in check mode, and such a directory must be
-        written as C(user@host:/path) too. A path with a V(:) before its first
+        is its last character, such as V(/srv/backup@), as an invalid host name
+        before it changes anything, so such a directory must be written as
+        C(user@host:/path) too. A path with a V(:) before its first
         V(@), such as V(/srv/a:b@c), is read as a directory path. A target that
         starts with V(@) and contains V(:), such as V(@host:/path), is read as
         a relative directory path.
@@ -122,10 +125,13 @@ options:
         V((global)).
       - Passed to kopia as given, so V(~) and environment variables are not
         expanded.
-      - A target that is not valid UTF-8, such as one with a lone surrogate
-        code point, is rejected before kopia runs, also in check mode, because
-        kopia records it with U+FFFD in its place. So is a target or a policy
-        key or value with a NUL character.
+      - With O(state=present), a target that is not valid UTF-8, such as one
+        with a lone surrogate code point, is rejected before kopia runs, also
+        in check mode, because kopia records it with U+FFFD in its place. With
+        O(state=absent), only a lone surrogate code point from U+D800 to
+        U+DC7F, which cannot be passed to kopia, is rejected, and U+DC80 to
+        U+DCFF, which Ansible uses for bytes that are not valid UTF-8, are
+        passed as those bytes.
     type: str
     required: true
 requirements:
@@ -176,12 +182,16 @@ policy:
   description:
     - Defined policy reported by C(kopia policy export).
     - In check mode, when a change would be made, the desired policy from
-      O(policy), without the values kopia does not store.
+      O(policy), without the values kopia does not store. A key that is not
+      valid UTF-8, which kopia would refuse, is returned with escapes, such as
+      C(\udc80), in place of the characters it cannot encode.
     - Empty when kopia is unavailable in check mode.
     - Empty when the module fails, also for an option value the module rejects
       before kopia runs. Not returned when Ansible rejects the arguments, such
       as a missing required option, a value of the wrong type or an invalid
-      choice, or when the kopia command is not found.
+      choice, or fails to log them, such as for a lone surrogate code point in
+      an option that is not secret, or when the kopia command is not found or
+      cannot be started, such as for a NUL character in a value passed to it.
   returned: when O(state=present)
   type: dict
   sample:
@@ -196,7 +206,6 @@ policy:
 
 import json
 import os
-import re
 
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.common.dict_transformations import (
@@ -216,10 +225,9 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
     policy_normalize,
     prune_empty,
     same_value,
+    text_label,
+    text_labels,
 )
-
-# kopia's field names are camelCase words, each capital followed by a lower-case letter or digit
-POLICY_KEY = re.compile(r"[a-z][a-z0-9]*(?:[A-Z][a-z0-9]+)*")
 
 
 def camel_key(key):
@@ -230,31 +238,47 @@ def snake_key(key):
     return next(iter(camel_dict_to_snake_dict({key: None})))
 
 
+def policy_values(value, name):
+    """Yield (name, item) for each value in value that is neither a dictionary nor a list, named by its keys."""
+    if isinstance(value, dict):
+        for key, item in value.items():
+            yield from policy_values(item, f"{name}.{text_label(key)}")
+
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            yield from policy_values(item, f"{name}[{index}]")
+
+    else:
+        yield name, value
+
+
 def check_policy_keys(module, value, name, fields=None):
-    """Fail naming the first key that converts to a capitalization kopia does not report.
+    """Fail naming the first key that kopia would read differently than it reports it.
 
     fields holds kopia's field names for value, see POLICY_FIELDS, or None when they are unknown.
     """
     if isinstance(value, dict):
+        converted = {}
+
         for key, item in value.items():
-            child = f"{name}.{key}"
+            child = f"{name}.{text_label(key)}"
             camel = camel_key(key)
+
+            # snake_dict_to_camel_dict keeps only the last of two keys that convert to the same key
+            if camel in converted:
+                module.fail_json(
+                    msg=f"invalid policy keys {converted[camel]} and {child}: both convert to {text_label(camel)}; give only one",
+                    policy={},
+                )
+
+            converted[camel] = child
 
             # kopia matches field names ignoring case, so it accepts such a key, then reports the field in camelCase
             field = policy_field_mismatch(camel, fields)
             if field:
-                matched = f"which it matches to its field {field} ignoring case, so the policy would never match"
-                spelling = f"write {field}" if snake_key(field) == field else f"write {snake_key(field)} or {field}"
+                spelling = field if snake_key(field) == field else f"{snake_key(field)} or {field}"
                 module.fail_json(
-                    msg=f"invalid policy key {child}: kopia reads it as {camel}, {matched}; {spelling}", policy={}
-                )
-
-            # a later kopia can add a field that such a key matches only ignoring case
-            if not POLICY_KEY.fullmatch(camel):
-                reason = "which kopia matches ignoring case but reports in camelCase, so the policy would never match"
-                spelling = "write it in snake_case, such as keep_latest, or in kopia's camelCase, such as keepLatest"
-                module.fail_json(
-                    msg=f"invalid policy key {child}: kopia reads it as {camel}, {reason}; {spelling}",
+                    msg=f"invalid policy key {child}: kopia matches it to its field {field} ignoring case, so it would never match; write {spelling}",
                     policy={},
                 )
 
@@ -266,27 +290,31 @@ def check_policy_keys(module, value, name, fields=None):
 
 
 def ensure_present(module):
+    target = module.params["target"]
+
     check_connection(module, failed_result={"policy": {}})
+    # kopia policy export reads the target as an argument, and kopia policy import as JSON, with U+FFFD in place of a
+    # lone surrogate, as it reads a value, so such a target or value would never match
     check_utf8(
         module,
-        [("target", module.params["target"]), ("policy", module.params["policy"])],
+        [("target", target)] + list(policy_values(module.params["policy"], "policy")),
         failed_result={"policy": {}},
     )
-    check_policy_target(module, module.params["target"], failed_result={"policy": {}})
+    check_policy_target(module, target, failed_result={"policy": {}})
     check_policy_keys(module, module.params["policy"], "policy", POLICY_FIELDS)
 
     if module.check_mode and not kopia_available(module):
         module.exit_json(changed=True, policy={})
 
-    target = module.params["target"]
     desired = policy_normalize(snake_dict_to_camel_dict(module.params["policy"]))
     current = policy_export(module, target, failed_result={"policy": {}})
 
     if current is not None and same_value(policy_normalize(current), desired):
         module.exit_json(changed=False, policy=camel_dict_to_snake_dict(prune_empty(current)))
 
+    # a key that is not valid UTF-8, which kopia refuses as an unknown field when it imports the policy, is escaped
     if module.check_mode:
-        module.exit_json(changed=True, policy=camel_dict_to_snake_dict(desired))
+        module.exit_json(changed=True, policy=text_labels(camel_dict_to_snake_dict(desired)))
 
     source = os.path.join(module.tmpdir, "policy.json")
     with open(source, "w") as handle:
@@ -295,7 +323,7 @@ def ensure_present(module):
     rc, _dummy, stderr = kopia_command(module, ["policy", "import", "--from-file", source])
 
     if rc != 0:
-        module.fail_json(msg=f"unable to import kopia policy {target}: {stderr.strip()}", policy={})
+        module.fail_json(msg=f"unable to import kopia policy {text_label(target)}: {stderr.strip()}", policy={})
 
     current = policy_export(module, target, failed_result={"changed": True, "policy": {}})
 
@@ -303,14 +331,16 @@ def ensure_present(module):
 
 
 def ensure_absent(module):
+    target = module.params["target"]
+
     check_connection(module)
-    check_utf8(module, [("target", module.params["target"])])
-    check_policy_target(module, module.params["target"])
+    # run_command cannot pass U+D800 to U+DC7F to kopia
+    check_utf8(module, [("target", target)], errors="surrogateescape")
+    check_policy_target(module, target)
 
     if module.check_mode and not kopia_available(module):
         module.exit_json(changed=False)
 
-    target = module.params["target"]
     current = policy_export(module, target)
 
     if current is None:
@@ -322,7 +352,7 @@ def ensure_absent(module):
     rc, _dummy, stderr = kopia_command(module, ["policy", "delete", "--", target])
 
     if rc != 0:
-        module.fail_json(msg=f"unable to delete kopia policy {target}: {stderr.strip()}")
+        module.fail_json(msg=f"unable to delete kopia policy {text_label(target)}: {stderr.strip()}")
 
     module.exit_json(changed=True)
 

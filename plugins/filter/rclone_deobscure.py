@@ -34,7 +34,9 @@ requirements:
 EXAMPLES = r"""
 - name: Ensure the sftp password is revealed from an rclone remote
   ansible.builtin.set_fact:
-    __sftp_password: "{{ (rclone_config | selectattr('name', 'equalto', 'backup') | first).pass | linuxhq.linux.rclone_deobscure }}"
+    __sftp_password: >-
+      {{ (rclone_config | selectattr('name', 'equalto', 'backup') | first).pass
+      | linuxhq.linux.rclone_deobscure }}
 """
 
 RETURN = r"""

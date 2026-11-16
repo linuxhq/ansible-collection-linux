@@ -33,6 +33,10 @@ description:
     O(mode) is set. It is created with that mode, so it is never readable by
     other users, even before O(mode) is applied. An existing file keeps its
     mode.
+  - An O(owner) or O(group) that cannot be looked up and an O(mode) that is
+    neither octal nor symbolic fail before anything is written. An SELinux
+    context or O(attributes) value the system refuses fails only after the
+    file is written.
 options:
   content:
     description:
@@ -99,6 +103,12 @@ options:
         U+DC80 to U+DCFF is rejected before any file is read or written,
         because it cannot name a file. U+DC80 to U+DCFF, which Ansible uses
         for bytes that are not valid UTF-8, stand for those bytes.
+      - Unless the task sets C(no_log), Ansible fails before the module runs
+        for a path with any lone surrogate code point, because it logs the
+        arguments as UTF-8. ansible-core 2.18 also returns the arguments with
+        the result, which then fails as not valid UTF-8 after the module has
+        run. Lone surrogates in the returned RV(path) and in failure messages
+        are backslash escaped, such as C(\udcff).
     type: path
     required: true
   state:
@@ -125,7 +135,9 @@ attributes:
   check_mode:
     description: Predicts changes without modifying the target.
     support: full
-    details: Reports a potential change without inspecting the configuration when neither pycryptodome nor pycryptodomex is available.
+    details: >-
+      Reports a potential change without inspecting the configuration when
+      neither pycryptodome nor pycryptodomex is available.
   diff_mode:
     description: Returns the decrypted configuration before and after the change.
     support: full
@@ -173,13 +185,20 @@ encrypted:
   type: bool
   sample: true
 path:
-  description: Path to the managed configuration file.
+  description:
+    - Path to the managed configuration file.
+    - Lone surrogate code points, such as U+DC80 to U+DCFF, which stand for
+      bytes that are not valid UTF-8, are backslash escaped, such as
+      C(\udcff), so the result is valid UTF-8.
   returned: always
   type: str
   sample: /root/.config/rclone/rclone.conf
 """
 
+import grp
 import os
+import pwd
+import stat
 import tempfile
 
 from ansible.module_utils.basic import AnsibleModule, missing_required_lib
@@ -195,6 +214,14 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.rclone import (
 
 CONFIG_UMASK = 0o077
 
+# a regular file of mode 0600, against which a symbolic mode is checked before the configuration file is written
+SAMPLE_STAT = os.stat_result((stat.S_IFREG | 0o600, 0, 0, 0, 0, 0, 0, 0, 0, 0))
+
+
+def label(text):
+    """Return text with lone surrogates and NUL backslash escaped, for messages and results that must be UTF-8."""
+    return text.encode("utf-8", "backslashreplace").decode("utf-8").replace("\x00", "\\x00")
+
 
 def read_config(module, path):
     if not os.path.exists(path):
@@ -204,7 +231,7 @@ def read_config(module, path):
         with open(path, "rb") as handle:
             raw = handle.read()
     except OSError as error:
-        module.fail_json(msg=f"unable to read {path}: {to_native(error)}")
+        module.fail_json(msg=f"unable to read {label(path)}: {label(to_native(error))}")
 
     return raw
 
@@ -245,7 +272,7 @@ def write_config(module, path, content):
                 stream.flush()
                 os.fsync(stream.fileno())
         except OSError as error:
-            module.fail_json(msg=f"unable to write {path}: {to_native(error)}")
+            module.fail_json(msg=f"unable to write {label(path)}: {label(to_native(error))}")
 
         umask = os.umask(CONFIG_UMASK) if creating else None
         try:
@@ -265,7 +292,7 @@ def current_config(module, path, raw):
     try:
         encrypted = is_encrypted(raw)
     except ValueError as error:
-        module.fail_json(msg=f"unable to read configuration file {path}: {to_native(error)}")
+        module.fail_json(msg=f"unable to read configuration file {label(path)}: {to_native(error)}")
 
     if not encrypted:
         return False, raw
@@ -295,24 +322,68 @@ def check_plain_text(module, path, plain):
         readable = False
 
     if not readable:
-        header = "begins with an rclone encryption header, so rclone would not read it as plain text"
-        module.fail_json(msg=f"plain text for configuration file {path} {header}")
+        module.fail_json(
+            msg=f"plain text for configuration file {label(path)} begins with an rclone encryption header, so rclone would not read it as plain text"
+        )
 
 
 def check_path(module, path):
     """Fail before any file access for a path that cannot name a file, which os functions refuse with a traceback."""
-    label = path.encode("utf-8", "backslashreplace").decode("utf-8")
-
     if "\x00" in path:
-        module.fail_json(msg=f"invalid path {label}: it contains a NUL character, which a file path cannot contain")
+        module.fail_json(
+            msg=f"invalid path {label(path)}: it contains a NUL character, which a file path cannot contain"
+        )
 
     # U+DC80 to U+DCFF stand for the bytes that are not valid UTF-8, but another lone surrogate stands for none
     try:
-        os.fsencode(path)
+        path.encode("utf-8", "surrogateescape")
     except UnicodeEncodeError as error:
-        character = f"U+{ord(error.object[error.start]):04X}"
-        escaped = "other than U+DC80 to U+DCFF, which stand for bytes that are not valid UTF-8"
-        module.fail_json(msg=f"invalid path {label}: it contains {character}, a lone surrogate code point {escaped}")
+        module.fail_json(
+            msg=f"invalid path {label(path)}: U+{ord(path[error.start]):04X} is a lone surrogate that stands for no byte, unlike U+DC80 to U+DCFF"
+        )
+
+
+def check_file_attributes(module, path):
+    """Fail before writing for an owner, group or mode that Ansible refuses only after the file is written."""
+    owner = module.params["owner"]
+    group = module.params["group"]
+    mode = module.params["mode"]
+
+    # Ansible takes a value that int() accepts as an ID and looks up any other as a name, as checked here
+    if owner is not None:
+        try:
+            int(owner)
+        except ValueError:
+            try:
+                pwd.getpwnam(owner)
+            except (KeyError, ValueError):
+                module.fail_json(
+                    msg=f"unable to manage configuration file {label(path)}: failed to look up user {label(owner)}"
+                )
+
+    if group is not None:
+        try:
+            int(group)
+        except ValueError:
+            try:
+                grp.getgrnam(group)
+            except (KeyError, ValueError):
+                module.fail_json(
+                    msg=f"unable to manage configuration file {label(path)}: failed to look up group {label(group)}"
+                )
+
+    if mode is None or isinstance(mode, int):
+        return
+
+    try:
+        int(mode, 8)
+    except (TypeError, ValueError):
+        try:
+            module._symbolic_mode_to_octal(SAMPLE_STAT, mode)
+        except (AttributeError, TypeError, ValueError):
+            module.fail_json(
+                msg=f"unable to manage configuration file {label(path)}: mode {label(str(mode))} must be in octal or symbolic form"
+            )
 
 
 def ensure_present(module, path):
@@ -322,8 +393,9 @@ def ensure_present(module, path):
 
     if desired is None:
         if encrypted and current is None:
-            encrypted_with = "is already encrypted with a different password or its encrypted payload is damaged"
-            module.fail_json(msg=f"configuration file {path} {encrypted_with}")
+            module.fail_json(
+                msg=f"configuration file {label(path)} is already encrypted with a different password or its encrypted payload is damaged"
+            )
 
         desired = current
     else:
@@ -338,7 +410,7 @@ def ensure_present(module, path):
 
     changed = module.set_fs_attributes_if_different(module.load_file_common_arguments(module.params, path), changed)
 
-    module.exit_json(changed=changed, encrypted=True, path=module.params["path"], **diff)
+    module.exit_json(changed=changed, encrypted=True, path=label(module.params["path"]), **diff)
 
 
 def ensure_absent(module, path):
@@ -348,8 +420,9 @@ def ensure_absent(module, path):
 
     if desired is None:
         if encrypted and current is None:
-            reason = "wrong or missing password or damaged encrypted payload"
-            module.fail_json(msg=f"unable to decrypt configuration file {path}, {reason}")
+            module.fail_json(
+                msg=f"unable to decrypt configuration file {label(path)}, wrong or missing password or damaged encrypted payload"
+            )
 
         desired = current
 
@@ -366,7 +439,7 @@ def ensure_absent(module, path):
 
     changed = module.set_fs_attributes_if_different(module.load_file_common_arguments(module.params, path), changed)
 
-    module.exit_json(changed=changed, encrypted=False, path=module.params["path"], **diff)
+    module.exit_json(changed=changed, encrypted=False, path=label(module.params["path"]), **diff)
 
 
 def main():
@@ -391,37 +464,40 @@ def main():
     password = module.params["password"]
     check_path(module, module.params["path"])
     path = os.path.realpath(module.params["path"])
+    check_file_attributes(module, path)
 
     if password is not None:
         try:
             check_config_password(password)
         except ValueError as error:
-            module.fail_json(msg=f"invalid password for configuration file {path}: {to_native(error)}")
+            module.fail_json(msg=f"invalid password for configuration file {label(path)}: {to_native(error)}")
 
     if module.params["content"] is not None:
         # a lone surrogate, which a JSON value can carry, cannot be written; U+DC80 to U+DCFF stand for raw bytes
         try:
             to_bytes(module.params["content"], errors="surrogate_or_strict")
         except UnicodeEncodeError as error:
-            surrogate = f"character U+{ord(error.object[error.start]):04X} is a surrogate, which is not valid UTF-8"
-            module.fail_json(msg=f"invalid content for configuration file {path}: {surrogate}")
+            code = ord(error.object[error.start])
+            module.fail_json(
+                msg=f"invalid content for configuration file {label(path)}: character U+{code:04X} is a surrogate, which is not valid UTF-8"
+            )
 
         if module.params["state"] == "absent":
             check_plain_text(module, path, module.params["content"])
 
     if module.params["content"] is None and not os.path.exists(path):
-        module.fail_json(msg=f"configuration file does not exist: {path}")
+        module.fail_json(msg=f"configuration file does not exist: {label(path)}")
 
     if not HAS_PYCRYPTODOME:
         if module.check_mode:
             module.exit_json(
                 changed=True,
                 encrypted=module.params["state"] == "present",
-                path=module.params["path"],
+                path=label(module.params["path"]),
             )
 
         library = missing_required_lib("pycryptodome or pycryptodomex")
-        module.fail_json(msg=f"unable to manage configuration file {path}: {library}")
+        module.fail_json(msg=f"unable to manage configuration file {label(path)}: {library}")
 
     if module.params["state"] == "present":
         ensure_present(module, path)

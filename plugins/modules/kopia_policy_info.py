@@ -32,13 +32,16 @@ options:
         C(~/.config/kopia), not in the working directory, so write V(./name)
         for a file in the working directory.
       - The module fails before kopia runs, also in check mode, when the file,
-        or kopia's default one when this is unset, exists and is not a regular
-        file, such as a directory or a FIFO, which kopia fails or waits
-        reading.
-      - A path with a NUL character, or a lone surrogate code point other than
-        U+DC80 to U+DCFF, cannot be passed to kopia, so it is rejected before
-        kopia runs, also in check mode. U+DC80 to U+DCFF, which Ansible uses
-        for bytes that are not valid UTF-8, are passed as those bytes.
+        or kopia's default one when this is unset, is a FIFO or a character
+        device, on which kopia can wait forever. So is the password file kopia
+        reads, named after the file with
+        C(.kopia-password) added. kopia reports any other file it cannot read,
+        such as a directory.
+      - A path with a NUL character, which the module cannot look up, or a
+        lone surrogate code point from U+D800 to U+DC7F, which cannot be passed
+        to kopia, is rejected before kopia runs, also in check mode. U+DC80 to
+        U+DCFF, which Ansible uses for bytes that are not valid UTF-8, are
+        passed as those bytes.
     type: path
   target:
     description:
@@ -48,9 +51,9 @@ options:
         C(user@host) or C(user@host:path), so a directory whose path is such a
         path, such as V(/home/alice@example.com), must be written as
         C(user@host:/path). kopia rejects a target with no V(:) whose only V(@)
-        is its last character, such as V(/srv/backup@), so the module rejects
-        it before kopia runs, also in check mode, and such a directory must be
-        written as C(user@host:/path) too. A path with a V(:) before its first
+        is its last character, such as V(/srv/backup@), as an invalid host name
+        before it changes anything, so such a directory must be written as
+        C(user@host:/path) too. A path with a V(:) before its first
         V(@), such as V(/srv/a:b@c), is read as a directory path. A target that
         starts with V(@) and contains V(:), such as V(@host:/path), is read as
         a relative directory path.
@@ -80,10 +83,10 @@ options:
         V((global)).
       - Passed to kopia as given, so V(~) and environment variables are not
         expanded.
-      - A target that is not valid UTF-8, such as one with a lone surrogate
-        code point, fails before kopia runs, also in check mode, because kopia
-        records a target with U+FFFD in its place. So does a target with a NUL
-        character, which cannot be passed to kopia.
+      - A target with a lone surrogate code point from U+D800 to U+DC7F, which
+        cannot be passed to kopia, is rejected before kopia runs, also in check
+        mode. U+DC80 to U+DCFF, which Ansible uses for bytes that are not valid
+        UTF-8, are passed as those bytes.
     type: str
 requirements:
   - kopia >= 0.18.0
@@ -114,7 +117,9 @@ defined:
     - Whether a policy is defined for O(target).
     - Not returned when the module fails, as it is then unknown, nor when
       kopia is unavailable in check mode.
-  returned: when O(target) is set and the module succeeds, unless kopia is unavailable in check mode
+  returned: >-
+    when O(target) is set and the module succeeds, unless kopia is unavailable
+    in check mode
   type: bool
   sample: true
 effective_policy:
@@ -123,8 +128,10 @@ effective_policy:
       inherited values resolved.
     - Empty when the module fails, and when kopia is unavailable in check mode.
       Not returned when Ansible rejects the arguments, such as a missing
-      required option, a value of the wrong type or an invalid choice, or when
-      the kopia command is not found.
+      required option, a value of the wrong type or an invalid choice, or fails
+      to log them, such as for a lone surrogate code point in an option that is
+      not secret, or when the kopia command is not found or cannot be started,
+      such as for a NUL character in a value passed to it.
   returned: when O(target) is set
   type: dict
   sample:
@@ -138,8 +145,10 @@ policies:
     - Policies defined in the repository from C(kopia policy list).
     - Empty when the module fails, and when kopia is unavailable in check mode.
       Not returned when Ansible rejects the arguments, such as a missing
-      required option, a value of the wrong type or an invalid choice, or when
-      the kopia command is not found.
+      required option, a value of the wrong type or an invalid choice, or fails
+      to log them, such as for a lone surrogate code point in an option that is
+      not secret, or when the kopia command is not found or cannot be started,
+      such as for a NUL character in a value passed to it.
   returned: when O(target) is not set
   type: list
   elements: dict
@@ -157,8 +166,10 @@ policy:
     - Empty when no policy is defined for the target.
     - Empty when the module fails, and when kopia is unavailable in check mode.
       Not returned when Ansible rejects the arguments, such as a missing
-      required option, a value of the wrong type or an invalid choice, or when
-      the kopia command is not found.
+      required option, a value of the wrong type or an invalid choice, or fails
+      to log them, such as for a lone surrogate code point in an option that is
+      not secret, or when the kopia command is not found or cannot be started,
+      such as for a NUL character in a value passed to it.
   returned: when O(target) is set
   type: dict
   sample:
@@ -179,6 +190,7 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
     kopia_command,
     policy_export,
     prune_empty,
+    text_label,
 )
 
 
@@ -187,7 +199,8 @@ def info(module):
     failed_result = {"effective_policy": {}, "policy": {}}
 
     check_connection(module, failed_result=failed_result)
-    check_utf8(module, [("target", module.params["target"])], failed_result=failed_result)
+    # run_command cannot pass U+D800 to U+DC7F to kopia
+    check_utf8(module, [("target", module.params["target"])], errors="surrogateescape", failed_result=failed_result)
     check_policy_target(module, module.params["target"], failed_result=failed_result)
 
     if module.check_mode and not kopia_available(module):
@@ -199,19 +212,12 @@ def info(module):
     rc, stdout, stderr = kopia_command(module, ["policy", "show", "--json", "--", target])
 
     if rc != 0:
-        module.fail_json(msg=f"unable to show kopia policy {target}: {stderr.strip()}", **failed_result)
-
-    try:
-        effective = json.loads(stdout)
-    except ValueError:
-        module.fail_json(
-            msg=f"unable to parse kopia policy show output for {target}: {stdout.strip()}", **failed_result
-        )
+        module.fail_json(msg=f"unable to show kopia policy {text_label(target)}: {stderr.strip()}", **failed_result)
 
     module.exit_json(
         changed=False,
         defined=defined is not None,
-        effective_policy=camel_dict_to_snake_dict(effective),
+        effective_policy=camel_dict_to_snake_dict(json.loads(stdout)),
         policy=camel_dict_to_snake_dict(prune_empty(defined or {})),
     )
 
@@ -227,14 +233,9 @@ def list_policies(module):
     if rc != 0:
         module.fail_json(msg=f"unable to list kopia policies: {stderr.strip()}", policies=[])
 
-    try:
-        policies = json.loads(stdout)
-    except ValueError:
-        module.fail_json(msg=f"unable to parse kopia policy list output: {stdout.strip()}", policies=[])
-
     module.exit_json(
         changed=False,
-        policies=[camel_dict_to_snake_dict(policy) for policy in policies],
+        policies=[camel_dict_to_snake_dict(policy) for policy in json.loads(stdout)],
     )
 
 

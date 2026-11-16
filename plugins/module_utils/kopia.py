@@ -174,39 +174,45 @@ def invalid_utf8(value, name, errors="strict"):
 
 
 def check_utf8(module, settings, errors="strict", failed_result=None):
-    """Fail naming the first (name, value) setting holding a NUL or text that is not valid UTF-8, never its value.
+    """Fail naming the first (name, value) setting holding text that is not valid UTF-8, never its value.
 
     With errors="surrogateescape", only a lone surrogate outside U+DC80 to U+DCFF fails, see invalid_utf8.
     """
     failed_result = failed_result or {}
 
     for name, value in settings:
-        # a command-line argument or an environment variable cannot carry a NUL, which run_command cannot pass
-        found = find_text(value, name, lambda text: "\x00" in text)
-
-        if found:
-            module.fail_json(msg=f"invalid {found}: it must not contain a NUL character", **failed_result)
-
         found = invalid_utf8(value, name, errors)
 
         if not found:
             continue
 
-        # U+D800 to U+DC7F cannot be encoded, so run_command cannot pass them to kopia at all
+        # run_command cannot encode U+D800 to U+DC7F in an argument, and fails with a traceback
         if errors == "surrogateescape":
-            rule = "it must not contain a lone surrogate code point other than U+DC80 to U+DCFF"
-            escaped = "which stand for bytes that are not valid UTF-8"
             module.fail_json(
-                msg=f"invalid {found}: {rule}, {escaped}, as it cannot be passed to kopia", **failed_result
+                msg=f"invalid {found}: it must not contain a lone surrogate code point from U+D800 to U+DC7F, which cannot be passed to kopia",
+                **failed_result,
             )
 
-        # a lone surrogate, which a JSON value can carry, reaches kopia as a raw byte or not at all, and kopia records
-        # text that is not valid UTF-8 with U+FFFD in its place, so the value it reports never matches
-        recorded = "kopia records other text with U+FFFD in its place"
+        # a lone surrogate reaches kopia as a raw byte or as a JSON escape, and kopia records text that is not valid
+        # UTF-8 with U+FFFD in its place, so the value it reports never matches
         module.fail_json(
-            msg=f"invalid {found}: it must be valid UTF-8, without a lone surrogate code point, as {recorded}",
+            msg=f"invalid {found}: it must be valid UTF-8, without a lone surrogate code point, as kopia records other text with U+FFFD in its place",
             **failed_result,
         )
+
+
+def text_labels(value):
+    """Return value with every string in it, a key or item at any depth, written as text_label writes it."""
+    if isinstance(value, str):
+        return text_label(value)
+
+    if isinstance(value, dict):
+        return {text_labels(key): text_labels(item) for key, item in value.items()}
+
+    if isinstance(value, list):
+        return [text_labels(item) for item in value]
+
+    return value
 
 
 def config_path(module):
@@ -218,33 +224,43 @@ def config_path(module):
 
     settings = os.environ.get("XDG_CONFIG_HOME") or os.path.join(os.environ.get("HOME", ""), ".config")
 
-    return os.path.join(settings, "kopia", path)
+    # kopia joins the path with Go's filepath.Join, which cleans it
+    return clean_path(os.path.join(settings, "kopia", path))
 
 
-def check_connection(module, failed_result=None):
-    """Fail before kopia runs for a config_file or password that kopia cannot be given or cannot use."""
-    failed_result = failed_result or {}
-    settings = [(name, module.params.get(name)) for name in ("config_file", "password")]
-
-    # run_command passes U+DC80 to U+DCFF in a path or a password to kopia as the bytes they stand for
-    check_utf8(module, settings, errors="surrogateescape", failed_result=failed_result)
-
-    # kopia reads an empty KOPIA_PASSWORD as no password, and uses a persisted password or asks for one instead
-    if module.params.get("password") == "":
-        reason = "as kopia reads an empty password as no password"
-        module.fail_json(msg=f"invalid password: it must not be empty, {reason}", **failed_result)
-
-    path = config_path(module)
-
+def check_readable(module, path, label, failed_result):
+    """Fail when path is a FIFO or a character device, on which kopia can wait forever reading it."""
     try:
         mode = os.stat(path).st_mode
     except OSError:
         return
 
-    # kopia waits reading a FIFO or a terminal, and fails reading a directory, as its configuration
-    if not stat.S_ISREG(mode):
-        label = "config_file" if module.params.get("config_file") else "kopia configuration file"
-        module.fail_json(msg=f"invalid {label} {path}: it is not a regular file", **failed_result)
+    # kopia reports any other file it cannot read or decode, such as a directory
+    if stat.S_ISFIFO(mode) or stat.S_ISCHR(mode):
+        module.fail_json(
+            msg=f"invalid {label} {text_label(path)}: it is a FIFO or a character device, which kopia can wait reading forever",
+            **failed_result,
+        )
+
+
+def check_connection(module, failed_result=None):
+    """Fail before kopia runs for a config_file that cannot be passed to kopia, or files kopia would wait reading."""
+    failed_result = failed_result or {}
+    config_file = module.params.get("config_file")
+
+    # os.stat fails with a traceback for a NUL, and run_command for U+D800 to U+DC7F; it passes U+DC80 to U+DCFF to
+    # kopia as the bytes they stand for
+    if config_file and "\x00" in config_file:
+        module.fail_json(msg="invalid config_file: it must not contain a NUL character", **failed_result)
+
+    check_utf8(module, [("config_file", config_file)], errors="surrogateescape", failed_result=failed_result)
+
+    path = config_path(module)
+    check_readable(module, path, "config_file" if config_file else "kopia configuration file", failed_result)
+
+    # kopia reads the persisted password when none is given, as it reads an empty KOPIA_PASSWORD
+    if not module.params.get("password"):
+        check_readable(module, f"{path}.kopia-password", "kopia password file", failed_result)
 
 
 def kopia_available(module):
@@ -268,18 +284,25 @@ def kopia_command(module, args, password=None):
     # kopia asks for a password that is neither given nor persisted on the standard input it inherits, which can be a
     # terminal, such as over SSH without pipelining, so it inherits /dev/null instead, on which it fails at once; data
     # would give it a pipe, but writing it fails when kopia exits first
-    null = os.open(os.devnull, os.O_RDONLY)
     try:
-        os.dup2(null, 0)
-    finally:
-        os.close(null)
+        null = os.open(os.devnull, os.O_RDONLY)
+    except OSError as error:
+        module.fail_json(msg=f"unable to open {os.devnull} as the standard input of kopia: {error}")
+
+    # with standard input closed, os.open returns 0, which is then already /dev/null
+    if null != 0:
+        try:
+            os.dup2(null, 0)
+        finally:
+            os.close(null)
 
     rc, stdout, stderr = module.run_command(command, environ_update=environ, expand_user_and_vars=False)
 
+    # kopia's messages can repeat a value with bytes that are not valid UTF-8, which every message must be
+    stderr = text_label(stderr)
+
     if rc != 0 and PASSWORD_PROMPT_ERROR in stderr:
-        missing = "kopia needs the repository password, which is not given"
-        persisted = f"and not persisted next to {config_path(module)}"
-        stderr = f"{missing} {persisted}: {stderr.strip()}"
+        stderr = f"kopia needs the repository password, which is not given and not persisted next to {text_label(config_path(module))}: {stderr.strip()}"
 
     return rc, stdout, stderr
 
@@ -335,27 +358,20 @@ def snapshot_source(module, path, operation, failed_result=None):
         return absolute
 
     status = repository_status(module, password=module.params["password"], failed_result=failed_result)
+    label = text_label(path)
 
     if status is None:
-        module.fail_json(msg=f"unable to {operation} of {path}: repository is not connected", **failed_result)
+        module.fail_json(msg=f"unable to {operation} of {label}: repository is not connected", **failed_result)
 
-    options = status.get("clientOptions") if isinstance(status, dict) else None
-    options = options if isinstance(options, dict) else {}
-    username = options.get("username")
-    hostname = options.get("hostname")
-
-    if not isinstance(username, str) or not username or not isinstance(hostname, str) or not hostname:
-        module.fail_json(
-            msg=f"unable to {operation} of {path}: kopia did not report the client user and host", **failed_result
-        )
+    # kopia fills in the client user and host of every connection
+    username = status["clientOptions"]["username"]
+    hostname = status["clientOptions"]["hostname"]
 
     # kopia splits user@host:/path at the first "@" and the first ":", so a host may contain "@"
     if "@" in username or ":" in username or ":" in hostname:
-        client = f"client user {username!r} on host {hostname!r}"
-        split = "as it splits user@host:/path at the first '@' and ':'"
-        reason = f"a path in which an '@' comes before any ':', for {client}, {split}"
         module.fail_json(
-            msg=f"unable to {operation} of {path}: kopia cannot list {absolute}, {reason}", **failed_result
+            msg=f"unable to {operation} of {text_label(absolute)}: kopia cannot list it for {username!r} at {hostname!r}, splitting at the first '@' and ':'",
+            **failed_result,
         )
 
     return f"{username}@{hostname}:{absolute}"
@@ -374,12 +390,7 @@ def repository_status(module, password=None, failed_result=None, context=None):
     rc, stdout, stderr = kopia_command(module, ["repository", "status", "--json"], password=password)
 
     if rc == 0:
-        try:
-            return json.loads(stdout)
-        except ValueError:
-            module.fail_json(
-                msg=f"{prefix}unable to parse kopia repository status output: {stdout.strip()}", **failed_result
-            )
+        return json.loads(stdout)
 
     if "repository is not connected" in stderr:
         return None
@@ -394,10 +405,7 @@ def maintenance_info(module, failed_result=None):
     if rc != 0:
         module.fail_json(msg=f"unable to query kopia maintenance info: {stderr.strip()}", **failed_result)
 
-    try:
-        return json.loads(stdout)
-    except ValueError:
-        module.fail_json(msg=f"unable to parse kopia maintenance info output: {stdout.strip()}", **failed_result)
+    return json.loads(stdout)
 
 
 def policy_export(module, target, failed_result=None):
@@ -406,48 +414,36 @@ def policy_export(module, target, failed_result=None):
     rc, stdout, stderr = kopia_command(module, ["policy", "export", "--", target])
 
     if rc == 0:
-        try:
-            policies = json.loads(stdout)
-        except ValueError:
-            module.fail_json(
-                msg=f"unable to parse kopia policy export output for {target}: {stdout.strip()}", **failed_result
-            )
-
-        return next(iter(policies.values()), {})
+        return next(iter(json.loads(stdout).values()), {})
 
     if "policy not found" in stderr:
         return None
 
-    module.fail_json(msg=f"unable to export kopia policy {target}: {stderr.strip()}", **failed_result)
+    module.fail_json(msg=f"unable to export kopia policy {text_label(target)}: {stderr.strip()}", **failed_result)
 
 
 def check_policy_target(module, target, failed_result=None):
-    """Fail before kopia runs for a target that kopia rejects or that its commands read differently."""
+    """Fail before kopia runs for a target that kopia's policy commands read differently."""
     failed_result = failed_result or {}
 
     # kopia policy import reads every target as a path, but the other commands look a target up as a manifest ID
     # first, such as the ID of another policy or of a snapshot, whose source they then use
     if MANIFEST_ID.fullmatch(target):
-        lookup = "kopia policy export, show and delete read it as a manifest ID, such as that of a policy or a snapshot"
-        spelling = f"write a relative directory with such a name as ./{target}"
         module.fail_json(
-            msg=f"invalid target {target}: {lookup}, while kopia policy import reads it as a path; {spelling}",
-            **failed_result,
-        )
-
-    # kopia reads a target with an "@" and no ":" as user@host, and rejects one with no host after its only "@"
-    if target.endswith("@") and target.count("@") == 1 and ":" not in target:
-        user_host = "kopia reads a target with an '@' and no ':' as user@host"
-        rejected = "rejects one with nothing after the '@'"
-        module.fail_json(
-            msg=f"invalid target {target}: {user_host}, and {rejected}; write such a directory as user@host:/path",
+            msg=f"invalid target {target}: kopia policy export, show and delete read it as a manifest ID, but import as a path; write the directory ./{target}",
             **failed_result,
         )
 
 
 def go_fold(name):
-    """Return name in upper case, as Go's encoding/json folds a key to match it to a field name ignoring case."""
-    return "".join(char.upper() if len(char.upper()) == 1 else char for char in name)
+    """Return name folded as Go's encoding/json folds a key to match it to one of kopia's ASCII field names.
+
+    Go folds an ASCII letter, the Kelvin sign U+212A to K and the long s U+017F to S; it folds no other character to
+    an ASCII letter, so any other character is kept.
+    """
+    folds = {"\u212a": "K", "\u017f": "S"}
+
+    return "".join(folds.get(char, char.upper() if char.isascii() else char) for char in name)
 
 
 def policy_field_mismatch(key, fields):

@@ -1,0 +1,12 @@
+---
+bugfixes:
+  - kopia_repository - run ``kopia repository create`` first and connect with
+    ``kopia repository connect`` only when kopia reports that the storage
+    already holds data. Connecting first to storage without a repository
+    could write to it, such as the ``.shards`` file of ``filesystem`` storage
+    in an existing empty directory, which then held legacy sharding
+    parameters different from those of a repository kopia creates.
+  - kopia_repository - document that ``kopia repository connect`` waits for
+    as long as another client holds the repository for a format upgrade, as
+    it has no option to fail instead, and that a connection to a kopia
+    server is not supported.

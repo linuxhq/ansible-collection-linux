@@ -8,8 +8,9 @@ bugfixes:
     quoted parts, trailing non-breaking spaces and continuation lines no
     longer report a change on every run.
   - systemd_hostname - read ``/etc/machine-info`` as storing no settings when
-    it contains a NUL byte, and stop reading it at the first setting that is
-    not valid UTF-8, as systemd does. The module replaced such bytes and kept
+    it contains a NUL byte, or on systemd 239 only up to the NUL byte, and
+    stop reading it at the first setting that is not valid UTF-8, as systemd
+    does. The module replaced such bytes and kept
     reading, so a setting systemd ignores was compared as stored and reported
     no change while systemd-hostnamed reported its fallback.
   - systemd_hostname - read ``/etc/hostname`` line by line as systemd does,
@@ -21,20 +22,22 @@ bugfixes:
     failing or blocking.
   - systemd_hostname - fail before writing any setting, also in check mode,
     when ``chassis``, ``deployment``, ``icon_name``, ``location`` or
-    ``pretty_hostname`` would change and ``/etc/machine-info`` contains a NUL
-    byte or a setting that is not valid UTF-8, which systemd-hostnamed refuses
-    to rewrite. The module wrote ``static_hostname`` first, then failed with
+    ``pretty_hostname`` would change and ``/etc/machine-info`` contains a
+    setting that is not valid UTF-8, or on systemd 240 and later a NUL byte,
+    which systemd-hostnamed refuses to rewrite. The module wrote ``static_hostname`` first, then failed with
     ``Invalid argument`` or ``Bad message``, and check mode predicted success.
   - systemd_hostname - reject an ``icon_name``, ``location`` or
     ``pretty_hostname`` containing a Unicode noncharacter, such as U+FDD0,
-    which the system bus refuses, before writing any setting. The module wrote
+    which systemd's D-Bus library (sd-bus) refuses, before writing any
+    setting. The module wrote
     ``static_hostname`` first, then failed with ``Bad message``.
-  - systemd_hostname - reject an ``icon_name`` containing ``\``, a quote, ``*``,
-    ``?`` or ``[``, which systemd 262 and later refuse, before writing any
-    setting.
+  - systemd_hostname - reject an ``icon_name`` that the running systemd
+    refuses before writing any setting, which is ``.``, ``..`` or a name
+    containing ``/``, one longer than 255 bytes, or 4096 bytes before systemd
+    248, and on systemd 262 and later one containing a control character,
+    ``\``, a quote, ``*``, ``?`` or ``[``.
   - systemd_hostname - document that ``?`` wildcards and ``$`` tokens in
-    ``transient_hostname``, and ``$`` tokens in ``static_hostname``, are not
-    accepted.
+    ``transient_hostname`` are not accepted.
   - systemd_hostname_info, systemd_locale_info, systemd_timedate_info,
     systemd_hostname, systemd_locale, systemd_timedate - fail with a clear
     message instead of a GLib error when the system bus cannot be reached.

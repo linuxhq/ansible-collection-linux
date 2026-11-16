@@ -102,13 +102,9 @@ def obscure(plaintext):
     data = plaintext
 
     if isinstance(plaintext, str):
-        # U+DC80 to U+DCFF stand for the bytes that are not valid UTF-8, such as in registered command output, which
-        # rclone obscure accepts; another lone surrogate stands for no byte
-        try:
-            data = plaintext.encode("utf-8", "surrogateescape")
-        except UnicodeEncodeError as error:
-            character = plaintext[error.start]
-            raise ValueError(f"character U+{ord(character):04X} is a surrogate, which is not valid UTF-8") from error
+        # U+DC80 to U+DCFF stand for the bytes that are not valid UTF-8, which rclone obscure accepts; another lone
+        # surrogate stands for no byte and fails to encode
+        data = plaintext.encode("utf-8", "surrogateescape")
 
     iv = hashlib.sha256(data).digest()[: AES.block_size]
 
@@ -129,10 +125,6 @@ def deobscure(obscured):
         obscured = obscured.decode("utf-8")
 
     decoded = base64_urlsafe_decode(obscured)
-
-    if len(decoded) < AES.block_size:
-        raise ValueError("value is too short to contain an IV")
-
     iv = decoded[: AES.block_size]
     buf = decoded[AES.block_size :]
 
@@ -271,8 +263,9 @@ def check_config_password(password):
 
         # NFKC of a code point unknown to this Python may differ from rclone's newer tables
         if unicodedata.category(character) == "Cn" and not is_noncharacter(character):
-            unassigned = f"character U+{ord(character):04X} is unassigned in Unicode {unicodedata.unidata_version}"
-            raise ValueError(f"{unassigned}, the version of this Python, so its normalization may differ from rclone's")
+            raise ValueError(
+                f"character U+{ord(character):04X} is unassigned in this Python's Unicode {unicodedata.unidata_version}, so rclone may normalize it differently"
+            )
 
     # Python does not insert U+034F into a long run of non-starters, as rclone does. Go also counts characters
     # of class 0 that combine with the one before as non-starters, so every mark, Hangul jamo and other such
@@ -285,9 +278,8 @@ def check_config_password(password):
             run = 0
 
         if run > MAX_NON_STARTERS:
-            characters = "consecutive combining characters, marks or Hangul jamo"
             raise ValueError(
-                f"password has more than {MAX_NON_STARTERS} {characters}, which rclone normalizes differently"
+                f"password has more than {MAX_NON_STARTERS} consecutive combining characters, marks or Hangul jamo, which rclone normalizes differently"
             )
 
     return password

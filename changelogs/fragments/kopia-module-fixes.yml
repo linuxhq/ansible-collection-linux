@@ -18,9 +18,9 @@ bugfixes:
     storage.
   - kopia_snapshot, kopia_snapshot_info - return snapshot tag keys as kopia
     reports them instead of converting them to snake_case.
-  - kopia_maintenance - reject negative values for integer settings before
-    running kopia, since kopia reads ``-1`` as unset and the setting never
-    converges.
+  - kopia_maintenance - reject ``-1`` for ``list_parallelism``,
+    ``max_retained_log_count`` and ``max_retained_log_size_mb`` before running
+    kopia, since kopia reads it as not given and the setting never converges.
   - kopia_repository, kopia_snapshot, kopia_snapshot_info - correct the
     documented return conditions and snapshot ordering.
 minor_changes:

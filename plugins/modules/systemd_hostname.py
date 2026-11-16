@@ -21,12 +21,15 @@ description:
     computed fallback for a setting that is not stored, such as a chassis
     detected from the firmware or an icon name derived from the chassis. A
     missing file means no setting is stored. The file is parsed as the running
-    systemd version parses it, which ignores a file containing a NUL byte
-    and everything from the first setting that is not valid UTF-8.
+    systemd version parses it, which ignores everything from the first
+    setting that is not valid UTF-8, and a whole file containing a NUL byte,
+    except systemd 239, which parses the file up to the NUL byte.
   - C(systemd-hostnamed) refuses to rewrite C(/etc/machine-info) when it
-    contains a NUL byte or a setting that is not valid UTF-8, so changing
-    O(chassis), O(deployment), O(icon_name), O(location) or O(pretty_hostname)
-    then fails before any setting is written, also in check mode.
+    contains a setting that is not valid UTF-8, or on systemd 240 and later a
+    NUL byte, so changing O(chassis), O(deployment), O(icon_name),
+    O(location) or O(pretty_hostname) then fails before any setting is
+    written, also in check mode. systemd 239 to 245 also fail to start
+    C(systemd-hostnamed) with such a file.
   - O(static_hostname) is compared against C(/etc/hostname), the file
     C(systemd-hostnamed) stores it in, read as systemd reads it, from the first
     line that is neither empty nor a comment, with surrounding whitespace and
@@ -34,23 +37,37 @@ description:
     so systemd 239, which ends a line only at a line feed or a NUL, also
     keeps V(_) and every V(-). A missing file, or one without a valid
     hostname, means no static hostname is stored. So does a file the module
-    cannot read, such as one it may not access, or one with a line of 1 MiB
-    or more before the hostname, which C(systemd-hostnamed) 246 and later
-    ignore, while earlier versions fail to start.
+    cannot read for a reason other than a denied access, such as one with a
+    line of 1 MiB or more before the hostname, or an I/O error. A file the
+    module may not read fails the task, as C(systemd-hostnamed) runs as root
+    and reads it.
+  - C(systemd-hostnamed) 246 and later ignore a C(/etc/hostname) they cannot
+    read or whose first hostname line is not a valid hostname. systemd 239
+    to 245 instead fail to start C(systemd-hostnamed) on any such error other
+    than a missing file, including a first hostname line that is left empty
+    once invalid characters are removed. They also read C(/etc/hostname)
+    only when C(systemd-hostnamed) starts, so a change made outside it is not
+    reported until it restarts, as it does after exiting when idle, while
+    the module reads the file on every run.
   - The module reads C(/etc/hostname) only when it is a regular file, and
     otherwise reads no static hostname. C(systemd-hostnamed) may block
     reading a file that is not a regular file, such as a FIFO.
-  - Every option is validated before any setting is written, so an invalid
-    value fails without leaving earlier settings applied. O(static_hostname) is
-    written first, so a value the running systemd refuses also fails before
-    anything is changed.
+  - Every option except O(static_hostname) is validated before any setting is
+    written, so an invalid value fails without leaving earlier settings
+    applied. O(static_hostname) is written first and validated by
+    C(systemd-hostnamed), so a value the running systemd refuses fails before
+    anything is changed. In check mode such a value is reported as a change.
   - With no options set the module reads the current settings and reports no
     change.
 notes:
   - Requires a running C(systemd-hostnamed) reachable on the system D-Bus, so the
     module does not work in a container or chroot without systemd.
   - Reads the running systemd version from the C(Version) property of
-    C(org.freedesktop.systemd1) when it compares a setting.
+    C(org.freedesktop.systemd1), the service manager, when it compares a
+    setting. After systemd is upgraded without a reboot or
+    C(systemctl daemon-reexec), the service manager still reports the earlier
+    version while a restarted C(systemd-hostnamed) runs the new one, so the
+    files are then read as the earlier version reads them.
 options:
   chassis:
     description:
@@ -81,11 +98,12 @@ options:
   icon_name:
     description:
       - Icon name of the machine, following the XDG icon naming specification.
-      - Must be a valid file name, so it cannot contain V(/) or control
-        characters and cannot be V(.) or V(..).
+      - Must be a valid file name, so it cannot contain V(/) and cannot be
+        V(.) or V(..). systemd 248 and later allow at most 255 bytes, and
+        earlier versions at most 4096.
       - Unicode noncharacters, such as U+FDD0 or U+FFFE, are not allowed.
-      - Must not contain V(\\), V('), V("), V(*), V(?) or V([), which
-        systemd 262 and later refuse.
+      - systemd 262 and later also refuse control characters, V(\\), V('),
+        V("), V(*), V(?) and V([), which earlier versions accept.
       - Written to C(/etc/machine-info).
       - An empty string removes it from C(/etc/machine-info).
     type: str
@@ -112,23 +130,29 @@ options:
         C(hostnamectl hostname --static) sets.
       - C(systemd-hostnamed) applies it as the transient hostname as well, so
         RV(hostname) follows it.
-      - Must be a valid hostname of at most 64 characters, made of labels of
-        letters, digits and V(-) separated by V(.), where no label is empty or
-        starts or ends with V(-).
+      - C(systemd-hostnamed) validates it. systemd 240 and later accept a
+        hostname of at most 64 characters, made of labels of letters, digits
+        and V(-) separated by V(.), where no label is empty or starts or ends
+        with V(-). systemd 239 also accepts V(_) and a label starting or
+        ending with V(-).
+      - It must not contain a NUL character. A Unicode noncharacter is
+        refused by systemd's D-Bus library.
       - Each V(?) is a wildcard that C(systemd-hostnamed) replaces with a
         hexadecimal character derived from the machine ID. It requires systemd
-        258 or later, and older versions refuse it. C(/etc/hostname) keeps the
-        V(?) characters, so the option is compared as written. In check mode
-        the predicted RV(hostname) keeps the V(?) characters.
-      - Labels starting with V($), which systemd 262 and later accept as
-        tokens, are not accepted by this module.
+        258 or later, and older versions refuse it. systemd 262 and later
+        also accept labels starting with V($) as tokens they replace.
+        C(/etc/hostname) keeps the V(?) and V($) characters, so the option is
+        compared as written. In check mode the predicted RV(hostname) keeps
+        them.
       - An empty string removes C(/etc/hostname).
     type: str
   transient_hostname:
     description:
       - Transient hostname, as C(hostnamectl hostname --transient) sets.
-      - Must be a valid hostname, following the same rules as
-        O(static_hostname).
+      - Must be a valid hostname of at most 64 characters, made of labels of
+        letters, digits and V(-) separated by V(.), where no label is empty or
+        starts or ends with V(-), which the module checks before any setting
+        is written.
       - The V(?) wildcard and V($) tokens, which systemd 258 and later accept
         in some hostnames, are not accepted by this module.
       - C(/etc/hostname) takes the highest preference in C(systemd-hostnamed), so
@@ -138,7 +162,8 @@ options:
         than reporting a change it cannot make, so set O(static_hostname) to the
         same value instead, either on its own or alongside.
       - It cannot be combined with changing O(static_hostname) to a value
-        containing the V(?) wildcard, as the module cannot predict the hostname
+        containing a V(?) wildcard or a V($) token, as the module cannot
+        predict the hostname
         C(systemd-hostnamed) expands it to, so that fails even when the
         expanded hostname would match. Once the static hostname is configured,
         a matching RV(hostname) is reported as no change.
@@ -269,16 +294,42 @@ HOSTNAME_CHARACTERS_239 = HOSTNAME_CHARACTERS | frozenset("-_")
 # the first systemd that keeps only letters, digits and hyphens between dots in a hostname it reads
 HOSTNAME_LDH_VERSION = 240
 HOSTNAME_MAX = 64
-ICON_NAME_UNSAFE = re.compile(r"[\x00-\x1f\x7f\\'\"*?\[/]")
+# systemd 247 and earlier accept an icon name of up to FILENAME_MAX bytes, later ones up to NAME_MAX bytes
+FILENAME_MAX = 4096
+ICON_NAME_MAX_VERSION = 248
 NAME_MAX = 255
+# the first systemd that also refuses control characters, backslashes, quotes and glob characters in an icon name
+ICON_NAME_SAFE_VERSION = 262
+ICON_NAME_UNSAFE = re.compile(r"[\x00-\x1f\x7f\\'\"*?\[]")
 
 
 def hostname_valid(value):
     return len(value) <= HOSTNAME_MAX and HOSTNAME.match(value) is not None
 
 
-def icon_name_valid(value):
-    return value not in (".", "..") and len(value.encode("utf-8")) <= NAME_MAX and not ICON_NAME_UNSAFE.search(value)
+def check_icon_name(module, version):
+    """Fail when systemd-hostnamed of the given version refuses icon_name.
+
+    Only what every version refuses is checked when the version is not known.
+    """
+    value = module.params["icon_name"]
+
+    if not value:
+        return
+
+    if value in (".", "..") or "/" in value:
+        module.fail_json(msg=f"invalid icon_name {value!r}: it must be a valid file name")
+
+    if version is None:
+        return
+
+    if len(value.encode("utf-8")) > (NAME_MAX if version >= ICON_NAME_MAX_VERSION else FILENAME_MAX):
+        module.fail_json(msg=f"invalid icon_name {value!r}: it is longer than systemd {version} allows for a file name")
+
+    if version >= ICON_NAME_SAFE_VERSION and ICON_NAME_UNSAFE.search(value):
+        module.fail_json(
+            msg=f"invalid icon_name {value!r}: systemd {version} refuses control characters, backslashes, quotes and glob characters in it"
+        )
 
 
 def validate_settings(module):
@@ -288,6 +339,8 @@ def validate_settings(module):
         if params[param] and CONTROL_CHARACTERS.search(params[param]):
             module.fail_json(msg=f"invalid {param}: control characters are not allowed")
 
+    # the static hostname is written first, so a noncharacter, which sd-bus refuses, leaves nothing written
+    check_utf8(module, [("static_hostname", params["static_hostname"])], noncharacters=False)
     check_utf8(module, [(param, params[param]) for param in ("icon_name", "location", "pretty_hostname")])
 
     if params["deployment"] and not DEPLOYMENT.match(params["deployment"]):
@@ -295,12 +348,7 @@ def validate_settings(module):
             msg=f"invalid deployment {params['deployment']!r}: only letters, digits, '-', '.' and ':' are allowed"
         )
 
-    if params["icon_name"] and not icon_name_valid(params["icon_name"]):
-        rule = "it must be a valid file name without backslashes, quotes or glob characters"
-        module.fail_json(msg=f"invalid icon_name {params['icon_name']!r}: {rule}")
-
-    if params["static_hostname"] and not hostname_valid(params["static_hostname"].replace("?", "0")):
-        module.fail_json(msg=f"invalid static_hostname {params['static_hostname']!r}: it is not a valid hostname")
+    check_icon_name(module, None)
 
     if params["transient_hostname"] and not hostname_valid(params["transient_hostname"]):
         module.fail_json(msg=f"invalid transient_hostname {params['transient_hostname']!r}: it is not a valid hostname")
@@ -402,8 +450,11 @@ def read_static_hostname(module, version):
 
                     # newer systemd accepts '?' wildcards and '$' tokens in a stored hostname, unlike this module
                     return hostname if hostname_valid(hostname.replace("?", "0").replace("$", "0")) else ""
+    except PermissionError as error:
+        # systemd-hostnamed runs as root, so it reads a file the module may not
+        module.fail_json(msg=f"unable to read {HOSTNAME_FILE}: {error}")
     except OSError:
-        # such as a missing file, a symbolic link loop, a denied access or an I/O error
+        # such as a missing file, a symbolic link loop or an I/O error
         return ""
 
     return ""
@@ -434,6 +485,7 @@ def ensure_present(module):
         version = systemd_version(module)
 
     if compare_machine_info:
+        check_icon_name(module, version)
         stored, machine_info_error = read_machine_info(module, version)
 
     if compare_static_hostname:
@@ -452,8 +504,9 @@ def ensure_present(module):
             continue
 
         if machine_info_error and param in MACHINE_INFO_KEYS.values():
-            refused = "which systemd-hostnamed refuses to rewrite"
-            module.fail_json(msg=f"unable to set {param}: {MACHINE_INFO} {machine_info_error}, {refused}")
+            module.fail_json(
+                msg=f"unable to set {param}: {MACHINE_INFO} {machine_info_error}, which systemd-hostnamed refuses to rewrite"
+            )
 
         if param == "static_hostname":
             predicted["hostname"] = value or default or current["hostname"]
@@ -466,8 +519,9 @@ def ensure_present(module):
 
     if transient and predicted["hostname"] != transient:
         if predicted["static_hostname"]:
-            static = f"the static hostname {predicted['static_hostname']} takes precedence"
-            module.fail_json(msg=f"unable to set the transient hostname: {static}")
+            module.fail_json(
+                msg=f"unable to set the transient hostname: the static hostname {predicted['static_hostname']} takes precedence"
+            )
 
         predicted["hostname"] = transient
         predicted["hostname_source"] = "transient"

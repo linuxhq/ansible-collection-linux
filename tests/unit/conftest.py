@@ -1,3 +1,4 @@
+import os
 from unittest.mock import Mock
 
 import pytest
@@ -49,6 +50,17 @@ def module_factory(tmp_path):
         return module
 
     return create
+
+
+@pytest.fixture
+def keep_stdin():
+    """Restore the standard input of the test process, which a test or the code it runs can replace or close."""
+    saved = os.dup(0)
+    try:
+        yield
+    finally:
+        os.dup2(saved, 0)
+        os.close(saved)
 
 
 @pytest.fixture
