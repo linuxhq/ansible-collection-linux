@@ -1,0 +1,12 @@
+---
+bugfixes:
+  - kopia_policy, kopia_policy_info - fail before running kopia, also in check
+    mode, when ``target`` starts with ``-``. ``kopia policy export``, ``show``
+    and ``delete`` read such a target as a command-line flag, so
+    ``state=absent`` with ``target=--global`` deleted the global policy, and
+    ``state=present`` imported a policy for a relative path while comparing
+    against the global policy, reporting a change on every run.
+  - kopia_repository, kopia_policy, kopia_maintenance - report ``changed``
+    when kopia fails after the repository was connected or created, the policy
+    imported or the maintenance settings set, such as when validating the
+    provider or reading the result back fails.

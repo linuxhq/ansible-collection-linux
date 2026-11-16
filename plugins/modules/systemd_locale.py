@@ -20,14 +20,17 @@ description:
 notes:
   - Requires a running C(systemd-localed) reachable on the system D-Bus, so the
     module does not work in a container or chroot without systemd.
-  - Only the requested locale variables are sent to C(systemd-localed), which
-    merges them into the ones already configured, so a configured variable it
-    would now refuse, such as a C(LANGUAGE) list written by an installer, does
-    not block changes to the others.
-  - When O(locale.lang) is written without O(locale.language),
+  - Only the requested locale variables that differ from the configured ones
+    are sent to C(systemd-localed), which merges them into the ones already
+    configured, so a configured variable it would now refuse, such as a
+    C(LANGUAGE) list written by an installer, does not block changes to the
+    others.
+  - When O(locale.lang) changes and O(locale.language) is not set,
     C(systemd-localed) may derive C(LANGUAGE) from its own language fallback
-    map. Check mode cannot predict that value, so the reported C(language)
-    field can differ from the one a real run produces.
+    map, replacing the configured one. Check mode cannot predict that value,
+    so the reported C(language) field can differ from the one a real run
+    produces. A set O(locale.language) is sent together with a changed
+    O(locale.lang), so it is kept.
   - On EL, C(systemd-localed) rejects a locale that is not installed on the
     machine, so install it first. On Debian, it enables a missing locale in
     C(/etc/locale.gen) and runs C(locale-gen) before it returns, which can take
@@ -296,6 +299,17 @@ def locale_change(module, current):
     return merged
 
 
+def locale_request(requested, configured):
+    """Return the requested locale variables to send, the ones that differ from the configured ones."""
+    request = {name: value for name, value in requested.items() if value != configured.get(name)}
+
+    # localed derives LANGUAGE from a sent LANG unless LANGUAGE is sent with it
+    if "lang" in request and "language" in requested:
+        request["language"] = requested["language"]
+
+    return request
+
+
 def vconsole_change(module, current):
     keymap = module.params["vconsole_keymap"]
     toggle = module.params["vconsole_keymap_toggle"]
@@ -404,7 +418,9 @@ def ensure_present(module):
         simplified = locale_simplify(locale)
 
         predicted["locale"] = {name: simplified.get(name) for name in LOCALE_VARIABLES}
-        pending.append(("SetLocale", (locale_setting(locale_present(module.params["locale"])), False)))
+        request = locale_request(locale_present(module.params["locale"]), locale_present(current["locale"]))
+
+        pending.append(("SetLocale", (locale_setting(request), False)))
 
     if keymap is not None:
         predicted.update(keymap)

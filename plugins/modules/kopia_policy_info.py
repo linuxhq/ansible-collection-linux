@@ -46,6 +46,11 @@ options:
         policy target.
       - When set, RV(policy) and RV(effective_policy) are returned for the
         single target instead of RV(policies).
+      - A target that starts with V(-) is rejected before kopia runs, also in
+        check mode, because C(kopia policy export), C(kopia policy show) and
+        C(kopia policy delete) read it as a command-line flag, such as
+        C(--global) for the global policy. Write the global policy as
+        V((global)) and a relative path starting with V(-) as V(./-name).
       - Passed to kopia as given, so V(~) and environment variables are not
         expanded.
       - A target that is not valid UTF-8, such as one with a lone surrogate
@@ -123,6 +128,7 @@ from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.common.dict_transformations import camel_dict_to_snake_dict
 
 from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
+    check_policy_target,
     check_utf8,
     kopia_available,
     kopia_command,
@@ -133,6 +139,7 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
 
 def info(module):
     check_utf8(module, [("target", module.params["target"])])
+    check_policy_target(module, module.params["target"])
 
     if module.check_mode and not kopia_available(module):
         module.exit_json(changed=False, defined=False, effective_policy={}, policy={})

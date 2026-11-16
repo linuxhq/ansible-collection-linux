@@ -97,6 +97,7 @@ def test_missing_crypto(monkeypatch, tmp_path, run_module, check_mode):
     if check_mode:
         assert result["changed"] and result["encrypted"]
     else:
+        assert result["msg"].startswith(f"unable to manage configuration file {path}: ")
         assert "pycryptodome" in result["msg"]
 
 
@@ -379,11 +380,22 @@ def test_wrong_password_message_names_path(tmp_path, run_module, state):
     assert result["failed"] and str(path) in result["msg"]
 
 
-def test_unsupported_encryption_message_names_path(tmp_path, run_module):
+@pytest.mark.parametrize("state", ["present", "absent"])
+@pytest.mark.parametrize("content", [None, "config"])
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_unsupported_encryption_message_names_path(tmp_path, run_module, state, content, check_mode):
     path = tmp_path / "rclone.conf"
     path.write_text("RCLONE_ENCRYPT_V1:\nAAAA")
-    result = run_module(plugin, {"path": str(path), "password": "secret"})
-    assert result["failed"] and "unsupported" in result["msg"] and str(path) in result["msg"]
+    params = {"path": str(path), "password": "secret", "state": state}
+    if content is not None:
+        params["content"] = content
+
+    result = run_module(plugin, params, check_mode)
+    assert result["failed"] and result["msg"] == (
+        f"unable to read configuration file {path}: unsupported configuration encryption version,"
+        " which this module cannot read"
+    )
+    assert path.read_text() == "RCLONE_ENCRYPT_V1:\nAAAA"
 
 
 @pytest.mark.parametrize("header", ["RCLONE_ENCRYPT_V0:", "RCLONE_ENCRYPT_V1:"])

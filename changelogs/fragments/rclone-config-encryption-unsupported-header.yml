@@ -1,0 +1,9 @@
+---
+bugfixes:
+  - rclone_config_encryption - document under ``content`` that a file
+    encrypted with a version the module does not support, such as one with an
+    ``RCLONE_ENCRYPT_V1:`` header, fails even when ``content`` is set, and say
+    in the failure message that the module cannot read it instead of asking to
+    update rclone.
+  - rclone_config_encryption - name the configuration file in the failure
+    message when pycryptodome is missing.

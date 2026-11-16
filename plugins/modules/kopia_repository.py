@@ -407,14 +407,13 @@ def ensure_present(module):
             rc, _dummy, stderr = kopia_command(module, ["repository", "validate-provider"], password=password)
 
             if rc != 0:
-                module.fail_json(
-                    msg=f"created the kopia repository in {description}, but validating the provider failed and is not retried on a later run: {stderr.strip()}"
-                )
+                msg = f"created the kopia repository in {description}, but validating the provider failed and is not retried on a later run: {stderr.strip()}"
+                module.fail_json(changed=True, msg=msg, repository={})
 
     if rc != 0:
         module.fail_json(msg=f"unable to connect to the kopia repository in {description}: {stderr.strip()}")
 
-    status = repository_status(module, password=password)
+    status = repository_status(module, password=password, failed_result={"changed": True, "repository": {}})
 
     module.exit_json(changed=True, repository=camel_dict_to_snake_dict(status or {}))
 

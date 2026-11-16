@@ -43,6 +43,7 @@ timedate:
     - Time and date settings reported by C(systemd-timedated).
     - The C(rtc_time_usec) and C(time_usec) fields are microseconds since the
       epoch, as reported by systemd.
+    - Empty when dasbus is unavailable in check mode.
   returned: always
   type: dict
   sample:
@@ -54,7 +55,9 @@ timedate:
     time_usec: 1784083200123456
     timezone: America/Los_Angeles
 timezones:
-  description: Time zones known to C(systemd-timedated).
+  description:
+    - Time zones known to C(systemd-timedated).
+    - An empty list when dasbus is unavailable in check mode.
   returned: always
   type: list
   elements: str
