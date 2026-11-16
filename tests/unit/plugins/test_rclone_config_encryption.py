@@ -589,13 +589,14 @@ def test_mode_out_of_range_fails_before_writing(tmp_path, run_module, mode, stat
 @pytest.mark.parametrize("state", ["present", "absent"])
 @pytest.mark.parametrize("check_mode", [False, True])
 def test_path_that_is_not_a_regular_file_fails_before_reading(tmp_path, run_module, kind, state, check_mode):
-    # reading a FIFO would block and /dev/zero never end, and writing would replace the device
+    # reading a FIFO would block and a device such as /dev/zero never end, and writing would replace the device;
+    # /dev/null stands for any device, as reading /dev/zero would not end
     link = tmp_path / "rclone.conf"
     if kind == "fifo":
         target = tmp_path / "fifo"
         os.mkfifo(target)
     else:
-        target = Path("/dev/zero")
+        target = Path("/dev/null")
 
     link.symlink_to(target)
 

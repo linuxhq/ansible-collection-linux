@@ -405,9 +405,10 @@ def test_read_bytes_reads_no_content_from_other_files(module_factory, tmp_path, 
     if kind == "fifo":
         os.mkfifo(path)
     elif kind == "device":
-        path.symlink_to("/dev/zero")
+        # a device such as /dev/zero would never end, so /dev/null stands for any device, which reads as empty
+        path.symlink_to("/dev/null")
 
-    # reading a FIFO would wait for a writer and /dev/zero never ends, so fail after 5 seconds instead
+    # reading a FIFO would wait for a writer, so fail after 5 seconds instead
     def expire(signum, frame):
         raise AssertionError("read_bytes blocked")
 
