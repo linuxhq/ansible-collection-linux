@@ -86,14 +86,18 @@ EXAMPLES = r"""
 
 RETURN = r"""
 defined:
-  description: Whether a policy is defined for O(target).
-  returned: when O(target) is set
+  description:
+    - Whether a policy is defined for O(target).
+    - Not returned when the module fails, as it is then unknown.
+  returned: when O(target) is set and the module succeeds
   type: bool
   sample: true
 effective_policy:
   description:
     - Effective policy for O(target) reported by C(kopia policy show), with
       inherited values resolved.
+    - Empty when the module fails. Not returned when the kopia command is not
+      found.
   returned: when O(target) is set
   type: dict
   sample:
@@ -103,7 +107,10 @@ effective_policy:
       keep_daily: 7
       keep_latest: 2
 policies:
-  description: Policies defined in the repository from C(kopia policy list).
+  description:
+    - Policies defined in the repository from C(kopia policy list).
+    - Empty when the module fails. Not returned when the kopia command is not
+      found.
   returned: when O(target) is not set
   type: list
   elements: dict
@@ -119,6 +126,8 @@ policy:
   description:
     - Defined policy for O(target) reported by C(kopia policy export).
     - Empty when no policy is defined for the target.
+    - Empty when the module fails. Not returned when the kopia command is not
+      found.
   returned: when O(target) is set
   type: dict
   sample:
@@ -142,24 +151,29 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
 
 
 def info(module):
-    check_utf8(module, [("target", module.params["target"])])
-    check_policy_target(module, module.params["target"])
+    # whether a policy is defined is unknown on failure, so it is left out
+    failed_result = {"effective_policy": {}, "policy": {}}
+
+    check_utf8(module, [("target", module.params["target"])], failed_result=failed_result)
+    check_policy_target(module, module.params["target"], failed_result=failed_result)
 
     if module.check_mode and not kopia_available(module):
         module.exit_json(changed=False, defined=False, effective_policy={}, policy={})
 
     target = module.params["target"]
-    defined = policy_export(module, target)
+    defined = policy_export(module, target, failed_result=failed_result)
 
     rc, stdout, stderr = kopia_command(module, ["policy", "show", "--json", "--", target])
 
     if rc != 0:
-        module.fail_json(msg=f"unable to show kopia policy {target}: {stderr.strip()}")
+        module.fail_json(msg=f"unable to show kopia policy {target}: {stderr.strip()}", **failed_result)
 
     try:
         effective = json.loads(stdout)
     except ValueError:
-        module.fail_json(msg=f"unable to parse kopia policy show output for {target}: {stdout.strip()}")
+        module.fail_json(
+            msg=f"unable to parse kopia policy show output for {target}: {stdout.strip()}", **failed_result
+        )
 
     module.exit_json(
         changed=False,
@@ -176,12 +190,12 @@ def list_policies(module):
     rc, stdout, stderr = kopia_command(module, ["policy", "list", "--json"])
 
     if rc != 0:
-        module.fail_json(msg=f"unable to list kopia policies: {stderr.strip()}")
+        module.fail_json(msg=f"unable to list kopia policies: {stderr.strip()}", policies=[])
 
     try:
         policies = json.loads(stdout)
     except ValueError:
-        module.fail_json(msg=f"unable to parse kopia policy list output: {stdout.strip()}")
+        module.fail_json(msg=f"unable to parse kopia policy list output: {stdout.strip()}", policies=[])
 
     module.exit_json(
         changed=False,

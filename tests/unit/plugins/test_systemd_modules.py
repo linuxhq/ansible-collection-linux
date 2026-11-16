@@ -1,3 +1,6 @@
+import os
+import signal
+from contextlib import contextmanager
 from copy import deepcopy
 from unittest.mock import Mock
 
@@ -92,6 +95,27 @@ def keyboard_files(monkeypatch, tmp_path):
     monkeypatch.setattr(systemd_locale, "LANGUAGE_FALLBACK_MAP", str(files["language_fallback_map"]))
     monkeypatch.setattr(systemd_locale, "debian_family", Mock(return_value=False))
     return files
+
+
+class Expired(BaseException):
+    """Raised by time_limit, outside Exception so that no handler for OSError, such as TimeoutError, catches it."""
+
+
+@contextmanager
+def time_limit(seconds=5):
+    """Fail a read that would block or never end, such as of a FIFO or /dev/zero, instead of hanging the tests."""
+
+    def expire(signum, frame):
+        raise Expired(f"still running after {seconds} seconds")
+
+    previous = signal.signal(signal.SIGALRM, expire)
+    signal.alarm(seconds)
+
+    try:
+        yield
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, previous)
 
 
 def analyze_output(seconds, original="2026-07-26 14:30"):
@@ -397,10 +421,88 @@ def test_language_fallback_parses_map_as_systemd(keyboard_files, content, lang, 
     assert systemd_locale.language_fallback(lang) == language
 
 
-def test_language_fallback_endless_map_has_no_fallback(keyboard_files):
-    # read_line() reads /dev/zero as endless empty lines, so the module reads only a regular file
-    keyboard_files["language_fallback_map"].symlink_to("/dev/zero")
-    assert systemd_locale.language_fallback("en_AU") is None
+@pytest.mark.parametrize("kind", ["device", "fifo"])
+def test_language_fallback_reads_only_a_regular_file(keyboard_files, kind):
+    # reading /dev/zero would never end and opening a FIFO without a writer would block, so neither is read
+    if kind == "device":
+        keyboard_files["language_fallback_map"].symlink_to("/dev/zero")
+    else:
+        os.mkfifo(keyboard_files["language_fallback_map"])
+
+    with time_limit():
+        assert systemd_locale.language_fallback("en_AU") is None
+
+
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_locale_check_mode_with_fifo_language_fallback_map_keeps_language(
+    monkeypatch, run_module, keyboard_files, check_mode
+):
+    os.mkfifo(keyboard_files["language_fallback_map"])
+    monkeypatch.setattr(systemd_locale, "HAS_DASBUS", True)
+    monkeypatch.setattr(systemd_locale, "systemd_proxy", Mock())
+    configured = {**LOCALE, "locale": {"lang": "en_US.UTF-8", "language": "en_US"}}
+    updated = {**LOCALE, "locale": {"lang": "en_AU", "language": "en_US"}}
+    monkeypatch.setattr(systemd_locale, "locale_status", Mock(side_effect=[configured, updated]))
+    monkeypatch.setattr(systemd_locale, "systemd_call", Mock())
+
+    with time_limit():
+        result = run_module(systemd_locale, {"locale": {"lang": "en_AU"}}, check_mode)
+
+    assert result["changed"] and result["locale"]["locale"]["language"] == "en_US"
+
+
+@pytest.mark.parametrize("check_mode", [False, True])
+@pytest.mark.parametrize(
+    "content,lang",
+    [
+        # systemd-localed writes such a fallback, then fails to read the locale back
+        (b"en_AU caf\xe9\n", "en_AU"),
+        (b"en_AU \xed\xa0\x80\n", "en_AU"),
+        (b"fr_CA fr_CA:fr_FR\nen_AU 'en_AU:\xef\xbf\xbe'\n", "en_AU"),
+    ],
+)
+def test_locale_fallback_not_valid_utf8_fails_before_any_call(
+    monkeypatch, run_module, keyboard_files, content, lang, check_mode
+):
+    keyboard_files["language_fallback_map"].write_bytes(content)
+    monkeypatch.setattr(systemd_locale, "HAS_DASBUS", True)
+    monkeypatch.setattr(systemd_locale, "systemd_proxy", Mock())
+    configured = {**LOCALE, "locale": {"lang": "en_US.UTF-8", "language": "en_US"}}
+    monkeypatch.setattr(systemd_locale, "locale_status", Mock(return_value=configured))
+    mutate = Mock()
+    monkeypatch.setattr(systemd_locale, "systemd_call", mutate)
+    result = run_module(systemd_locale, {"locale": {"lang": lang, "lc_time": "C.UTF-8"}}, check_mode)
+    path = keyboard_files["language_fallback_map"]
+    assert result["failed"] and result["msg"] == (
+        f"unable to set locale.lang {lang}: {path} lists a LANGUAGE fallback for it that is not valid UTF-8, which "
+        "systemd-localed would write and then fail to report; set locale.language as well"
+    )
+    mutate.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "configured,params",
+    [
+        # a requested LANGUAGE is sent with the changed LANG, so localed does not use the map
+        ({"lang": "en_US.UTF-8"}, {"lang": "en_AU", "language": "en_GB"}),
+        # an unchanged LANG is not sent
+        ({"lang": "en_AU"}, {"lang": "en_AU", "lc_time": "C.UTF-8"}),
+        # the fallback of another LANG
+        ({"lang": "en_US.UTF-8"}, {"lang": "en_NZ"}),
+    ],
+)
+def test_locale_fallback_not_valid_utf8_for_unsent_lang_is_ignored(
+    monkeypatch, run_module, keyboard_files, configured, params
+):
+    keyboard_files["language_fallback_map"].write_bytes(b"en_AU caf\xe9\n")
+    monkeypatch.setattr(systemd_locale, "HAS_DASBUS", True)
+    monkeypatch.setattr(systemd_locale, "systemd_proxy", Mock())
+    monkeypatch.setattr(systemd_locale, "locale_status", Mock(return_value={**LOCALE, "locale": configured}))
+    mutate = Mock()
+    monkeypatch.setattr(systemd_locale, "systemd_call", mutate)
+    result = run_module(systemd_locale, {"locale": params})
+    assert result["changed"] and not result.get("failed")
+    assert mutate.call_args.args[2] == "SetLocale"
 
 
 def test_locale_check_mode_keeps_language_for_empty_fallback(monkeypatch, run_module, keyboard_files):
@@ -414,17 +516,18 @@ def test_locale_check_mode_keeps_language_for_empty_fallback(monkeypatch, run_mo
     assert result["changed"] and result["locale"]["locale"]["language"] == "en_US"
 
 
-def test_locale_real_run_does_not_read_language_fallback_map(monkeypatch, run_module):
+def test_locale_real_run_returns_language_read_back(monkeypatch, run_module):
+    # a real run checks the fallback the map lists but returns the LANGUAGE localed reports
     configured = {**LOCALE, "locale": {"lang": "en_US.UTF-8"}}
-    updated = {**LOCALE, "locale": {"lang": "en_AU", "language": "en_AU:en_GB"}}
+    updated = {**LOCALE, "locale": {"lang": "en_AU", "language": "en_GB"}}
     monkeypatch.setattr(systemd_locale, "HAS_DASBUS", True)
     monkeypatch.setattr(systemd_locale, "systemd_proxy", Mock())
     monkeypatch.setattr(systemd_locale, "locale_status", Mock(side_effect=[configured, updated]))
-    monkeypatch.setattr(systemd_locale, "language_fallback", Mock(side_effect=AssertionError("must not read the map")))
+    monkeypatch.setattr(systemd_locale, "language_fallback", Mock(return_value="en_AU:en_GB"))
     mutate = Mock()
     monkeypatch.setattr(systemd_locale, "systemd_call", mutate)
     result = run_module(systemd_locale, {"locale": {"lang": "en_AU"}})
-    assert result["changed"] and result["locale"]["locale"]["language"] == "en_AU:en_GB"
+    assert result["changed"] and result["locale"]["locale"]["language"] == "en_GB"
     assert mutate.call_args.args[2:] == ("SetLocale", ["LANG=en_AU"], False)
 
 
@@ -927,6 +1030,58 @@ def test_hostname_static_hostname_read_as_running_systemd(
     mutate = hostname_module(monkeypatch, tmp_path, status, etc_hostname=etc_hostname)
     assert run_module(systemd_hostname, {"static_hostname": value}, True)["changed"] is changed
     mutate.assert_not_called()
+
+
+# systemd's LONG_LINE_MAX, the length at which read_line() fails
+LONG_LINE = 1024 * 1024
+
+
+@pytest.mark.parametrize(
+    "etc_hostname,stored",
+    [
+        # read_line() fails for a line of LONG_LINE_MAX bytes or more, and systemd-hostnamed then ignores the file
+        (b"#" + b"x" * (LONG_LINE - 1) + b"\nweb\n", ""),
+        (b"\n" * 3 + b" " * LONG_LINE + b"\rweb\n", ""),
+        (b"#" + b"x" * (LONG_LINE - 2) + b"\nweb\n", "web"),
+        # a line after the hostname is not read
+        (b"web\n" + b"x" * LONG_LINE, "web"),
+        # a NUL ends a line as a line break does
+        (b"# comment\0web\n", "web"),
+    ],
+)
+def test_hostname_static_hostname_read_line_by_line(monkeypatch, tmp_path, run_module, etc_hostname, stored):
+    (tmp_path / "hostname").write_bytes(etc_hostname)
+    status = {**HOSTNAME, "hostname": "web", "static_hostname": stored}
+    mutate = hostname_module(monkeypatch, tmp_path, status)
+    assert run_module(systemd_hostname, {"static_hostname": "web"}, True)["changed"] is (stored != "web")
+    assert run_module(systemd_hostname, {"static_hostname": ""}, True)["changed"] is (stored != "")
+    mutate.assert_not_called()
+
+
+@pytest.mark.parametrize("kind", ["directory", "fifo"])
+def test_hostname_static_hostname_not_a_regular_file_reads_as_unset(monkeypatch, tmp_path, run_module, kind):
+    path = tmp_path / "hostname"
+    if kind == "directory":
+        path.mkdir()
+    else:
+        os.mkfifo(path)
+
+    mutate = hostname_module(monkeypatch, tmp_path, {**HOSTNAME, "hostname": "localhost", "static_hostname": ""})
+
+    with time_limit():
+        assert run_module(systemd_hostname, {"static_hostname": ""}, True)["changed"] is False
+        assert run_module(systemd_hostname, {"static_hostname": "web"}, True)["changed"] is True
+
+    mutate.assert_not_called()
+
+
+def test_hostname_static_hostname_unreadable_fails(monkeypatch, tmp_path, run_module):
+    path = tmp_path / "hostname"
+    path.write_text("web\n")
+    hostname_module(monkeypatch, tmp_path, HOSTNAME)
+    monkeypatch.setattr(systemd_hostname, "open_regular", Mock(side_effect=PermissionError(13, "Permission denied")))
+    result = run_module(systemd_hostname, {"static_hostname": "web"}, True)
+    assert result["failed"] and result["msg"] == f"unable to read {path}: [Errno 13] Permission denied"
 
 
 def test_hostname_version_read_only_to_compare(monkeypatch, tmp_path, run_module, systemd_version):

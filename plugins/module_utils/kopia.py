@@ -100,11 +100,13 @@ def invalid_utf8(value, name, errors="strict"):
     return None
 
 
-def check_utf8(module, settings, errors="strict"):
+def check_utf8(module, settings, errors="strict", failed_result=None):
     """Fail naming the first (name, value) setting holding text that is not valid UTF-8, never its value.
 
     With errors="surrogateescape", only a lone surrogate outside U+DC80 to U+DCFF fails, see invalid_utf8.
     """
+    failed_result = failed_result or {}
+
     for name, value in settings:
         found = invalid_utf8(value, name, errors)
 
@@ -113,17 +115,18 @@ def check_utf8(module, settings, errors="strict"):
 
         # U+D800 to U+DC7F cannot be encoded, so run_command cannot pass them to kopia at all
         if errors == "surrogateescape":
+            reason = (
+                "it must not contain a lone surrogate code point other than U+DC80 to U+DCFF, which stand for bytes"
+            )
             module.fail_json(
-                msg=f"invalid {found}: it must not contain a lone surrogate code point other than U+DC80 to U+DCFF, "
-                "which stand for bytes that are not valid UTF-8, as it cannot be passed to kopia"
+                msg=f"invalid {found}: {reason} that are not valid UTF-8, as it cannot be passed to kopia",
+                **failed_result,
             )
 
         # a lone surrogate, which a JSON value can carry, reaches kopia as a raw byte or not at all, and kopia records
         # text that is not valid UTF-8 with U+FFFD in its place, so the value it reports never matches
-        module.fail_json(
-            msg=f"invalid {found}: it must be valid UTF-8, without a lone surrogate code point, "
-            "as kopia records other text with U+FFFD in its place"
-        )
+        reason = "it must be valid UTF-8, without a lone surrogate code point, as kopia records other text with U+FFFD in its place"
+        module.fail_json(msg=f"invalid {found}: {reason}", **failed_result)
 
 
 def kopia_available(module):
@@ -210,13 +213,10 @@ def snapshot_source(module, path, operation, failed_result=None):
 
     # kopia splits user@host:/path at the first "@" and the first ":", so a host may contain "@"
     if "@" in username or ":" in username or ":" in hostname:
+        client = f"client user {username!r} on host {hostname!r}"
+        reason = f"a path in which an '@' comes before any ':', for {client}, as it splits user@host:/path at the first '@' and ':'"
         module.fail_json(
-            msg=(
-                f"unable to {operation} of {path}: kopia cannot list {absolute}, a path in which an '@' comes before "
-                f"any ':', for client "
-                f"user {username!r} on host {hostname!r}, as it splits user@host:/path at the first '@' and ':'"
-            ),
-            **failed_result,
+            msg=f"unable to {operation} of {path}: kopia cannot list {absolute}, {reason}", **failed_result
         )
 
     return f"{username}@{hostname}:{absolute}"
@@ -282,17 +282,18 @@ def policy_export(module, target, failed_result=None):
     module.fail_json(msg=f"unable to export kopia policy {target}: {stderr.strip()}", **failed_result)
 
 
-def check_policy_target(module, target):
+def check_policy_target(module, target, failed_result=None):
     """Fail before kopia runs for a target that kopia policy export, show and delete would read as a manifest ID."""
     # kopia policy import reads every target as a path, but the other commands look a target up as a manifest ID
     # first, such as the ID of another policy or of a snapshot, whose source they then use
     if MANIFEST_ID.fullmatch(target):
+        commands = (
+            "kopia policy export, show and delete read a target of 32 lowercase hexadecimal digits as a manifest ID"
+        )
+        reason = f"{commands}, such as that of a policy or a snapshot, while kopia policy import reads it as a path"
         module.fail_json(
-            msg=(
-                f"invalid target {target}: kopia policy export, show and delete read a target of 32 lowercase "
-                "hexadecimal digits as a manifest ID, such as that of a policy or a snapshot, while kopia policy "
-                f"import reads it as a path; write a relative directory with such a name as ./{target}"
-            )
+            msg=f"invalid target {target}: {reason}; write a relative directory with such a name as ./{target}",
+            **(failed_result or {}),
         )
 
 

@@ -362,7 +362,10 @@ def test_damaged_payload_is_replaced_by_content(tmp_path, run_module, payload, s
 
 
 @pytest.mark.parametrize("payload", ["AAAA", "!!!!"])
-@pytest.mark.parametrize("state, message", [("present", "different password"), ("absent", "unable to decrypt")])
+@pytest.mark.parametrize(
+    "state, message",
+    [("present", "different password"), ("absent", "wrong or missing password or damaged encrypted payload")],
+)
 def test_damaged_payload_without_content_fails_clearly(tmp_path, run_module, payload, state, message):
     path = tmp_path / "rclone.conf"
     original = f"{rclone.CONFIG_MARKER}\n{payload}"
@@ -393,7 +396,7 @@ def test_unsupported_encryption_message_names_path(tmp_path, run_module, state, 
 
     result = run_module(plugin, params, check_mode)
     assert result["failed"] and result["msg"] == (
-        f"unable to read configuration file {path}: configuration encryption header not supported by this module"
+        f"unable to read configuration file {path}: unsupported or damaged configuration encryption header"
     )
     assert path.read_text() == header
 

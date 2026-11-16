@@ -5,10 +5,14 @@ bugfixes:
     starts with ``RCLONE_ENCRYPT_V`` but is not exactly
     ``RCLONE_ENCRYPT_V0:``, such as an ``RCLONE_ENCRYPT_V1:`` header or a
     damaged ``RCLONE_ENCRYPT_V0:`` line with the payload on it, fails even
-    when ``content`` is set, and that, like rclone, the module reads lines in
-    pieces of 4096 bytes, so a longer line counts as several. The failure
-    message now calls it a configuration encryption header not supported by
-    this module instead of asking to update rclone.
+    when ``content`` is set, and that, like rclone, the module trims the
+    Unicode space characters rclone trims and reads lines in pieces of up to
+    4096 bytes, so a longer line counts as several. The failure message now
+    calls it an unsupported or damaged configuration encryption header instead
+    of asking to update rclone.
+  - rclone_config_encryption - say in the failure for a file that
+    ``state=absent`` cannot decrypt without ``content`` that the encrypted
+    payload may be damaged, besides the password being wrong or missing.
   - rclone_config_encryption - document under ``content`` that a file whose
     encrypted payload is damaged is replaced, while one with an unsupported
     encryption header fails.

@@ -32,7 +32,9 @@ description:
     line that is neither empty nor a comment, with surrounding whitespace and
     invalid characters removed as the running systemd version removes them. A
     missing file, or one without a valid hostname, means no static hostname is
-    stored.
+    stored. So does a file that is not a regular file, or one with a line of
+    1 MiB or more before the hostname, which C(systemd-hostnamed) fails to
+    read and ignores.
   - Every option is validated before any setting is written, so an invalid
     value fails without leaving earlier settings applied. O(static_hostname) is
     written first, so a value the running systemd refuses also fails before
@@ -217,6 +219,7 @@ import re
 import string
 
 from ansible.module_utils.basic import AnsibleModule
+from ansible.module_utils.common.text.converters import to_native
 
 from ansible_collections.linuxhq.linux.plugins.module_utils.systemd import (
     ENV_WHITESPACE,
@@ -224,7 +227,9 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.systemd import (
     HOSTNAME_PROPERTIES,
     check_utf8,
     load_env_file,
+    open_regular,
     read_bytes,
+    read_lines,
     systemd_call,
     systemd_properties,
     systemd_proxy,
@@ -295,12 +300,6 @@ def validate_settings(module):
         module.fail_json(msg=f"invalid transient_hostname {params['transient_hostname']!r}: it is not a valid hostname")
 
 
-def read_text(module, path):
-    content = read_bytes(module, path)
-
-    return None if content is None else content.decode("utf-8", errors="replace")
-
-
 def read_machine_info(module, version):
     """Return the stored settings and why systemd-hostnamed refuses to rewrite the file, or None."""
     entries, error = load_env_file(read_bytes(module, MACHINE_INFO) or b"", version)
@@ -347,14 +346,29 @@ def hostname_cleanup(value, version):
 
 def read_static_hostname(module, version):
     """Read the static hostname as systemd's read_etc_hostname() does, an unusable one reading as unset."""
-    for line in re.split(r"\r\n|[\r\n\x00]", read_text(module, HOSTNAME_FILE) or ""):
-        line = line.strip(ENV_WHITESPACE)
+    try:
+        # systemd-hostnamed ignores a file it cannot read, such as a directory; the module reads only a regular file
+        handle = open_regular(HOSTNAME_FILE)
+        if handle is None:
+            return ""
 
-        if line and not line.startswith("#"):
-            hostname = hostname_cleanup(line, version)
+        with handle:
+            for line in read_lines(handle):
+                # read_line() fails for a line too long, and systemd-hostnamed then ignores the file
+                if line is None:
+                    return ""
 
-            # newer systemd accepts '?' wildcards and '$' tokens in a stored hostname, even where this module does not.
-            return hostname if hostname_valid(hostname.replace("?", "0").replace("$", "0")) else ""
+                line = line.strip(ENV_WHITESPACE)
+
+                if line and not line.startswith("#"):
+                    hostname = hostname_cleanup(line, version)
+
+                    # newer systemd accepts '?' wildcards and '$' tokens in a stored hostname, where this module does not
+                    return hostname if hostname_valid(hostname.replace("?", "0").replace("$", "0")) else ""
+    except FileNotFoundError:
+        return ""
+    except OSError as error:
+        module.fail_json(msg=f"unable to read {HOSTNAME_FILE}: {to_native(error)}")
 
     return ""
 
