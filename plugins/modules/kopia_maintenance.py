@@ -310,7 +310,7 @@ def ensure_present(module):
     if rc != 0:
         module.fail_json(msg=f"unable to set kopia maintenance settings: {stderr.strip()}")
 
-    current = maintenance_info(module)
+    current = maintenance_info(module, failed_result={"changed": True, "maintenance": {}})
 
     module.exit_json(changed=True, maintenance=camel_dict_to_snake_dict(current))
 

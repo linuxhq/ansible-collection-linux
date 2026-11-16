@@ -87,6 +87,11 @@ options:
         policy target.
       - Policy manifest IDs are not accepted, because C(kopia policy import)
         reads every target as a path.
+      - A target that starts with V(-) is rejected before kopia runs, also in
+        check mode, because C(kopia policy export), C(kopia policy show) and
+        C(kopia policy delete) read it as a command-line flag, such as
+        C(--global) for the global policy. Write the global policy as
+        V((global)) and a relative path starting with V(-) as V(./-name).
       - Passed to kopia as given, so V(~) and environment variables are not
         expanded.
       - A target that is not valid UTF-8, such as one with a lone surrogate
@@ -167,6 +172,7 @@ from ansible.module_utils.common.dict_transformations import (
 )
 
 from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
+    check_policy_target,
     check_utf8,
     kopia_available,
     kopia_command,
@@ -209,6 +215,7 @@ def check_policy_keys(module, value, name):
 
 def ensure_present(module):
     check_utf8(module, [("target", module.params["target"]), ("policy", module.params["policy"])])
+    check_policy_target(module, module.params["target"])
     check_policy_keys(module, module.params["policy"], "policy")
 
     if module.check_mode and not kopia_available(module):
@@ -233,13 +240,14 @@ def ensure_present(module):
     if rc != 0:
         module.fail_json(msg=f"unable to import kopia policy {target}: {stderr.strip()}")
 
-    current = policy_export(module, target)
+    current = policy_export(module, target, failed_result={"changed": True, "policy": {}})
 
     module.exit_json(changed=True, policy=camel_dict_to_snake_dict(prune_empty(current or {})))
 
 
 def ensure_absent(module):
     check_utf8(module, [("target", module.params["target"])])
+    check_policy_target(module, module.params["target"])
 
     if module.check_mode and not kopia_available(module):
         module.exit_json(changed=False)

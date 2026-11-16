@@ -49,6 +49,10 @@ options:
         bytes that are not valid UTF-8, are written as those bytes.
       - When omitted, the file must already exist and only its encryption state
         is managed, and a file that cannot be opened with O(password) fails.
+      - A file encrypted with a version this module does not support, whose
+        header starts with C(RCLONE_ENCRYPT_V) but is not C(RCLONE_ENCRYPT_V0:),
+        such as C(RCLONE_ENCRYPT_V1:), fails before anything is written, even
+        when O(content) is set.
     type: str
   password:
     description:
@@ -390,7 +394,7 @@ def main():
                 path=module.params["path"],
             )
 
-        module.fail_json(msg=missing_required_lib("pycryptodome"))
+        module.fail_json(msg=f"unable to manage configuration file {path}: {missing_required_lib('pycryptodome')}")
 
     if module.params["state"] == "present":
         ensure_present(module, path)

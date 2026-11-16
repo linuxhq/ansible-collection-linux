@@ -40,6 +40,7 @@ locale:
     - Locale and keyboard settings reported by C(systemd-localed).
     - The C(locale) field holds the locale variables, and variables that are not
       configured are returned as V(none).
+    - Empty when dasbus is unavailable in check mode.
   returned: always
   type: dict
   sample:

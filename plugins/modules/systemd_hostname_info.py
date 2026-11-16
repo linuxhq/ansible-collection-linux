@@ -39,6 +39,7 @@ hostname:
   description:
     - Hostname settings reported by C(systemd-hostnamed).
     - Properties the running systemd does not implement are returned as V(none).
+    - Empty when dasbus is unavailable in check mode.
   returned: always
   type: dict
   sample:

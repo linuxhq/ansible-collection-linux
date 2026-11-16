@@ -270,6 +270,32 @@ def test_locale_sends_only_requested_variables(monkeypatch, run_module, check_mo
         assert mutate.call_args.args[2:] == ("SetLocale", ["LC_TIME=en_GB.UTF-8"], False)
 
 
+@pytest.mark.parametrize(
+    "configured,params,expected",
+    [
+        # localed derives LANGUAGE from a sent LANG, so an unchanged LANG is not sent
+        ({"lang": "en_AU", "language": "en_AU"}, {"lang": "en_AU", "lc_time": "C.UTF-8"}, ["LC_TIME=C.UTF-8"]),
+        # localed drops LC_TIME equal to the merged LANG, so the change converges without sending LANG
+        ({"lang": "en_AU", "lc_time": "C.UTF-8"}, {"lang": "en_AU", "lc_time": "en_AU"}, ["LC_TIME=en_AU"]),
+        # a requested LANGUAGE is sent with a changed LANG so the fallback map does not replace it
+        (
+            {"lang": "en_US", "language": "en_US"},
+            {"lang": "en_AU", "language": "en_US"},
+            ["LANG=en_AU", "LANGUAGE=en_US"],
+        ),
+        ({"lang": "en_US", "language": "en_US"}, {"lang": "en_AU"}, ["LANG=en_AU"]),
+    ],
+)
+def test_locale_sends_only_changed_variables(monkeypatch, run_module, configured, params, expected):
+    monkeypatch.setattr(systemd_locale, "HAS_DASBUS", True)
+    monkeypatch.setattr(systemd_locale, "systemd_proxy", Mock())
+    monkeypatch.setattr(systemd_locale, "locale_status", Mock(return_value={**LOCALE, "locale": configured}))
+    mutate = Mock()
+    monkeypatch.setattr(systemd_locale, "systemd_call", mutate)
+    assert run_module(systemd_locale, {"locale": params})["changed"]
+    assert mutate.call_args.args[2:] == ("SetLocale", expected, False)
+
+
 @pytest.mark.parametrize("check_mode", [False, True])
 def test_locale_requires_systemd_239_before_any_write(monkeypatch, run_module, systemd_version, check_mode):
     systemd_version.return_value = 238

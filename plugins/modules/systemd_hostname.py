@@ -130,6 +130,11 @@ options:
         When it differs and a static hostname is configured, this fails rather
         than reporting a change it cannot make, so set O(static_hostname) to the
         same value instead, either on its own or alongside.
+      - It cannot be combined with changing O(static_hostname) to a value
+        containing the V(?) wildcard, as the module cannot predict the hostname
+        C(systemd-hostnamed) expands it to, so that fails even when the
+        expanded hostname would match. Once the static hostname is configured,
+        a matching RV(hostname) is reported as no change.
       - An empty string resets it to the default hostname. While a static
         hostname is in effect there is nothing observable to reset, so it is
         reported as no change.

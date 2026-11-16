@@ -213,48 +213,68 @@ def snapshot_source(module, path, operation):
     return f"{username}@{hostname}:{absolute}"
 
 
-def repository_status(module, password=None):
+# The read helpers below add failed_result to a failure, such as changed=True when the caller has already written.
+
+
+def repository_status(module, password=None, failed_result=None):
+    failed_result = failed_result or {}
     rc, stdout, stderr = kopia_command(module, ["repository", "status", "--json"], password=password)
 
     if rc == 0:
         try:
             return json.loads(stdout)
         except ValueError:
-            module.fail_json(msg=f"unable to parse kopia repository status output: {stdout.strip()}")
+            module.fail_json(msg=f"unable to parse kopia repository status output: {stdout.strip()}", **failed_result)
 
     if "repository is not connected" in stderr:
         return None
 
-    module.fail_json(msg=f"unable to query kopia repository status: {stderr.strip()}")
+    module.fail_json(msg=f"unable to query kopia repository status: {stderr.strip()}", **failed_result)
 
 
-def maintenance_info(module):
+def maintenance_info(module, failed_result=None):
+    failed_result = failed_result or {}
     rc, stdout, stderr = kopia_command(module, ["maintenance", "info", "--json"])
 
     if rc != 0:
-        module.fail_json(msg=f"unable to query kopia maintenance info: {stderr.strip()}")
+        module.fail_json(msg=f"unable to query kopia maintenance info: {stderr.strip()}", **failed_result)
 
     try:
         return json.loads(stdout)
     except ValueError:
-        module.fail_json(msg=f"unable to parse kopia maintenance info output: {stdout.strip()}")
+        module.fail_json(msg=f"unable to parse kopia maintenance info output: {stdout.strip()}", **failed_result)
 
 
-def policy_export(module, target):
+def policy_export(module, target, failed_result=None):
+    failed_result = failed_result or {}
     rc, stdout, stderr = kopia_command(module, ["policy", "export", target])
 
     if rc == 0:
         try:
             policies = json.loads(stdout)
         except ValueError:
-            module.fail_json(msg=f"unable to parse kopia policy export output for {target}: {stdout.strip()}")
+            module.fail_json(
+                msg=f"unable to parse kopia policy export output for {target}: {stdout.strip()}", **failed_result
+            )
 
         return next(iter(policies.values()), {})
 
     if "policy not found" in stderr:
         return None
 
-    module.fail_json(msg=f"unable to export kopia policy {target}: {stderr.strip()}")
+    module.fail_json(msg=f"unable to export kopia policy {target}: {stderr.strip()}", **failed_result)
+
+
+def check_policy_target(module, target):
+    """Fail before kopia runs for a target that kopia policy export, show and delete would read as a flag."""
+    # kopia policy import reads every target as a path, but the other commands read "--global" as the global policy
+    if target.startswith("-"):
+        module.fail_json(
+            msg=(
+                f"invalid target {target}: kopia reads a target starting with '-' as a command-line flag; "
+                "use (global) for the global policy, or prefix a relative path with ./"
+            )
+        )
 
 
 def prune_empty(value):

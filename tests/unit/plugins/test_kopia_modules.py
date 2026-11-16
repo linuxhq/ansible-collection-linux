@@ -19,6 +19,8 @@ from ansible_collections.linuxhq.linux.plugins.modules import (
 )
 
 RUN_COMMAND = basic.AnsibleModule.run_command
+# the kopia_client fixture replaces the shared helper, which kopia_repository also imports
+REPOSITORY_STATUS = kopia_utils.repository_status
 
 FAKE_KOPIA = """#!/bin/sh
 for arg in "$@"; do printf '%s\\n' "$arg" >> "$KOPIA_FAKE_DIR/argv"; done
@@ -703,7 +705,7 @@ def test_repository_status_uses_password(monkeypatch, run_module):
     monkeypatch.setattr(kopia_repository, "kopia_command", Mock(return_value=(0, "", "")))
     params = repository_params(options={"path": "/backup", "persist_credentials": False})
     assert run_module(kopia_repository, params)["changed"]
-    assert [entry.kwargs for entry in status.call_args_list] == [{"password": "secret"}, {"password": "secret"}]
+    assert [entry.kwargs["password"] for entry in status.call_args_list] == ["secret", "secret"]
 
 
 @pytest.mark.parametrize(
@@ -1334,3 +1336,92 @@ def test_repository_saved_path_rejects_raw_bytes(monkeypatch, run_module, storag
     result = run_module(kopia_repository, dict(params, _ansible_no_log=True), check_mode)
     assert result["failed"]
     assert result["msg"].startswith(f"invalid options.{option}: it must be valid UTF-8")
+
+
+@pytest.mark.parametrize(
+    "plugin,params",
+    [
+        (kopia_policy, {"target": "--global", "policy": {"retention": {"keep_latest": 2}}}),
+        (kopia_policy, {"target": "--global", "state": "absent"}),
+        (kopia_policy, {"target": "-data", "state": "absent"}),
+        (kopia_policy_info, {"target": "--global"}),
+    ],
+)
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_policy_target_read_as_flag_fails_before_kopia_runs(
+    monkeypatch, run_module, tmp_path, plugin, params, check_mode
+):
+    """Record the argv of a fake kopia, to which policy export, show and delete would pass '--global' as a flag."""
+    kopia = tmp_path / "kopia"
+    kopia.write_text(FAKE_KOPIA)
+    kopia.chmod(0o755)
+    (tmp_path / "policy.json").write_text('{"(global)": {"retention": {"keepLatest": 10}}}')
+    monkeypatch.setenv("KOPIA_FAKE_DIR", str(tmp_path))
+    monkeypatch.setattr(basic.AnsibleModule, "run_command", RUN_COMMAND)
+    monkeypatch.setattr(basic.AnsibleModule, "get_bin_path", lambda self, name, required=False: str(kopia))
+    result = run_module(plugin, params, check_mode)
+    assert result["failed"] and result["msg"] == (
+        f"invalid target {params['target']}: kopia reads a target starting with '-' as a command-line flag; "
+        "use (global) for the global policy, or prefix a relative path with ./"
+    )
+    assert not (tmp_path / "argv").exists()
+    assert (tmp_path / "policy.json").exists()
+
+
+NOT_CONNECTED = (1, "", "repository is not connected")
+NOT_INITIALIZED = (1, "", "repository not initialized")
+
+
+@pytest.mark.parametrize(
+    "replies,validate",
+    [
+        # validate-provider fails after create
+        ([NOT_CONNECTED, NOT_INITIALIZED, (0, "", ""), (1, "", "listing failed")], True),
+        # repository status fails after connect
+        ([NOT_CONNECTED, (0, "", ""), (1, "", "status failed")], False),
+        # repository status fails after create
+        ([NOT_CONNECTED, NOT_INITIALIZED, (0, "", ""), (1, "", "status failed")], False),
+        # repository status output cannot be parsed after connect
+        ([NOT_CONNECTED, (0, "", ""), (0, "not json", "")], False),
+    ],
+)
+def test_repository_failure_after_write_reports_change(monkeypatch, run_module, replies, validate):
+    command = Mock(side_effect=replies)
+    monkeypatch.setattr(kopia_repository, "kopia_command", command)
+    monkeypatch.setattr(kopia_utils, "kopia_command", command)
+    monkeypatch.setattr(kopia_repository, "repository_status", REPOSITORY_STATUS)
+    result = run_module(kopia_repository, repository_params(validate_provider=validate))
+    assert result["failed"] and result["changed"] is True and result["repository"] == {}
+    assert command.call_count == len(replies)
+
+
+def test_repository_failure_before_write_reports_no_change(monkeypatch, run_module):
+    command = Mock(side_effect=[NOT_CONNECTED, (1, "", "permission denied")])
+    monkeypatch.setattr(kopia_repository, "kopia_command", command)
+    monkeypatch.setattr(kopia_utils, "kopia_command", command)
+    monkeypatch.setattr(kopia_repository, "repository_status", REPOSITORY_STATUS)
+    result = run_module(kopia_repository, repository_params())
+    assert result["failed"] and not result.get("changed")
+
+
+@pytest.mark.parametrize("export", [(1, "", "denied"), (0, "not json", "")])
+def test_policy_export_failure_after_import_reports_change(monkeypatch, run_module, export):
+    command = Mock(side_effect=[(1, "", "policy not found"), (0, "", ""), export])
+    monkeypatch.setattr(kopia_policy, "kopia_command", command)
+    monkeypatch.setattr(kopia_utils, "kopia_command", command)
+    monkeypatch.setattr(kopia_policy, "policy_export", kopia_utils.policy_export)
+    result = run_module(kopia_policy, {"target": "/data", "policy": {"retention": {"keep_latest": 2}}})
+    assert result["failed"] and result["changed"] is True and result["policy"] == {}
+    assert "/data" in result["msg"]
+    assert command.call_args_list[1].args[1][:2] == ["policy", "import"]
+
+
+@pytest.mark.parametrize("info", [(1, "", "denied"), (0, "not json", "")])
+def test_maintenance_info_failure_after_set_reports_change(monkeypatch, run_module, info):
+    command = Mock(side_effect=[(0, '{"full": {"enabled": false}}', ""), (0, "", ""), info])
+    monkeypatch.setattr(kopia_maintenance, "kopia_command", command)
+    monkeypatch.setattr(kopia_utils, "kopia_command", command)
+    monkeypatch.setattr(kopia_maintenance, "maintenance_info", kopia_utils.maintenance_info)
+    result = run_module(kopia_maintenance, {"enable_full": True})
+    assert result["failed"] and result["changed"] is True and result["maintenance"] == {}
+    assert command.call_args_list[1].args[1][:2] == ["maintenance", "set"]

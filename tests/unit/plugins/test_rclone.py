@@ -134,7 +134,9 @@ def test_plaintext_is_not_encrypted(text):
 
 def test_config_header_and_wrapped_payload():
     assert rclone.config_body("# comment\n; comment\n\n RCLONE_ENCRYPT_V0: \nabcd\r\nefgh\n") == b"abcdefgh"
-    with pytest.raises(ValueError, match="unsupported"):
+    with pytest.raises(
+        ValueError, match="^unsupported configuration encryption version, which this module cannot read$"
+    ):
         rclone.config_body("RCLONE_ENCRYPT_V1:\nAAAA")
 
     with pytest.raises(ValueError, match="too short"):
