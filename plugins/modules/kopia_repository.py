@@ -56,12 +56,22 @@ options:
         kopia saves the storage options in its configuration with U+FFFD in
         place of other text and connects again from that copy, so the
         connection would fail or never match.
-      - The exceptions are C(file) and C(token_file) with
-        O(storage=from-config), which kopia only reads. U+DC80 to U+DCFF in
-        them, which Ansible uses for bytes that are not valid UTF-8, are passed
-        to kopia as those bytes. Another lone surrogate code point, from
-        U+D800 to U+DC7F, cannot be passed to kopia, so it is rejected before
-        kopia runs, also in check mode.
+      - The exceptions are the file paths that kopia only reads and never
+        saves in its configuration. These are C(file) and C(token_file) with
+        O(storage=from-config), C(root_ca_pem_path) with O(storage=s3), whose
+        file contents kopia saves instead, and C(embed_rclone_config) with
+        O(storage=rclone), whose contents kopia embeds instead.
+      - With C(embed_credentials) set to the Boolean V(true) in O(options) or
+        O(secrets), kopia saves the file contents in place of the path of
+        C(credentials_file) with O(storage=gcs) or O(storage=gdrive), and,
+        with O(storage=sftp) when C(external) is not given or is V(false), of
+        C(keyfile) when C(key_data) is not given or empty, and of
+        C(known_hosts) when C(known_hosts_data) is not given or empty, so these
+        are exceptions too.
+      - U+DC80 to U+DCFF in these exceptions, which Ansible uses for bytes
+        that are not valid UTF-8, are passed to kopia as those bytes. Another
+        lone surrogate code point, from U+D800 to U+DC7F, cannot be passed to
+        kopia, so it is rejected before kopia runs, also in check mode.
       - Put credential-carrying flags in O(secrets) instead so they stay out of
         logs.
       - Values are passed to kopia as given, so the module does not expand V(~)
@@ -211,13 +221,51 @@ STORAGE_KEYS = {
 
 STORAGE_TYPES = {"azure": "azureBlob"}
 
-UNSAVED_OPTIONS = {"from-config": ("file", "token_file")}
+# kopia reads these files and never saves their paths in its configuration
+UNSAVED_OPTIONS = {
+    "from-config": ("file", "token_file"),
+    "rclone": ("embed_rclone_config",),
+    "s3": ("root_ca_pem_path",),
+}
+
+# with embed_credentials, kopia saves the contents of these files in place of their paths
+EMBEDDED_OPTIONS = {
+    "gcs": ("credentials_file",),
+    "gdrive": ("credentials_file",),
+    "sftp": ("keyfile", "known_hosts"),
+}
+
+# kopia keeps the sftp file path when the matching data option is also given
+SFTP_DATA_OPTIONS = {"keyfile": "key_data", "known_hosts": "known_hosts_data"}
+
+
+def unsaved_options(module):
+    """Return the options kopia only reads, never saving them in its configuration."""
+    storage = module.params["storage"]
+    options = storage_options(module)
+    unsaved = set(UNSAVED_OPTIONS.get(storage, ()))
+
+    # kopia_flags sends --embed-credentials only for a Boolean true
+    if options.get("embed_credentials") is not True:
+        return unsaved
+
+    # kopia embeds the sftp files only without an external SSH command
+    external = options.get("external")
+    if storage == "sftp" and external is not None and external is not False:
+        return unsaved
+
+    for option in EMBEDDED_OPTIONS.get(storage, ()):
+        data = SFTP_DATA_OPTIONS.get(option)
+        if data is None or options.get(data) in (None, ""):
+            unsaved.add(option)
+
+    return unsaved
 
 
 def check_option_values(module):
     # kopia saves the storage options in its configuration with U+FFFD in place of bytes that are not UTF-8 and
     # reopens the storage from that copy, but it only reads these options, which run_command passes as the bytes
-    unsaved = UNSAVED_OPTIONS.get(module.params["storage"], ())
+    unsaved = unsaved_options(module)
 
     for param in ("options", "secrets"):
         values = module.params[param]

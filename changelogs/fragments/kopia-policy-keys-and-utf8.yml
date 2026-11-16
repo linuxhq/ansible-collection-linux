@@ -19,10 +19,18 @@ bugfixes:
     For kopia_repository, kopia saves the storage options and secrets in its
     configuration and connects again from that copy, so a value such as an
     sftp ``keyfile`` with such text could create a repository that never
-    connected. Only ``file`` and ``token_file`` with
-    ``storage=from-config``, which kopia only reads, pass U+DC80 to U+DCFF to
-    kopia as the bytes Ansible uses them for, and are rejected only for
-    another lone surrogate code point, which cannot be passed to kopia.
+    connected. Only the file paths kopia reads and never saves pass U+DC80
+    to U+DCFF to kopia as the bytes Ansible uses them for, and are rejected
+    only for another lone surrogate code point, which cannot be passed to
+    kopia. These are ``file`` and ``token_file`` with
+    ``storage=from-config``, ``root_ca_pem_path`` with ``storage=s3`` and
+    ``embed_rclone_config`` with ``storage=rclone``, whose contents kopia
+    saves instead, and, with ``embed_credentials`` set to the Boolean
+    ``true``, ``credentials_file`` with ``storage=gcs`` or
+    ``storage=gdrive`` and, with ``storage=sftp`` when ``external`` is not
+    given or is ``false``, ``keyfile`` when ``key_data`` is not given or
+    empty and ``known_hosts`` when ``known_hosts_data`` is not given or
+    empty, which kopia replaces with the file contents.
   - kopia_snapshot_info - document the UTF-8 requirement under ``path``,
     which the module checks, instead of ``config_file``.
   - kopia_maintenance, kopia_policy - document that the returned

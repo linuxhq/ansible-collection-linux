@@ -1243,3 +1243,94 @@ def test_repository_unsaved_option_passes_raw_bytes(monkeypatch, run_module, par
     flag_name = option.replace("_", "-")
     assert flag == f"--{flag_name}=/etc/kopia/r\udce9.config"
     assert to_bytes(flag, errors="surrogate_or_strict") == f"--{flag_name}=/etc/kopia/r".encode() + b"\xe9.config"
+
+
+READ_ONLY_PATHS = [
+    ("s3", {"bucket": "b"}, "root_ca_pem_path"),
+    ("rclone", {"remote_path": "r:p"}, "embed_rclone_config"),
+    ("gcs", {"bucket": "b", "embed_credentials": True}, "credentials_file"),
+    ("gdrive", {"folder_id": "f", "embed_credentials": True}, "credentials_file"),
+    ("sftp", {"host": "h", "path": "/p", "embed_credentials": True}, "keyfile"),
+    ("sftp", {"host": "h", "path": "/p", "embed_credentials": True, "key_data": ""}, "keyfile"),
+    ("sftp", {"host": "h", "path": "/p", "embed_credentials": True, "external": False}, "known_hosts"),
+]
+
+
+@pytest.mark.parametrize("check_mode", [False, True])
+@pytest.mark.parametrize("param", ["options", "secrets"])
+@pytest.mark.parametrize("storage,options,option", READ_ONLY_PATHS)
+def test_repository_read_only_path_passes_raw_bytes(
+    monkeypatch, run_module, storage, options, option, param, check_mode
+):
+    # kopia reads these files and saves their contents, never the path, so the byte U+DCE9 stands for reaches it
+    monkeypatch.setattr(kopia_repository, "kopia_available", lambda module: True)
+    monkeypatch.setattr(kopia_repository, "repository_status", Mock(side_effect=[None, {"storageType": "x"}]))
+    command = Mock(return_value=(0, "", ""))
+    monkeypatch.setattr(kopia_repository, "kopia_command", command)
+    params = {"storage": storage, "password": "secret", "options": dict(options)}
+    params.setdefault(param, {})[option] = "/etc/kopia/f\udce9"
+    result = run_module(kopia_repository, dict(params, _ansible_no_log=True), check_mode)
+    assert result["changed"] and not result.get("failed")
+
+    if check_mode:
+        command.assert_not_called()
+        return
+
+    flag_name = option.replace("_", "-")
+    flag = next(arg for arg in command.call_args.args[1] if arg.startswith(f"--{flag_name}="))
+    assert to_bytes(flag, errors="surrogate_or_strict") == f"--{flag_name}=/etc/kopia/f".encode() + b"\xe9"
+
+
+@pytest.mark.parametrize("check_mode", [False, True])
+@pytest.mark.parametrize("embed,accepted", [(True, True), (False, False)])
+def test_repository_embed_credentials_from_secrets(monkeypatch, run_module, embed, accepted, check_mode):
+    # a secret overrides an option of the same name, so embed_credentials counts from either
+    monkeypatch.setattr(kopia_repository, "kopia_available", lambda module: True)
+    monkeypatch.setattr(kopia_repository, "repository_status", Mock(side_effect=[None, {"storageType": "x"}]))
+    monkeypatch.setattr(kopia_repository, "kopia_command", Mock(return_value=(0, "", "")))
+    params = {
+        "storage": "sftp",
+        "password": "secret",
+        "options": {"host": "h", "path": "/p", "keyfile": "/k\udce9", "embed_credentials": not embed},
+        "secrets": {"embed_credentials": embed},
+    }
+    result = run_module(kopia_repository, dict(params, _ansible_no_log=True), check_mode)
+    assert bool(result.get("failed")) is not accepted
+
+
+@pytest.mark.parametrize("check_mode", [False, True])
+@pytest.mark.parametrize("storage,options,option", READ_ONLY_PATHS)
+def test_repository_read_only_path_rejects_unencodable_surrogate(
+    monkeypatch, run_module, storage, options, option, check_mode
+):
+    must_not_run_kopia(monkeypatch, kopia_repository)
+    params = {"storage": storage, "password": "secret", "options": dict(options, **{option: "/f\udc7f"})}
+    result = run_module(kopia_repository, dict(params, _ansible_no_log=True), check_mode)
+    assert result["failed"]
+    assert result["msg"].startswith(f"invalid options.{option}: it must not contain a lone surrogate code point other")
+
+
+@pytest.mark.parametrize("check_mode", [False, True])
+@pytest.mark.parametrize(
+    "storage,options,option",
+    [
+        # kopia saves these paths in its configuration and opens the storage again from that copy
+        ("sftp", {"host": "h", "path": "/p"}, "keyfile"),
+        ("sftp", {"host": "h", "path": "/p", "embed_credentials": False}, "keyfile"),
+        ("sftp", {"host": "h", "path": "/p", "embed_credentials": "true"}, "keyfile"),
+        ("sftp", {"host": "h", "path": "/p", "embed_credentials": True, "key_data": "k"}, "keyfile"),
+        ("sftp", {"host": "h", "path": "/p", "embed_credentials": True, "external": True}, "keyfile"),
+        ("sftp", {"host": "h", "path": "/p", "embed_credentials": True, "known_hosts_data": "k"}, "known_hosts"),
+        ("gcs", {"bucket": "b"}, "credentials_file"),
+        ("gdrive", {"folder_id": "f", "embed_credentials": False}, "credentials_file"),
+        ("s3", {"bucket": "b", "embed_credentials": True}, "credentials_file"),
+        ("azure", {"container": "c", "embed_credentials": True}, "azure_federated_token_file"),
+        ("filesystem", {"embed_credentials": True}, "path"),
+    ],
+)
+def test_repository_saved_path_rejects_raw_bytes(monkeypatch, run_module, storage, options, option, check_mode):
+    must_not_run_kopia(monkeypatch, kopia_repository)
+    params = {"storage": storage, "password": "secret", "options": dict(options, **{option: "/f\udce9"})}
+    result = run_module(kopia_repository, dict(params, _ansible_no_log=True), check_mode)
+    assert result["failed"]
+    assert result["msg"].startswith(f"invalid options.{option}: it must be valid UTF-8")
