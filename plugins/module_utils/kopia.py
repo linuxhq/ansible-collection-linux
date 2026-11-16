@@ -265,11 +265,16 @@ def kopia_command(module, args, password=None):
     if password is not None:
         environ["KOPIA_PASSWORD"] = password
 
-    # kopia asks for a password that is neither given nor persisted on its standard input, which can be a terminal,
-    # such as over SSH without pipelining, so it gets a pipe, on which kopia fails at once instead of waiting
-    rc, stdout, stderr = module.run_command(
-        command, data="\n", binary_data=True, environ_update=environ, expand_user_and_vars=False
-    )
+    # kopia asks for a password that is neither given nor persisted on the standard input it inherits, which can be a
+    # terminal, such as over SSH without pipelining, so it inherits /dev/null instead, on which it fails at once; data
+    # would give it a pipe, but writing it fails when kopia exits first
+    null = os.open(os.devnull, os.O_RDONLY)
+    try:
+        os.dup2(null, 0)
+    finally:
+        os.close(null)
+
+    rc, stdout, stderr = module.run_command(command, environ_update=environ, expand_user_and_vars=False)
 
     if rc != 0 and PASSWORD_PROMPT_ERROR in stderr:
         missing = "kopia needs the repository password, which is not given"

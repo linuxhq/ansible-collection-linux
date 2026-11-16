@@ -1828,7 +1828,7 @@ def test_repository_create_failure_on_other_storage_reports_no_change(monkeypatc
 
 
 # kopia asks for a password it is not given and has not persisted on its standard input, and fails at once when that is
-# not a terminal; this one records what it got there, waiting at most 5 seconds so a test without a pipe fails
+# not a terminal; this one records what it got there, waiting at most 5 seconds so a test without /dev/null fails
 PROMPT_KOPIA = """#!{python}
 import os
 import select
@@ -1837,7 +1837,7 @@ import sys
 
 ready = select.select([0], [], [], 5)[0]
 data = os.read(0, 16) if ready else b"(nothing within 5 seconds)"
-kind = "pipe" if stat.S_ISFIFO(os.fstat(0).st_mode) else "other"
+kind = "device" if stat.S_ISCHR(os.fstat(0).st_mode) else "other"
 with open(os.path.join(os.environ["KOPIA_FAKE_DIR"], "stdin"), "w") as handle:
     handle.write(f"{{data!r}} {{kind}}")
 if not os.isatty(0):
@@ -1885,11 +1885,23 @@ def test_password_prompt_fails_instead_of_waiting(monkeypatch, run_module, tmp_p
     monkeypatch.setattr(basic.AnsibleModule, "run_command", RUN_COMMAND)
     monkeypatch.setattr(basic.AnsibleModule, "get_bin_path", lambda self, name, required=False: str(kopia))
     monkeypatch.setattr(kopia_utils, "repository_status", REPOSITORY_STATUS)
-    result = run_module(plugin, dict(params, config_file=str(config)), check_mode)
+
+    # the module's own standard input is a pipe nothing is written to, on which an inheriting kopia would wait
+    stdin = os.dup(0)
+    read_end, write_end = os.pipe()
+    os.dup2(read_end, 0)
+
+    try:
+        result = run_module(plugin, dict(params, config_file=str(config)), check_mode)
+    finally:
+        os.dup2(stdin, 0)
+        for fd in (stdin, read_end, write_end):
+            os.close(fd)
+
     missing = f"kopia needs the repository password, which is not given and not persisted next to {config}"
     assert result["failed"] and f"{missing}: {PROMPT_ERROR}" in result["msg"]
     assert {key: result[key] for key in keys} == keys and "changed" not in result
-    assert (tmp_path / "stdin").read_text() == "b'\\n' pipe"
+    assert (tmp_path / "stdin").read_text() == "b'' device"
 
 
 @pytest.mark.parametrize("check_mode", [False, True])

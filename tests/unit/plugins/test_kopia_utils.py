@@ -18,12 +18,9 @@ def test_command_keeps_password_out_of_argv(module_factory):
     module.get_bin_path.return_value = "/usr/bin/kopia"
     module.run_command = Mock(return_value=(0, "result", ""))
     assert kopia.kopia_command(module, ["repository", "status"], password="secret") == (0, "result", "")
-    # kopia gets a pipe on its standard input, so it fails rather than waits for a password on a terminal, and fails
-    # rather than waits while another client upgrades the repository format
+    # kopia fails rather than waits while another client upgrades the repository format
     module.run_command.assert_called_once_with(
         ["/usr/bin/kopia", "--config-file=/tmp/config with spaces", "repository", "status"],
-        data="\n",
-        binary_data=True,
         environ_update={
             "KOPIA_CHECK_FOR_UPDATES": "false",
             "KOPIA_PASSWORD": "secret",
