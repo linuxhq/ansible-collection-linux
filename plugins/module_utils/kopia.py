@@ -414,7 +414,8 @@ def policy_export(module, target, failed_result=None):
     rc, stdout, stderr = kopia_command(module, ["policy", "export", "--", target])
 
     if rc == 0:
-        return next(iter(json.loads(stdout).values()), {})
+        # kopia exports the one policy of the target, keyed by the target
+        return next(iter(json.loads(stdout).values()))
 
     if "policy not found" in stderr:
         return None

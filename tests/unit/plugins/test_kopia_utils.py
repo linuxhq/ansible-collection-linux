@@ -183,7 +183,6 @@ def test_invalid_utf8_surrogateescape_accepts_only_escaped_bytes(value, expected
         (kopia.repository_status, (), '{"storageType":"filesystem"}', {"storageType": "filesystem"}),
         (kopia.maintenance_info, (), '{"full":{"enabled":false}}', {"full": {"enabled": False}}),
         (kopia.policy_export, ("target",), '{"target":{"retention":{}}}', {"retention": {}}),
-        (kopia.policy_export, ("target",), "{}", {}),
     ],
 )
 def test_query_parses_json(monkeypatch, module_factory, function, args, output, expected):

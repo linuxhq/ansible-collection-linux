@@ -105,8 +105,9 @@ options:
     description:
       - Maintenance owner as C(user@hostname).
       - Must not be empty.
-      - kopia resolves the special value V(me) to the current user and host at
-        set time, so V(me) always reports a change, prefer the explicit form.
+      - kopia resolves the special value V(me) to the client user and host of
+        the connection, so V(me) is compared as that C(user@hostname), as
+        C(kopia repository status) reports it, also in check mode.
       - An owner that is not valid UTF-8, such as one with a lone surrogate
         code point, is rejected before kopia runs, also in check mode, because
         kopia records it with U+FFFD in its place.
@@ -188,6 +189,7 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
     kopia_available,
     kopia_command,
     maintenance_info,
+    repository_status,
     same_value,
 )
 
@@ -260,7 +262,7 @@ def flag_value(kind, value):
 
 
 def log_retention_or_default(retention):
-    if all(not retention.get(key) for key in LOG_RETENTION_DEFAULTS):
+    if all(not retention[key] for key in LOG_RETENTION_DEFAULTS):
         return dict(retention, **LOG_RETENTION_DEFAULTS)
 
     return dict(retention)
@@ -286,6 +288,16 @@ def log_retention_change(module, current):
         return None, []
 
     return expected, flags
+
+
+def owner_me(module):
+    """Return the owner kopia sets for "me", the client user and host of the connection."""
+    status = repository_status(module, failed_result={"maintenance": {}})
+
+    if status is None:
+        module.fail_json(msg="unable to resolve the maintenance owner me: repository is not connected", maintenance={})
+
+    return "{username}@{hostname}".format(**status["clientOptions"])
 
 
 def validate_settings(module):
@@ -326,6 +338,11 @@ def ensure_present(module):
         if value is None or param in LOG_RETENTION:
             continue
 
+        # kopia sets "me" as the client user and host of the connection, which never equal "me"
+        if param == "owner" and value == "me":
+            value = owner_me(module)
+
+        # kopia before 0.14 reports no extendObjectLocks and before 0.18 no listParallelism, as it has no such setting
         node = predicted
         for key in path[:-1]:
             node = node.setdefault(key, {})

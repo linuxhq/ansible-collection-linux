@@ -1,0 +1,15 @@
+---
+bugfixes:
+  - kopia_maintenance - compare ``owner=me`` with the stored owner as the
+    client user and host of the connection, ``user@hostname``, which kopia
+    stores for ``me``, also in check mode. The task reported a change on
+    every run.
+  - kopia_repository - also compare ``port`` and ``storage_domain``, and for
+    ``storage=sftp`` ``username``, with the connected repository, so a host
+    connected to the same path on another sftp server port or account, or to
+    an azure container in another storage domain, fails instead of reporting
+    no change. A ``storage_domain`` that is not stored is compared as
+    ``blob.core.windows.net``, the domain kopia uses then.
+  - kopia_repository - document that kopia refuses a Boolean flag given a
+    value, such as ``embed_credentials`` set to the string ``"true"``, before
+    it changes anything.
