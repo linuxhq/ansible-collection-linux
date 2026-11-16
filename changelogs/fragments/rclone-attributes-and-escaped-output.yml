@@ -3,11 +3,13 @@ bugfixes:
   - rclone_config_encryption - fail before writing anything for an ``owner``
     or ``group`` that cannot be looked up, including one with a NUL character
     or a lone surrogate code point, and for a ``mode`` that is neither octal
-    nor symbolic. Ansible applied them only after the configuration file was
-    written, so the run changed the file and then failed, and check mode
-    reported a change for a new file instead of failing. Document that an
-    SELinux context or ``attributes`` value the system refuses still fails
-    only after the file is written.
+    nor symbolic or is beyond the range of a C int, such as ``040000000000``.
+    Ansible applied them only after the configuration file was written, so
+    the run changed the file and then failed, and check mode reported a
+    change for a new file instead of failing. Document that an SELinux
+    context or ``attributes`` value the system refuses, and an ``owner`` or
+    ``group`` the module may not set, such as another user's when it does not
+    run as root, still fail only after the file is written.
   - rclone_config_encryption - backslash escape lone surrogate code points,
     such as U+DC80 to U+DCFF, which stand for bytes that are not valid UTF-8,
     in the returned ``path`` and in failure messages, including the resolved

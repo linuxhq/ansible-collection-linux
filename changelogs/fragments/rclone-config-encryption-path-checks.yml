@@ -6,3 +6,8 @@ bugfixes:
     the module failed with a traceback; without it, it failed saying the
     configuration file does not exist. U+DC80 to U+DCFF, which Ansible uses
     for bytes that are not valid UTF-8, still stand for those bytes.
+  - rclone_config_encryption - fail before anything is read or written when
+    ``path`` resolves to something other than a regular file. Reading a FIFO
+    blocked the module, a device such as ``/dev/zero`` never ended, and with
+    ``content`` as root a device such as ``/dev/null`` was replaced by the
+    configuration file.
