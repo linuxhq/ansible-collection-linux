@@ -51,14 +51,17 @@ options:
         or a list for one of the options that identify the repository, listed
         in the description, such as C(bucket) or C(path). Quote a value such as
         V(no) that YAML reads as a Boolean.
-      - A lone surrogate code point from U+D800 to U+DC7F cannot be passed to
-        kopia, so it is rejected before kopia runs, also in check mode.
-      - U+DC80 to U+DCFF, which Ansible uses for bytes that are not valid
-        UTF-8, are passed to kopia as those bytes, such as for a file path that
-        kopia only reads. In the options that identify the repository, listed
-        in the description, they are rejected before kopia runs, also in check
-        mode, because kopia records them with U+FFFD in their place, so the
-        connected repository would never match.
+      - Keys and values must be valid UTF-8, without a lone surrogate code
+        point, or the module fails before kopia runs, also in check mode.
+        kopia saves the storage options in its configuration with U+FFFD in
+        place of other text and connects again from that copy, so the
+        connection would fail or never match.
+      - The exceptions are C(file) and C(token_file) with
+        O(storage=from-config), which kopia only reads. U+DC80 to U+DCFF in
+        them, which Ansible uses for bytes that are not valid UTF-8, are passed
+        to kopia as those bytes. Another lone surrogate code point, from
+        U+D800 to U+DC7F, cannot be passed to kopia, so it is rejected before
+        kopia runs, also in check mode.
       - Put credential-carrying flags in O(secrets) instead so they stay out of
         logs.
       - Values are passed to kopia as given, so the module does not expand V(~)
@@ -208,20 +211,22 @@ STORAGE_KEYS = {
 
 STORAGE_TYPES = {"azure": "azureBlob"}
 
+UNSAVED_OPTIONS = {"from-config": ("file", "token_file")}
+
 
 def check_option_values(module):
-    # kopia only reads most options, such as a credentials file path, which run_command passes as the original bytes,
-    # but records the identifying options, which the module compares, with U+FFFD in place of bytes that are not UTF-8
-    check_utf8(module, [(param, module.params[param]) for param in ("options", "secrets")], errors="surrogateescape")
-    check_utf8(
-        module,
-        [
-            (f"{param}.{option}", value)
-            for param in ("options", "secrets")
-            for option, value in sorted(module.params[param].items())
-            if option in STORAGE_KEYS
-        ],
-    )
+    # kopia saves the storage options in its configuration with U+FFFD in place of bytes that are not UTF-8 and
+    # reopens the storage from that copy, but it only reads these options, which run_command passes as the bytes
+    unsaved = UNSAVED_OPTIONS.get(module.params["storage"], ())
+
+    for param in ("options", "secrets"):
+        values = module.params[param]
+        check_utf8(
+            module,
+            [(param, {option: value for option, value in values.items() if option in unsaved})],
+            errors="surrogateescape",
+        )
+        check_utf8(module, [(param, {option: value for option, value in values.items() if option not in unsaved})])
 
     for param in ("options", "secrets"):
         for option, value in sorted(module.params[param].items()):

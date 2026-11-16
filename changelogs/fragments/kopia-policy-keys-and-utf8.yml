@@ -16,9 +16,11 @@ bugfixes:
     maintenance owner was set on every run, and the next run failed against
     the module's own repository connection. Some such values made the module
     fail with a traceback. A failure names the option or key, never a value.
-    For kopia_repository, only the options that identify the repository,
-    such as ``path`` or ``bucket``, must be valid UTF-8; other options and
-    secrets, such as a file path kopia only reads, pass U+DC80 to U+DCFF to
+    For kopia_repository, kopia saves the storage options and secrets in its
+    configuration and connects again from that copy, so a value such as an
+    sftp ``keyfile`` with such text could create a repository that never
+    connected. Only ``file`` and ``token_file`` with
+    ``storage=from-config``, which kopia only reads, pass U+DC80 to U+DCFF to
     kopia as the bytes Ansible uses them for, and are rejected only for
     another lone surrogate code point, which cannot be passed to kopia.
   - kopia_snapshot_info - document the UTF-8 requirement under ``path``,

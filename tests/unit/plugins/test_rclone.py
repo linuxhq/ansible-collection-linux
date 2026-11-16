@@ -72,11 +72,15 @@ def test_deobscure_rejects_invalid_encoding(value):
         rclone_deobscure.rclone_deobscure(value)
 
 
+@pytest.mark.parametrize("data", [b"a\xffb", b"\x80", b"p\xc4\x81ss\xe9"])
 @pytest.mark.parametrize("function", [rclone.deobscure, rclone_deobscure.rclone_deobscure])
-def test_deobscure_rejects_invalid_utf8(function):
-    error = AnsibleFilterError if function is rclone_deobscure.rclone_deobscure else ValueError
-    with pytest.raises(error, match="revealed value is not valid UTF-8"):
-        function("AAAAAAAAAAAAAAAAAAAAAP8")
+def test_deobscure_round_trips_invalid_utf8(function, data):
+    # rclone reveal returns bytes that are not valid UTF-8 as they are; Ansible holds them as U+DC80 to U+DCFF
+    obscured = rclone.obscure(data)
+    revealed = function(obscured)
+    assert revealed == data.decode("utf-8", "surrogateescape")
+    assert rclone.obscure(revealed) == obscured
+    assert rclone_obscure.rclone_obscure(revealed) == obscured
 
 
 def test_base64_newlines_and_binary():

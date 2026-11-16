@@ -119,10 +119,8 @@ def deobscure(obscured):
 
     crypter = AES.new(key=SECRET_KEY, mode=AES.MODE_CTR, initial_value=iv, nonce=b"")
 
-    try:
-        return crypter.decrypt(buf).decode("utf-8")
-    except UnicodeDecodeError as error:
-        raise ValueError("revealed value is not valid UTF-8") from error
+    # rclone reveal returns bytes that are not valid UTF-8 as they are, which Ansible holds as U+DC80 to U+DCFF
+    return crypter.decrypt(buf).decode("utf-8", "surrogateescape")
 
 
 _SALSA20_QUARTERROUNDS = (

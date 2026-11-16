@@ -16,8 +16,10 @@ description:
     rejects it.
   - Other values that rclone would reject, such as those containing
     characters outside the unpadded base64url alphabet, raise an error.
-  - A value that reveals bytes which are not valid UTF-8 raises an error, as
-    the result must be a string.
+  - The revealed bytes are returned as UTF-8 text. Bytes that are not valid
+    UTF-8, which C(rclone reveal) returns as they are, are returned as U+DC80
+    to U+DCFF, which Ansible uses for such bytes, so
+    P(linuxhq.linux.rclone_obscure#filter) obscures them as those bytes again.
   - A vault encrypted value is decrypted before it is revealed.
 positional: _input
 options:

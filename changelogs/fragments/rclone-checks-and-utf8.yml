@@ -5,8 +5,10 @@ bugfixes:
     without pycryptodome fails where a real run would.
   - rclone_config_encryption - name the configuration file when the password
     is invalid.
-  - rclone_deobscure - report a value that reveals invalid UTF-8 as such
-    instead of with a codec error.
+  - rclone_deobscure - return bytes that are not valid UTF-8, which
+    ``rclone reveal`` returns as they are, as U+DC80 to U+DCFF, which Ansible
+    uses for such bytes, instead of failing with a codec error, so
+    rclone_obscure obscures the revealed value as the same bytes again.
   - rclone_obscure - obscure U+DC80 to U+DCFF, which Ansible uses for bytes
     that are not valid UTF-8, such as in registered command output, as those
     bytes, as ``rclone obscure`` does, instead of failing with a codec error.
