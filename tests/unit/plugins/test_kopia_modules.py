@@ -149,7 +149,7 @@ def test_repository_missing_filesystem_path_is_created(monkeypatch, run_module, 
 
 @pytest.mark.parametrize("status,connected", [(None, False), ({"storageType": "s3"}, True)])
 def test_repository_info(monkeypatch, run_module, status, connected):
-    monkeypatch.setattr(kopia_repository_info, "repository_status", lambda module: status)
+    monkeypatch.setattr(kopia_repository_info, "repository_status", lambda module, **kwargs: status)
     result = run_module(kopia_repository_info)
     assert result["connected"] is connected and not result["changed"]
     assert result["repository"] == ({"storage_type": "s3"} if connected else {})
@@ -1548,9 +1548,9 @@ def test_repository_create_failure_after_blobcfg_reports_change(monkeypatch, run
     result = run_module(kopia_repository, repository_params(validate_provider=True))
     assert result["failed"] and result["changed"] is True and result["repository"] == {}
     assert result["msg"] == (
-        "kopia failed to create the repository in filesystem path=/backup after writing its kopia.blobcfg blob, so "
-        "the storage holds a partial repository, and creating it fails until kopia.blobcfg is removed from the "
-        f"storage: {stderr}"
+        "kopia failed to create the repository in filesystem path=/backup after writing the kopia.blobcfg blob (the "
+        "file kopia.blobcfg.f with filesystem, rclone, sftp or webdav storage), so the storage holds a partial "
+        f"repository, and creating it fails until that blob is removed from the storage: {stderr}"
     )
     assert command.call_count == 3
 
@@ -1655,3 +1655,170 @@ def test_maintenance_info_failure_after_set_reports_change(monkeypatch, run_modu
     result = run_module(kopia_maintenance, {"enable_full": True})
     assert result["failed"] and result["changed"] is True and result["maintenance"] == {}
     assert command.call_args_list[1].args[1][:2] == ["maintenance", "set"]
+
+
+# the result keys each module returns empty on failure, and the ones it leaves out as unknown
+FAILED_KEYS = {
+    kopia_maintenance: ({"maintenance": {}}, ()),
+    kopia_maintenance_info: ({"maintenance": {}}, ()),
+    kopia_policy: ({"policy": {}}, ()),
+    kopia_policy_info: ({"effective_policy": {}, "policy": {}}, ("defined",)),
+    kopia_repository: ({"repository": {}}, ()),
+    kopia_repository_info: ({"repository": {}}, ("connected",)),
+    kopia_snapshot: ({"snapshot": {}}, ()),
+    kopia_snapshot_info: ({"snapshots": []}, ()),
+}
+
+
+def assert_failed_keys(plugin, result, params=None):
+    # kopia_policy_info lists the policies without a target
+    listing = plugin is kopia_policy_info and not (params or {}).get("target")
+    empty, omitted = ({"policies": []}, ("defined", "effective_policy", "policy")) if listing else FAILED_KEYS[plugin]
+    assert result["failed"] and not result.get("changed")
+    assert {key: result.get(key) for key in empty} == empty
+    assert not set(omitted) & set(result)
+
+
+@pytest.mark.parametrize("check_mode", [False, True])
+@pytest.mark.parametrize(
+    "plugin,params",
+    [
+        (kopia_repository, repository_params(options={"path": "/backup", "region": {"name": "us-west-1"}})),
+        (kopia_repository, repository_params(options={"path": ["/a", "/b"]})),
+        (kopia_repository, repository_params(options={"path": False})),
+        (kopia_repository, repository_params(options={"path": f"/srv/{SURROGATE}"})),
+        (kopia_repository, {"storage": "from-config", "password": "secret", "options": {"file": "/c\udc7f"}}),
+        (kopia_maintenance, {"full_interval": -1}),
+        (kopia_maintenance, {"max_retained_log_size_mb": 8796093022208}),
+        (kopia_maintenance, {"owner": ""}),
+        (kopia_maintenance, {"owner": f"root@{SURROGATE}"}),
+        (kopia_policy, {"target": MANIFEST_ID, "policy": {}}),
+        (kopia_policy, {"target": f"/srv/{SURROGATE}", "policy": {}}),
+        (kopia_policy, {"target": "/srv", "policy": {"Retention": {"keep_latest": 2}}}),
+        (kopia_policy_info, {"target": MANIFEST_ID}),
+        (kopia_policy_info, {"target": "/srv/\ud800"}),
+        (kopia_snapshot, {"path": f"/srv/{SURROGATE}"}),
+        (kopia_snapshot, {"path": "/srv", "tags": {"a:b": "c"}}),
+        (kopia_snapshot, {"path": "/srv", "tags": {"build": 42}}),
+        (kopia_snapshot_info, {"path": "/srv/\ud800"}),
+    ],
+)
+def test_invalid_input_fails_with_empty_result_before_kopia_runs(monkeypatch, run_module, plugin, params, check_mode):
+    must_not_run_kopia(monkeypatch, plugin)
+    assert_failed_keys(plugin, run_module(plugin, dict(params, _ansible_no_log=True), check_mode), params)
+
+
+@pytest.mark.parametrize("response", [(1, "", "denied"), (0, "not json", "")])
+@pytest.mark.parametrize(
+    "plugin,params,replies",
+    [
+        (kopia_repository_info, {}, []),
+        (kopia_maintenance_info, {}, []),
+        (kopia_policy_info, {}, []),
+        # export, then show
+        (kopia_policy_info, {"target": "/srv"}, []),
+        (kopia_policy_info, {"target": "/srv"}, [(0, "{}", "")]),
+        (kopia_snapshot_info, {}, []),
+        (kopia_snapshot_info, {"path": "/srv"}, []),
+    ],
+)
+def test_info_failure_after_kopia_runs_returns_empty_result(monkeypatch, run_module, plugin, params, replies, response):
+    command = Mock(side_effect=replies + [response])
+    monkeypatch.setattr(kopia_utils, "kopia_command", command)
+    if hasattr(plugin, "kopia_command"):
+        monkeypatch.setattr(plugin, "kopia_command", command)
+
+    assert_failed_keys(plugin, run_module(plugin, params), params)
+    assert command.call_count == len(replies) + 1
+
+
+@pytest.mark.parametrize("check_mode", [False, True])
+@pytest.mark.parametrize("plugin", [kopia_snapshot, kopia_snapshot_info])
+@pytest.mark.parametrize(
+    "status,message",
+    [
+        # repository_status reports the repository as not connected
+        (None, "repository is not connected"),
+        ({"clientOptions": {"hostname": "host"}}, "kopia did not report the client user and host"),
+        ({"clientOptions": {"hostname": "host", "username": "a@b"}}, "kopia cannot list /home/a@b"),
+    ],
+)
+def test_snapshot_source_failure_returns_empty_result(
+    monkeypatch, run_module, kopia_client, plugin, status, message, check_mode
+):
+    kopia_client.return_value = status
+    monkeypatch.setattr(plugin, "kopia_available", lambda module: True)
+    monkeypatch.setattr(plugin, "kopia_command", Mock(side_effect=AssertionError("must not run kopia")))
+    result = run_module(plugin, {"path": "/home/a@b"}, check_mode)
+    assert message in result["msg"]
+    assert_failed_keys(plugin, result)
+
+
+BLOBCFG = "the kopia.blobcfg blob (the file kopia.blobcfg.f with filesystem, rclone, sftp or webdav storage)"
+
+
+def test_repository_create_failure_on_storage_left_partial_says_so(monkeypatch, run_module):
+    # a create that failed after writing kopia.blobcfg leaves storage that kopia neither connects to nor creates in
+    stderr = "kopia: error: unable to get repository storage: found existing data in storage location"
+    command = Mock(
+        side_effect=[NOT_CONNECTED, (1, "", "repository not initialized in the provided storage"), (1, "", stderr)]
+    )
+    monkeypatch.setattr(kopia_repository, "kopia_command", command)
+    monkeypatch.setattr(kopia_utils, "kopia_command", command)
+    monkeypatch.setattr(kopia_repository, "repository_status", REPOSITORY_STATUS)
+    result = run_module(kopia_repository, repository_params())
+    assert result["failed"] and not result.get("changed") and result["repository"] == {}
+    assert result["msg"] == (
+        "unable to create the kopia repository in filesystem path=/backup: the storage holds data but no kopia "
+        f"repository, such as {BLOBCFG} left by a failed create: {stderr}"
+    )
+
+
+@pytest.mark.parametrize("existed,changed", [(False, True), (True, False)])
+@pytest.mark.parametrize("home", [False, True])
+def test_repository_create_failure_after_creating_directory_reports_change(
+    monkeypatch, run_module, tmp_path, existed, changed, home
+):
+    # kopia's filesystem storage creates the directory and its .shards file before writing kopia.blobcfg
+    path = tmp_path / "repo"
+    if existed:
+        path.mkdir()
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+    connect = (1, "", f"can't connect to storage: cannot access storage path: stat {path}: no such file or directory")
+    stderr = "kopia: error: cannot initialize repository: unable to write blobcfg blob: no space left on device"
+
+    replies = iter([NOT_CONNECTED, NOT_INITIALIZED if existed else connect])
+
+    def kopia(module, args, password=None):
+        if args[:2] != ["repository", "create"]:
+            return next(replies)
+
+        path.mkdir(exist_ok=True)
+        return 1, "", stderr
+
+    monkeypatch.setattr(kopia_repository, "kopia_command", kopia)
+    monkeypatch.setattr(kopia_utils, "kopia_command", kopia)
+    monkeypatch.setattr(kopia_repository, "repository_status", REPOSITORY_STATUS)
+    result = run_module(kopia_repository, repository_params(options={"path": "~/repo" if home else str(path)}))
+    description = f"filesystem path={'~/repo' if home else path}"
+    assert result["failed"] and bool(result.get("changed")) is changed and result["repository"] == {}
+    if changed:
+        assert result["msg"] == (
+            f"kopia created the storage directory but failed to create the repository in {description}: {stderr}"
+        )
+    else:
+        assert result["msg"] == f"unable to create the kopia repository in {description}: {stderr}"
+
+
+@pytest.mark.parametrize("storage", ["sftp", "webdav"])
+def test_repository_create_failure_on_other_storage_reports_no_change(monkeypatch, run_module, tmp_path, storage):
+    # only filesystem storage creates a local directory
+    stderr = "kopia: error: cannot initialize repository: unable to write blobcfg blob: permission denied"
+    command = Mock(side_effect=[NOT_CONNECTED, NOT_INITIALIZED, (1, "", stderr)])
+    monkeypatch.setattr(kopia_repository, "kopia_command", command)
+    monkeypatch.setattr(kopia_utils, "kopia_command", command)
+    monkeypatch.setattr(kopia_repository, "repository_status", REPOSITORY_STATUS)
+    params = {"storage": storage, "password": "secret", "options": {"path": str(tmp_path / "missing")}}
+    result = run_module(kopia_repository, params)
+    assert result["failed"] and not result.get("changed") and result["repository"] == {}

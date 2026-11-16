@@ -46,12 +46,18 @@ EXAMPLES = r"""
 
 RETURN = r"""
 connected:
-  description: Whether the host is connected to a kopia repository.
-  returned: always
+  description:
+    - Whether the host is connected to a kopia repository.
+    - Not returned when the module fails, as the connection state is then
+      unknown.
+  returned: success
   type: bool
   sample: true
 repository:
-  description: Repository status reported by C(kopia repository status).
+  description:
+    - Repository status reported by C(kopia repository status).
+    - Empty when the module fails. Not returned when the kopia command is not
+      found.
   returned: always
   type: dict
   sample:
@@ -86,7 +92,7 @@ def info(module):
     if module.check_mode and not kopia_available(module):
         module.exit_json(changed=False, connected=False, repository={})
 
-    status = repository_status(module)
+    status = repository_status(module, failed_result={"repository": {}})
 
     module.exit_json(
         changed=False,

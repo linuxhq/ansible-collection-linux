@@ -42,7 +42,7 @@ options:
         that cannot be opened with O(password), because the password differs or
         the encrypted payload is damaged, is replaced rather than failing, which
         is what makes a password rotation a single run. A file with an
-        encryption header this module does not support fails instead, as
+        unsupported or damaged encryption header line fails instead, as
         described below.
       - Treated as a secret and kept out of logs, like O(password).
       - Content containing a lone surrogate code point, such as U+D800, which a
@@ -54,11 +54,13 @@ options:
       - A file whose first line other than blank and comment lines, trimmed
         of whitespace, starts with C(RCLONE_ENCRYPT_V) fails before anything is
         written, even when O(content) is set, unless that line, trimmed of
-        whitespace, is exactly C(RCLONE_ENCRYPT_V0:). This covers a version
-        this module does not support, such as C(RCLONE_ENCRYPT_V1:), and a
-        damaged C(RCLONE_ENCRYPT_V0:) line with the payload on it, which rclone
-        refuses as well. Like rclone, the module reads lines in pieces of 4096
-        bytes, so a longer line counts as several.
+        whitespace, is exactly C(RCLONE_ENCRYPT_V0:). Whitespace here is the
+        set of Unicode space characters rclone trims, as for O(password). This
+        covers a version this module does not support, such as
+        C(RCLONE_ENCRYPT_V1:), and a damaged C(RCLONE_ENCRYPT_V0:) line with
+        the payload on it, which rclone refuses as well. Like rclone, the
+        module reads lines in pieces of up to 4096 bytes, so a longer line
+        counts as several.
     type: str
   password:
     description:
@@ -103,7 +105,8 @@ options:
         rclone encryption header such as C(RCLONE_ENCRYPT_V0:), after any blank
         or comment lines, the module fails before writing anything, because
         rclone would read the file as encrypted rather than as the plain text
-        written.
+        written. The lines are read as described for O(content), trimmed of
+        whitespace and in pieces of up to 4096 bytes.
     type: str
     choices:
       - absent
@@ -327,7 +330,7 @@ def ensure_absent(module, path):
     if desired is None:
         if encrypted and current is None:
             module.fail_json(
-                msg=f"unable to decrypt configuration file {path}, wrong or missing password or damaged content"
+                msg=f"unable to decrypt configuration file {path}, wrong or missing password or damaged encrypted payload"
             )
 
         desired = current
@@ -381,9 +384,9 @@ def main():
         try:
             to_bytes(module.params["content"], errors="surrogate_or_strict")
         except UnicodeEncodeError as error:
+            character = f"character U+{ord(error.object[error.start]):04X}"
             module.fail_json(
-                msg=f"invalid content for configuration file {path}: character U+{ord(error.object[error.start]):04X}"
-                " is a surrogate, which is not valid UTF-8"
+                msg=f"invalid content for configuration file {path}: {character} is a surrogate, which is not valid UTF-8"
             )
 
         if module.params["state"] == "absent":

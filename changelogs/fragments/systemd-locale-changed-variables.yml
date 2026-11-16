@@ -10,17 +10,25 @@ bugfixes:
     ``systemd-localed`` sets from its language fallback map,
     ``/usr/share/systemd/language-fallback-map``, when ``lang`` changes
     without a set ``language``. Check mode reported the configured
-    ``LANGUAGE`` instead. The map is read only in check mode, as a real run
-    reads the result back, and line by line as ``systemd-localed`` reads it,
-    with quotes removed, backslash escapes, a NUL ending a line, and no
-    fallback after a line it cannot read or split, such as one of 1 MiB or
-    more or one with an unbalanced quote. A map that is not a regular file,
-    such as a link to ``/dev/zero``, gives no fallback.
+    ``LANGUAGE`` instead. The map is read line by line as ``systemd-localed``
+    reads it, with quotes removed, backslash escapes, a NUL ending a line,
+    and no fallback after a line it cannot read or split, such as one of
+    1 MiB or more or one with an unbalanced quote. The module reads the map
+    only when it is a regular file and otherwise predicts no fallback.
+  - systemd_locale - fail before any setting is written, also in check mode,
+    when ``lang`` changes without a set ``language`` and the language
+    fallback map lists a fallback for it that is not valid UTF-8.
+    ``systemd-localed`` writes such a fallback to the locale configuration
+    and then fails to report the locale, as seen on systemd 252, and check
+    mode returned it as lone surrogates. A real run reads the map for this
+    check, and returns the locale ``systemd-localed`` reports otherwise.
   - systemd_locale - document that ``systemd-localed`` writes the fallback
-    ``LANGUAGE`` without validating it, so on systemd 256 and later it can be
-    a list such as ``en_AU:en_GB``, which ``locale.language`` cannot set
-    again, and that the returned ``language`` then cannot be fed back where
-    it differs from the configured one.
+    ``LANGUAGE`` without validating it, so it can be a list such as
+    ``en_AU:en_GB``, which ``locale.language`` cannot set again where
+    ``systemd-localed`` refuses a list, from systemd 256 everywhere and from
+    systemd 247 where it checks that each locale is installed, as on EL, and
+    that the returned ``language`` then cannot be fed back where it differs
+    from the configured one.
   - systemd_locale - document that a set ``language`` is kept unless it equals
     the resulting ``LANG``, that an empty ``language`` counts as not set, and
     that ``systemd-localed`` drops any variable equal to the resulting

@@ -85,6 +85,8 @@ snapshots:
       well, each under its own C(source).
     - Keys under C(tags) are returned as kopia reports them, such as
       C(tag:role).
+    - Empty when the module fails. Not returned when the kopia command is not
+      found.
   returned: always
   type: list
   elements: dict
@@ -113,7 +115,9 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
 
 
 def list_snapshots(module):
-    check_utf8(module, [("path", module.params["path"])])
+    failed_result = {"snapshots": []}
+
+    check_utf8(module, [("path", module.params["path"])], failed_result=failed_result)
 
     if module.check_mode and not kopia_available(module):
         module.exit_json(changed=False, snapshots=[])
@@ -123,17 +127,17 @@ def list_snapshots(module):
 
     if module.params["path"]:
         source = f" of {module.params['path']}"
-        command.extend(["--", snapshot_source(module, module.params["path"], "list kopia snapshots")])
+        command.extend(["--", snapshot_source(module, module.params["path"], "list kopia snapshots", failed_result)])
 
     rc, stdout, stderr = kopia_command(module, command, password=module.params["password"])
 
     if rc != 0:
-        module.fail_json(msg=f"unable to list kopia snapshots{source}: {stderr.strip()}")
+        module.fail_json(msg=f"unable to list kopia snapshots{source}: {stderr.strip()}", **failed_result)
 
     try:
         snapshots = json.loads(stdout)
     except ValueError:
-        module.fail_json(msg=f"unable to parse kopia snapshot list output{source}: {stdout.strip()}")
+        module.fail_json(msg=f"unable to parse kopia snapshot list output{source}: {stdout.strip()}", **failed_result)
 
     return [camel_dict_to_snake_dict(snapshot, ignore_list=["tags"]) for snapshot in snapshots or []]
 

@@ -252,10 +252,8 @@ def check_config_password(password):
 
         # NFKC of a code point unknown to this Python may differ from rclone's newer tables
         if unicodedata.category(character) == "Cn" and not is_noncharacter(character):
-            raise ValueError(
-                f"character U+{ord(character):04X} is unassigned in Unicode {unicodedata.unidata_version},"
-                " the version of this Python, so its normalization may differ from rclone's"
-            )
+            unassigned = f"character U+{ord(character):04X} is unassigned in Unicode {unicodedata.unidata_version}"
+            raise ValueError(f"{unassigned}, the version of this Python, so its normalization may differ from rclone's")
 
     # Python does not insert U+034F into a long run of non-starters, as rclone does. Go also counts characters
     # of class 0 that combine with the one before as non-starters, so every mark, Hangul jamo and other such
@@ -268,9 +266,9 @@ def check_config_password(password):
             run = 0
 
         if run > MAX_NON_STARTERS:
+            characters = "consecutive combining characters, marks or Hangul jamo"
             raise ValueError(
-                f"password has more than {MAX_NON_STARTERS} consecutive combining characters, marks or Hangul jamo,"
-                " which rclone normalizes differently"
+                f"password has more than {MAX_NON_STARTERS} {characters}, which rclone normalizes differently"
             )
 
     return password
@@ -311,7 +309,7 @@ def config_body(text):
             return data[position:].replace(b"\r", b"").replace(b"\n", b"")
 
         if stripped.startswith("RCLONE_ENCRYPT_V"):
-            raise ValueError("configuration encryption header not supported by this module")
+            raise ValueError("unsupported or damaged configuration encryption header")
 
         return None
 

@@ -152,7 +152,8 @@ policy:
     - In check mode, when a change would be made, the desired policy from
       O(policy), without the values kopia does not store.
     - Empty when kopia is unavailable in check mode.
-    - Empty when the module fails after running kopia.
+    - Empty when the module fails, also for an invalid option before kopia
+      runs. Not returned when the kopia command is not found.
   returned: when O(state=present)
   type: dict
   sample:
@@ -202,12 +203,11 @@ def check_policy_keys(module, value, name):
 
             # kopia matches field names ignoring case, so it accepts such a key, then reports the field in camelCase
             if not POLICY_KEY.fullmatch(camel_key(key)):
+                reason = "which kopia matches ignoring case but reports in camelCase, so the policy would never match"
+                spelling = "write it in snake_case, such as keep_latest, or in kopia's camelCase, such as keepLatest"
                 module.fail_json(
-                    msg=(
-                        f"invalid policy key {child}: kopia reads it as {camel_key(key)}, which kopia matches ignoring "
-                        "case but reports in camelCase, so the policy would never match; write it in snake_case, "
-                        "such as keep_latest, or in kopia's camelCase, such as keepLatest"
-                    )
+                    msg=f"invalid policy key {child}: kopia reads it as {camel_key(key)}, {reason}; {spelling}",
+                    policy={},
                 )
 
             check_policy_keys(module, item, child)
@@ -218,8 +218,12 @@ def check_policy_keys(module, value, name):
 
 
 def ensure_present(module):
-    check_utf8(module, [("target", module.params["target"]), ("policy", module.params["policy"])])
-    check_policy_target(module, module.params["target"])
+    check_utf8(
+        module,
+        [("target", module.params["target"]), ("policy", module.params["policy"])],
+        failed_result={"policy": {}},
+    )
+    check_policy_target(module, module.params["target"], failed_result={"policy": {}})
     check_policy_keys(module, module.params["policy"], "policy")
 
     if module.check_mode and not kopia_available(module):

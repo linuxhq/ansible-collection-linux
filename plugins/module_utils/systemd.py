@@ -1,7 +1,9 @@
 # Copyright: Ansible Project
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
+import os
 import re
+import stat
 import traceback
 
 from ansible.module_utils.basic import missing_required_lib
@@ -93,6 +95,11 @@ LOCALE_VARIABLES = [
     "lc_telephone",
     "lc_time",
 ]
+
+# systemd's read_line() fails for a line of this many bytes or more
+LONG_LINE_MAX = 1024 * 1024
+
+LINE_READ_SIZE = 65536
 
 ENV_COMMENTS = "#;"
 ENV_NEWLINE = "\n\r"
@@ -364,6 +371,55 @@ def read_bytes(module, path):
         return None
     except OSError as error:
         module.fail_json(msg=f"unable to read {path}: {to_native(error)}")
+
+
+def open_regular(path):
+    """Open path for reading as bytes, or return None when it is not a regular file, which the module does not read.
+
+    The file is opened without blocking, so a FIFO is detected rather than waited on. Raise OSError when it cannot be
+    opened.
+    """
+    fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_CLOEXEC)
+
+    try:
+        regular = stat.S_ISREG(os.fstat(fd).st_mode)
+    except OSError:
+        os.close(fd)
+        raise
+
+    if not regular:
+        os.close(fd)
+        return None
+
+    return os.fdopen(fd, "rb")
+
+
+def read_lines(handle):
+    """Yield the lines of a file as systemd's read_line() reads them, ending at a carriage return, a line feed or a NUL.
+
+    Undecodable bytes are kept as surrogates. Yields None and stops for a line read_line() refuses as too long.
+    """
+    pending = b""
+
+    while True:
+        block = handle.read(LINE_READ_SIZE)
+        lines = re.split(b"[\r\n\0]", pending + block)
+        # the last piece can continue in the next block, unless the file has ended
+        pending = lines.pop() if block else b""
+
+        for line in lines + ([pending] if not block else []):
+            if len(line) >= LONG_LINE_MAX:
+                yield None
+                return
+
+            yield line.decode("utf-8", errors="surrogateescape")
+
+        if not block:
+            return
+
+        if len(pending) >= LONG_LINE_MAX:
+            yield None
+            return
 
 
 def load_env_file(content, version):

@@ -28,21 +28,35 @@ bugfixes:
     fails after initializing the storage, when connecting to the new
     repository or setting its default global policy and maintenance owner
     fails, and say that this setup is not retried by a later run, which
-    connects to the repository, or finds it connected, without it. Report
-    ``changed`` as well when ``kopia repository connect`` fails after saving
-    the connection, such as when persisting the password fails.
+    connects to the repository, or finds it connected, without it.
+  - kopia_repository - read the connection status when ``kopia repository
+    connect`` fails, and report ``changed`` when the host is connected, such
+    as when kopia saved the connection and then failed to persist the
+    password, or when the status cannot be read, as kopia may have saved the
+    connection. The module reports no change only when kopia reports that the
+    repository is not connected. It reported no change for every failed
+    connect.
   - kopia_repository - report ``changed`` when ``kopia repository create``
     fails to write the format blob after writing the ``kopia.blobcfg`` blob,
-    and say that ``kopia.blobcfg`` must be removed from the storage before the
-    repository can be created. The module reported no change, and later runs
-    failed with ``found existing data in storage location``.
-  - kopia_repository - treat the host as not connected after a failed
-    ``kopia repository connect`` only when ``kopia repository status`` reports
-    that the repository is not connected. Any other failure to read the status
-    now fails reporting a change, as kopia may have saved the connection,
-    instead of reporting no change.
+    stored as the file ``kopia.blobcfg.f`` with ``filesystem``, ``rclone``,
+    ``sftp`` or ``webdav`` storage, and say that this blob must be removed
+    from the storage before the repository can be created. The module
+    reported no change, and later runs failed with ``found existing data in
+    storage location``, which now also says that the storage holds data but
+    no kopia repository, such as that blob.
+  - kopia_repository - report ``changed`` when ``kopia repository create``
+    fails after creating the missing ``path`` directory of ``filesystem``
+    storage, such as when writing the ``kopia.blobcfg`` blob fails for lack
+    of space, and say that kopia created the directory.
   - kopia_repository, kopia_policy, kopia_maintenance, kopia_snapshot - return
     an empty ``repository``, ``policy``, ``maintenance`` or ``snapshot`` when
-    the module fails after running kopia, also before any change, such as
-    when reading the current state fails or the host is connected to a
-    different repository, instead of leaving the key out, and document it.
+    the module fails, also before any change, such as when reading the current
+    state fails, the host is connected to a different repository or an option
+    is refused before kopia runs, instead of leaving the key out, and document
+    it. The key is still left out when the kopia command is not found.
+  - kopia_repository_info, kopia_maintenance_info, kopia_policy_info,
+    kopia_snapshot_info - return an empty ``repository``, ``maintenance``,
+    ``policy`` and ``effective_policy``, ``policies`` or ``snapshots`` when the
+    module fails, such as when kopia fails or an option is refused before
+    kopia runs, instead of leaving the key out, and document that
+    ``connected`` and ``defined`` are left out then.

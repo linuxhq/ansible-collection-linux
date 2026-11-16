@@ -134,11 +134,11 @@ def test_plaintext_is_not_encrypted(text):
 
 def test_config_header_and_wrapped_payload():
     assert rclone.config_body("# comment\n; comment\n\n RCLONE_ENCRYPT_V0: \nabcd\r\nefgh\n") == b"abcdefgh"
-    with pytest.raises(ValueError, match="^configuration encryption header not supported by this module$"):
+    with pytest.raises(ValueError, match="^unsupported or damaged configuration encryption header$"):
         rclone.config_body("RCLONE_ENCRYPT_V1:\nAAAA")
 
     # a damaged V0 marker line with the payload on it is not the marker, which rclone refuses too
-    with pytest.raises(ValueError, match="^configuration encryption header not supported by this module$"):
+    with pytest.raises(ValueError, match="^unsupported or damaged configuration encryption header$"):
         rclone.config_body("RCLONE_ENCRYPT_V0:AAAA\n")
 
     with pytest.raises(ValueError, match="too short"):

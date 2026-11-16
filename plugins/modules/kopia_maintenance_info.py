@@ -43,6 +43,8 @@ maintenance:
   description:
     - Maintenance settings reported by C(kopia maintenance info).
     - Durations are in nanoseconds and sizes in bytes, as reported by kopia.
+    - Empty when the module fails. Not returned when the kopia command is not
+      found.
   returned: always
   type: dict
   sample:
@@ -77,7 +79,7 @@ def info(module):
     if module.check_mode and not kopia_available(module):
         module.exit_json(changed=False, maintenance={})
 
-    maintenance = maintenance_info(module)
+    maintenance = maintenance_info(module, failed_result={"maintenance": {}})
 
     module.exit_json(changed=False, maintenance=camel_dict_to_snake_dict(maintenance))
 

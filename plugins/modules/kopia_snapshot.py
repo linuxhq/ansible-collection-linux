@@ -144,6 +144,8 @@ snapshot:
     - Keys under C(tags) are returned as kopia reports them, such as
       C(tag:role).
     - Empty in check mode and when the snapshot manifest cannot be read back.
+    - Empty when the module fails before running kopia, such as for an
+      invalid option. Not returned when the kopia command is not found.
   returned: always
   type: dict
   sample:
@@ -230,15 +232,20 @@ def latest_snapshot(module, source, snapshot_id=None):
 def ensure_present(module):
     path = module.params["path"]
 
-    check_utf8(module, [(name, module.params[name]) for name in ("path", "description", "tags")])
+    check_utf8(
+        module,
+        [(name, module.params[name]) for name in ("path", "description", "tags")],
+        failed_result={"snapshot": {}},
+    )
 
     for key, value in (module.params["tags"] or {}).items():
         if ":" in key:
-            module.fail_json(msg=f"invalid tag key {key!r}: kopia splits tags at the first ':'")
+            module.fail_json(msg=f"invalid tag key {key!r}: kopia splits tags at the first ':'", snapshot={})
 
         if not isinstance(value, str):
             module.fail_json(
-                msg=f"tag {key!r} value is not a string; pass it as a string, for example quoted or with the string filter"
+                msg=f"tag {key!r} value is not a string; pass it as a string, for example quoted or with the string filter",
+                snapshot={},
             )
 
     if module.check_mode:
@@ -269,11 +276,9 @@ def ensure_present(module):
         # also in the final repository flush, which leaves the snapshot unsaved
         snapshots = list_snapshots(module, listed_source(manifest, source))
         if snapshots is None:
+            reason = "but kopia reported errors and the snapshots could not be listed"
             module.fail_json(
-                msg=(
-                    f"kopia snapshot {snapshot_id} of {path} may have been created, but kopia reported errors "
-                    f"and the snapshots could not be listed: {stderr.strip()}"
-                ),
+                msg=f"kopia snapshot {snapshot_id} of {path} may have been created, {reason}: {stderr.strip()}",
                 changed=True,
                 snapshot={},
             )

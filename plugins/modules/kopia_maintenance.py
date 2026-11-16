@@ -126,7 +126,8 @@ maintenance:
     - In check mode, when a change would be made, the settings reported by
       kopia with the requested changes applied, as the module predicts them.
     - Empty when kopia is unavailable in check mode.
-    - Empty when the module fails after running kopia.
+    - Empty when the module fails, also for an invalid option before kopia
+      runs. Not returned when the kopia command is not found.
   returned: always
   type: dict
   sample:
@@ -259,16 +260,18 @@ def validate_settings(module):
         value = module.params[param]
 
         if kind in INTEGER_KINDS and value is not None and value < 0:
-            module.fail_json(msg=f"invalid {param} {value}: it must not be negative")
+            module.fail_json(msg=f"invalid {param} {value}: it must not be negative", maintenance={})
 
     size = module.params["max_retained_log_size_mb"]
     if size is not None and size > MAX_LOG_SIZE_MB:
-        module.fail_json(msg=f"invalid max_retained_log_size_mb {size}: it must not exceed {MAX_LOG_SIZE_MB}")
+        module.fail_json(
+            msg=f"invalid max_retained_log_size_mb {size}: it must not exceed {MAX_LOG_SIZE_MB}", maintenance={}
+        )
 
     if module.params["owner"] == "":
-        module.fail_json(msg="invalid owner: it must not be empty")
+        module.fail_json(msg="invalid owner: it must not be empty", maintenance={})
 
-    check_utf8(module, [("owner", module.params["owner"])])
+    check_utf8(module, [("owner", module.params["owner"])], failed_result={"maintenance": {}})
 
 
 def ensure_present(module):

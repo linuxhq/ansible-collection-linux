@@ -37,10 +37,16 @@ description:
     a change, and a later run connects to it, or finds it connected, without
     retrying that setup, which kopia only does when it creates a repository.
   - C(kopia repository create) can also fail after writing the
-    C(kopia.blobcfg) blob, when writing the format blob fails. The module then
-    fails reporting a change, as the storage holds a partial repository, and
-    creating the repository fails until C(kopia.blobcfg) is removed from the
-    storage.
+    C(kopia.blobcfg) blob, stored as the file C(kopia.blobcfg.f) with
+    V(filesystem), V(rclone), V(sftp) or V(webdav) storage, when writing the
+    format blob fails. The module then fails reporting a change, as the
+    storage holds a partial repository, and creating the repository fails
+    until that blob is removed from the storage. A later run that finds such
+    data without a repository fails saying so.
+  - For V(filesystem) storage, C(kopia repository create) creates the
+    C(path) directory before it writes the repository. When it then fails,
+    such as for lack of space, and the directory did not exist before, the
+    module fails reporting a change.
   - When C(kopia repository connect) fails after kopia saved the connection,
     such as when persisting the password fails, the module fails reporting a
     change, and a later run finds the host connected. When the connection
@@ -186,7 +192,8 @@ repository:
     - Repository status reported by C(kopia repository status).
     - Empty in check mode when a connection would be made, and when kopia is
       unavailable in check mode.
-    - Empty when the module fails after running kopia.
+    - Empty when the module fails, also for an invalid option before kopia
+      runs. Not returned when the kopia command is not found.
   returned: always
   type: dict
   sample:
@@ -261,6 +268,15 @@ CREATE_INITIALIZED_ERRORS = ("unable to connect to repository", "error populatin
 # kopia repository create reports this when writing the format blob fails after it wrote the kopia.blobcfg blob
 CREATE_PARTIAL_ERROR = "unable to write format blob"
 
+# kopia repository create reports this for storage that holds any blob, and kopia repository connect the other when
+# the storage holds no format blob
+CREATE_NOT_EMPTY_ERROR = "found existing data in storage location"
+CONNECT_NOT_INITIALIZED_ERROR = "repository not initialized"
+
+# kopia stores a blob in a file named after it with ".f" added in sharded storage, which these providers use, rclone
+# through a WebDAV server
+BLOBCFG = "the kopia.blobcfg blob (the file kopia.blobcfg.f with filesystem, rclone, sftp or webdav storage)"
+
 
 def unsaved_options(module):
     """Return the options kopia only reads, never saving them in its configuration."""
@@ -296,24 +312,33 @@ def check_option_values(module):
             module,
             [(param, {option: value for option, value in values.items() if option in unsaved})],
             errors="surrogateescape",
+            failed_result={"repository": {}},
         )
-        check_utf8(module, [(param, {option: value for option, value in values.items() if option not in unsaved})])
+        check_utf8(
+            module,
+            [(param, {option: value for option, value in values.items() if option not in unsaved})],
+            failed_result={"repository": {}},
+        )
 
     for param in ("options", "secrets"):
         for option, value in sorted(module.params[param].items()):
             # kopia_flags would send a dictionary as Python text and a list as one flag per element
             if isinstance(value, dict):
-                module.fail_json(msg=f"invalid {param} value for {option}: a dictionary cannot be passed to kopia")
+                module.fail_json(
+                    msg=f"invalid {param} value for {option}: a dictionary cannot be passed to kopia", repository={}
+                )
 
             # kopia takes these as text flags, which kopia_flags cannot send for a Boolean or a list
             if option in STORAGE_KEYS and isinstance(value, bool):
                 module.fail_json(
-                    msg=f"invalid {param} value for {option}: it identifies the repository, so it takes a text value, not a Boolean; quote it"
+                    msg=f"invalid {param} value for {option}: it identifies the repository, so it takes a text value, not a Boolean; quote it",
+                    repository={},
                 )
 
             if option in STORAGE_KEYS and isinstance(value, (list, tuple)):
                 module.fail_json(
-                    msg=f"invalid {param} value for {option}: it identifies the repository, so it takes one value, not a list"
+                    msg=f"invalid {param} value for {option}: it identifies the repository, so it takes one value, not a list",
+                    repository={},
                 )
 
 
@@ -387,11 +412,23 @@ def not_initialized(storage, stderr):
     if storage == "from-config":
         return False
 
-    if "repository not initialized" in stderr:
+    if CONNECT_NOT_INITIALIZED_ERROR in stderr:
         return True
 
     # kopia only creates a missing filesystem path when creating the repository
     return storage == "filesystem" and "cannot access storage path" in stderr and "no such file or directory" in stderr
+
+
+def created_directory(module):
+    """Return the path kopia repository create makes for filesystem storage when it does not exist yet, or None."""
+    path = storage_options(module).get("path")
+
+    if module.params["storage"] != "filesystem" or path is None:
+        return None
+
+    path = storage_value("filesystem", "path", str(path))
+
+    return None if os.path.lexists(path) else path
 
 
 def ensure_present(module):
@@ -422,21 +459,34 @@ def ensure_present(module):
     rc, _dummy, stderr = kopia_command(module, ["repository", "connect"] + target, password=password)
 
     if rc != 0 and not_initialized(module.params["storage"], stderr):
+        uninitialized = CONNECT_NOT_INITIALIZED_ERROR in stderr
+        # kopia creates the directory of filesystem storage before it writes the repository, which can still fail
+        directory = created_directory(module)
+
         rc, _dummy, stderr = kopia_command(module, ["repository", "create"] + target, password=password)
 
         if rc != 0 and any(error in stderr for error in CREATE_INITIALIZED_ERRORS):
+            unset = (
+                "so its default global policy and maintenance owner may not be set, and a later run does not retry them"
+            )
             msg = (
-                f"created the kopia repository in {description}, but kopia failed afterwards, so its default global "
-                f"policy and maintenance owner may not be set, and a later run does not retry them: {stderr.strip()}"
+                f"created the kopia repository in {description}, but kopia failed afterwards, {unset}: {stderr.strip()}"
             )
             module.fail_json(changed=True, msg=msg, repository={})
 
         if rc != 0 and CREATE_PARTIAL_ERROR in stderr:
-            msg = (
-                f"kopia failed to create the repository in {description} after writing its kopia.blobcfg blob, so "
-                "the storage holds a partial repository, and creating it fails until kopia.blobcfg is removed from "
-                f"the storage: {stderr.strip()}"
+            partial = "the storage holds a partial repository, and creating it fails until that blob is removed from the storage"
+            msg = f"kopia failed to create the repository in {description} after writing {BLOBCFG}, so {partial}: {stderr.strip()}"
+            module.fail_json(changed=True, msg=msg, repository={})
+
+        if rc != 0 and uninitialized and CREATE_NOT_EMPTY_ERROR in stderr:
+            hint = f"the storage holds data but no kopia repository, such as {BLOBCFG} left by a failed create"
+            module.fail_json(
+                msg=f"unable to create the kopia repository in {description}: {hint}: {stderr.strip()}", repository={}
             )
+
+        if rc != 0 and directory is not None and os.path.lexists(directory):
+            msg = f"kopia created the storage directory but failed to create the repository in {description}: {stderr.strip()}"
             module.fail_json(changed=True, msg=msg, repository={})
 
         if rc != 0:
@@ -457,10 +507,7 @@ def ensure_present(module):
             module,
             password=password,
             failed_result={"changed": True, "repository": {}},
-            context=(
-                f"unable to connect to the kopia repository in {description}, and kopia may have saved the "
-                f"connection: {stderr.strip()}"
-            ),
+            context=f"unable to connect to the kopia repository in {description}, and kopia may have saved the connection: {stderr.strip()}",
         )
 
         if status is not None:

@@ -33,14 +33,20 @@ notes:
     where systemd installs it, to predict C(LANGUAGE) in check mode. When
     the module cannot read that file, or reaches a line that
     C(systemd-localed) cannot read or split into fields, it predicts no
-    fallback, as C(systemd-localed) then sets none. A different map set by
-    E(SYSTEMD_LANGUAGE_FALLBACK_MAP) in the environment of
-    C(systemd-localed) is not read, so the C(language) field check mode
+    fallback, as C(systemd-localed) then sets none. The module reads the map
+    only when it is a regular file, and otherwise predicts no fallback. A
+    different map set by E(SYSTEMD_LANGUAGE_FALLBACK_MAP) in the environment
+    of C(systemd-localed) is not read, so the C(language) field check mode
     reports can then differ from the one a real run produces.
   - C(systemd-localed) writes that fallback without the validation it applies
-    to the requested values, so on systemd 256 and later C(LANGUAGE) can
-    become a list such as V(en_AU:en_GB), which O(locale.language) cannot set
-    again.
+    to the requested values, so C(LANGUAGE) can become a list such as
+    V(en_AU:en_GB), which O(locale.language) cannot set again where
+    C(systemd-localed) refuses such a list, as described there.
+  - A fallback in that map that is not valid UTF-8 is written as well, after
+    which C(systemd-localed) fails to report the locale. So when O(locale.lang)
+    changes without a set O(locale.language) and the map lists such a fallback
+    for it, the module fails before any setting is written, also in check
+    mode, and reads the map in a real run for that check too.
   - A set O(locale.language) is sent together with a changed O(locale.lang),
     so it is kept unless it equals the resulting C(LANG).
   - On EL, C(systemd-localed) rejects a locale that is not installed on the
@@ -122,8 +128,13 @@ options:
       language:
         description:
           - Colon separated list of message translation fallbacks.
-          - systemd 256 and later refuse V(:) in locale values, so only a single
-            locale is accepted there.
+          - C(systemd-localed) refuses a list, such as V(en_AU:en_GB), on
+            systemd 256 and later, which refuse V(:) in locale values, and on
+            systemd 247 and later wherever it checks that each locale is
+            installed, such as on EL, where it reports the list as not
+            installed. Only systemd 239 to 246, and systemd 248 to 255 where
+            C(systemd-localed) generates locales with C(locale-gen) instead of
+            checking them, as on Debian 12, accept a list.
         type: str
       lc_address:
         description: Locale for postal address formatting.
@@ -235,10 +246,11 @@ locale:
     - Locale and keyboard settings reported by C(systemd-localed).
     - The C(locale) field holds the locale variables, and variables that are not
       configured are returned as V(none), so it can be fed straight back into
-      O(locale). On systemd 256 and later, C(language) can be a list such as
-      V(en_AU:en_GB), which C(systemd-localed) sets from its language fallback
-      map but refuses through O(locale.language), so feeding it back fails
-      wherever it differs from the configured C(LANGUAGE).
+      O(locale). C(language) can be a list such as V(en_AU:en_GB), which
+      C(systemd-localed) sets from its language fallback map but, as
+      described for O(locale.language), can refuse through
+      O(locale.language), so feeding it back then fails wherever it differs
+      from the configured C(LANGUAGE).
     - In check mode, the settings that would change are predicted from the
       options.
     - Empty when dasbus is unavailable in check mode.
@@ -268,10 +280,6 @@ locale:
     x11_variant: ''
 """
 
-import os
-import re
-import stat
-
 from ansible.module_utils import distro
 from ansible.module_utils.basic import AnsibleModule
 
@@ -285,10 +293,13 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.systemd import (
     locale_setting,
     locale_simplify,
     locale_status,
+    open_regular,
     read_bytes,
+    read_lines,
     systemd_call,
     systemd_proxy,
     systemd_version,
+    utf8_text,
 )
 
 # the first systemd-localed whose SetLocale keeps the variables a request leaves out
@@ -301,11 +312,6 @@ VCONSOLE_CONF = "/etc/vconsole.conf"
 
 # systemd-localed reads its language fallback map here, a path fixed when systemd is built
 LANGUAGE_FALLBACK_MAP = "/usr/share/systemd/language-fallback-map"
-
-# systemd's read_line() fails for a line of this many bytes or more
-LONG_LINE_MAX = 1024 * 1024
-
-MAP_READ_SIZE = 65536
 
 # Debian's systemd-localed before 253 keeps the X11 settings in this file instead of the X11 configuration
 DEBIAN_KEYBOARD = "/etc/default/keyboard"
@@ -381,47 +387,22 @@ def map_fields(line):
     return fields
 
 
-def map_lines(handle):
-    """Yield the lines of a map as systemd's read_line() reads them, ending at a carriage return, a line feed or a NUL.
-
-    Yields None and stops for a line read_line() refuses as too long.
-    """
-    pending = b""
-
-    while True:
-        block = handle.read(MAP_READ_SIZE)
-        lines = re.split(b"[\r\n\0]", pending + block)
-        # the last piece can continue in the next block, unless the file has ended
-        pending = lines.pop() if block else b""
-
-        for line in lines + ([pending] if not block else []):
-            if len(line) >= LONG_LINE_MAX:
-                yield None
-                return
-
-            yield line.decode("utf-8", errors="surrogateescape")
-
-        if not block:
-            return
-
-        if len(pending) >= LONG_LINE_MAX:
-            yield None
-            return
-
-
 def language_fallback(lang):
     """Return the LANGUAGE systemd-localed's fallback map lists for lang, or None, as find_language_fallback() does.
 
     systemd reads the map until the first line listing lang with exactly two fields, skipping empty lines, comments
-    and lines with another number of fields, and stops without a fallback at a line it cannot read or split.
+    and lines with another number of fields, and stops without a fallback at a line it cannot read or split. Bytes
+    that are not valid UTF-8 are kept as surrogates.
     """
     try:
-        with open(LANGUAGE_FALLBACK_MAP, "rb") as handle:
-            # systemd would read a device such as /dev/zero without end, so only a regular file is read
-            if not stat.S_ISREG(os.fstat(handle.fileno()).st_mode):
-                return None
+        # reading a FIFO could block and a device such as /dev/zero never end, so the module reads only a regular
+        # file and otherwise predicts no fallback
+        handle = open_regular(LANGUAGE_FALLBACK_MAP)
+        if handle is None:
+            return None
 
-            for line in map_lines(handle):
+        with handle:
+            for line in read_lines(handle):
                 if line is None:
                     return None
 
@@ -551,10 +532,16 @@ def ensure_present(module):
 
         # localed sets LANGUAGE from its fallback map when LANG is sent without LANGUAGE, before it merges the rest,
         # and keeps the configured one for an empty fallback; a real run reads the result back instead
-        if module.check_mode and "lang" in request and "language" not in request:
+        if "lang" in request and "language" not in request:
             language = language_fallback(request["lang"])
 
-            if language:
+            # localed writes a fallback that is not valid UTF-8, then cannot report the locale
+            if language and utf8_text(language) != language:
+                listed = f"{LANGUAGE_FALLBACK_MAP} lists a LANGUAGE fallback for it that is not valid UTF-8"
+                reason = "which systemd-localed would write and then fail to report; set locale.language as well"
+                module.fail_json(msg=f"unable to set locale.lang {request['lang']}: {listed}, {reason}")
+
+            if module.check_mode and language:
                 locale = dict(locale, language=language)
 
         simplified = locale_simplify(locale)
