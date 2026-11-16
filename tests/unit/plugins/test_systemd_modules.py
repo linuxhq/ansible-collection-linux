@@ -303,7 +303,8 @@ def test_locale_sends_only_changed_variables(monkeypatch, run_module, configured
     assert mutate.call_args.args[2:] == ("SetLocale", expected, False)
 
 
-# the map systemd ships, with the line ends, comments and malformed lines find_language_fallback() skips
+# a map based on the one systemd ships, with the line ends, comments and malformed lines find_language_fallback()
+# skips, and an entry whose fallback equals its LANG
 LANGUAGE_FALLBACK_MAP = (
     "# comment\r\n"
     "\n"
@@ -312,6 +313,7 @@ LANGUAGE_FALLBACK_MAP = (
     "csb_PL csb:pl\n"
     " \ten_AU \t en_AU:en_GB \r\n"
     "en_AU later:entry\n"
+    "it_IT it_IT\n"
 )
 
 
@@ -329,7 +331,9 @@ LANGUAGE_FALLBACK_MAP = (
         # the map is matched exactly, and a line without two fields is ignored
         ({"lang": "en_US.UTF-8", "language": "en_US"}, {"lang": "en_AU.UTF-8"}, "en_US"),
         ({"lang": "en_US.UTF-8", "language": "en_US"}, {"lang": "en_NZ"}, "en_US"),
-        ({"lang": "en_US.UTF-8", "language": "en_US"}, {"lang": "#"}, "en_US"),
+        ({"lang": "en_US.UTF-8", "language": "en_US"}, {"lang": "de_DE.UTF-8"}, "en_US"),
+        # localed sets the fallback, then drops it as equal to LANG
+        ({"lang": "en_US.UTF-8", "language": "en_US"}, {"lang": "it_IT"}, None),
         # an unchanged LANG is not sent, so localed keeps the configured LANGUAGE
         ({"lang": "en_AU", "language": "en_US"}, {"lang": "en_AU", "lc_time": "C.UTF-8"}, "en_US"),
         ({"lang": "en_AU"}, {"lang": "en_AU", "lc_time": "C.UTF-8"}, None),
@@ -347,6 +351,81 @@ def test_locale_check_mode_predicts_language_fallback(
     result = run_module(systemd_locale, {"locale": params}, True)
     assert result["changed"] and result["locale"]["locale"]["language"] == language
     mutate.assert_not_called()
+
+
+# systemd's LONG_LINE_MAX, the length at which read_line() fails
+LONG_LINE_MAX = 1024 * 1024
+
+
+@pytest.mark.parametrize(
+    "content,lang,language",
+    [
+        # strv_split_full() with EXTRACT_UNQUOTE removes quotes and takes the character after a backslash as it is
+        (b"\"en AU\" 'en_AU:en_GB'\n", "en AU", "en_AU:en_GB"),
+        (b'en_AU "en_AU:"en_GB\n', "en_AU", "en_AU:en_GB"),
+        (b"en\\_AU en_AU\\:en_GB\n", "en_AU", "en_AU:en_GB"),
+        (b"en\\ AU 'it''s'\n", "en AU", "its"),
+        (b'en_AU "a \\" b"\n', "en_AU", 'a " b'),
+        (b'en_AU ""\n', "en_AU", ""),
+        # an unbalanced quote or a trailing backslash ends the lookup without a fallback
+        (b'fr_CA "fr_CA:fr_FR\nen_AU en_AU:en_GB\n', "en_AU", None),
+        (b"fr_CA 'fr_CA:fr_FR\nen_AU en_AU:en_GB\n", "en_AU", None),
+        (b"fr_CA fr_CA:fr_FR\\\nen_AU en_AU:en_GB\n", "en_AU", None),
+        (b"fr_CA fr_CA:fr_FR\\ \t\nen_AU en_AU:en_GB\n", "en_AU", None),
+        # a comment is skipped before it is split, and an escaped quote is no quote
+        (b'# "unbalanced\nfr_CA fr\\" fr_CA:fr_FR\nen_AU en_AU:en_GB\n', "en_AU", "en_AU:en_GB"),
+        # a line after the one listing lang is not read
+        (b'en_AU en_AU:en_GB\nfr_CA "fr_CA:fr_FR\n', "en_AU", "en_AU:en_GB"),
+        # a NUL ends a line as a line break does
+        (b"en_AU\0en_AU:en_GB\n", "en_AU", None),
+        (b"fr_CA fr_CA:fr_FR\0en_AU en_AU:en_GB\n", "en_AU", "en_AU:en_GB"),
+        (b"# comment\0en_AU en_AU:en_GB\n", "en_AU", "en_AU:en_GB"),
+        (b"en_AU en_AU:en_GB\0extra\n", "en_AU", "en_AU:en_GB"),
+        # read_line() fails for a line of LONG_LINE_MAX bytes or more, ending the lookup
+        (b"#" + b"x" * (LONG_LINE_MAX - 2) + b"\nen_AU en_AU:en_GB\n", "en_AU", "en_AU:en_GB"),
+        (b"#" + b"x" * (LONG_LINE_MAX - 1) + b"\nen_AU en_AU:en_GB\n", "en_AU", None),
+        (b"#" + b"x" * (LONG_LINE_MAX - 1) + b"\ren_AU en_AU:en_GB\n", "en_AU", None),
+        (b"#" + b"x" * LONG_LINE_MAX, "en_AU", None),
+        # the limit applies to each line, not to a stretch of lines without a line feed
+        (b"fr_CA fr_CA:fr_FR\r" * 100000 + b"en_AU en_AU:en_GB\r", "en_AU", "en_AU:en_GB"),
+        (b"en_AU en_AU:en_GB\r" + b"fr_CA fr_CA:fr_FR\r" * 100000, "en_AU", "en_AU:en_GB"),
+        (b"#" * 65530 + b"\nen_AU en_AU:en_GB", "en_AU", "en_AU:en_GB"),
+    ],
+)
+def test_language_fallback_parses_map_as_systemd(keyboard_files, content, lang, language):
+    keyboard_files["language_fallback_map"].write_bytes(content)
+    assert systemd_locale.language_fallback(lang) == language
+
+
+def test_language_fallback_endless_map_has_no_fallback(keyboard_files):
+    # read_line() reads /dev/zero as endless empty lines, so the module reads only a regular file
+    keyboard_files["language_fallback_map"].symlink_to("/dev/zero")
+    assert systemd_locale.language_fallback("en_AU") is None
+
+
+def test_locale_check_mode_keeps_language_for_empty_fallback(monkeypatch, run_module, keyboard_files):
+    # localed replaces LANGUAGE with the empty fallback, then merges the configured one back in
+    keyboard_files["language_fallback_map"].write_bytes(b'en_AU ""\n')
+    monkeypatch.setattr(systemd_locale, "HAS_DASBUS", True)
+    monkeypatch.setattr(systemd_locale, "systemd_proxy", Mock())
+    configured = {"lang": "en_US.UTF-8", "language": "en_US"}
+    monkeypatch.setattr(systemd_locale, "locale_status", Mock(return_value={**LOCALE, "locale": configured}))
+    result = run_module(systemd_locale, {"locale": {"lang": "en_AU"}}, True)
+    assert result["changed"] and result["locale"]["locale"]["language"] == "en_US"
+
+
+def test_locale_real_run_does_not_read_language_fallback_map(monkeypatch, run_module):
+    configured = {**LOCALE, "locale": {"lang": "en_US.UTF-8"}}
+    updated = {**LOCALE, "locale": {"lang": "en_AU", "language": "en_AU:en_GB"}}
+    monkeypatch.setattr(systemd_locale, "HAS_DASBUS", True)
+    monkeypatch.setattr(systemd_locale, "systemd_proxy", Mock())
+    monkeypatch.setattr(systemd_locale, "locale_status", Mock(side_effect=[configured, updated]))
+    monkeypatch.setattr(systemd_locale, "language_fallback", Mock(side_effect=AssertionError("must not read the map")))
+    mutate = Mock()
+    monkeypatch.setattr(systemd_locale, "systemd_call", mutate)
+    result = run_module(systemd_locale, {"locale": {"lang": "en_AU"}})
+    assert result["changed"] and result["locale"]["locale"]["language"] == "en_AU:en_GB"
+    assert mutate.call_args.args[2:] == ("SetLocale", ["LANG=en_AU"], False)
 
 
 @pytest.mark.parametrize("directory", [False, True])

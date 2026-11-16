@@ -140,6 +140,7 @@ snapshot:
       the newest snapshot is returned.
     - Also returned when the module fails because kopia printed the snapshot
       it saved, then exited with an error, and kopia lists that snapshot.
+      Otherwise empty when the module fails after running kopia.
     - Keys under C(tags) are returned as kopia reports them, such as
       C(tag:role).
     - Empty in check mode and when the snapshot manifest cannot be read back.
@@ -242,12 +243,12 @@ def ensure_present(module):
 
     if module.check_mode:
         if reads_as_user_host(absolute_path(path)) and kopia_available(module):
-            snapshot_source(module, path, OPERATION)
+            snapshot_source(module, path, OPERATION, failed_result={"snapshot": {}})
 
         module.exit_json(changed=True, snapshot={})
 
     # a path that cannot be listed fails before kopia takes the snapshot
-    source = snapshot_source(module, path, OPERATION)
+    source = snapshot_source(module, path, OPERATION, failed_result={"snapshot": {}})
 
     # an absolute path keeps a name such as "--all" from being read as an option
     command = ["snapshot", "create", absolute_path(path), "--json"]

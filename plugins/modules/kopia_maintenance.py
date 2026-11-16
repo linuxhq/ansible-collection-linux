@@ -126,7 +126,7 @@ maintenance:
     - In check mode, when a change would be made, the settings reported by
       kopia with the requested changes applied, as the module predicts them.
     - Empty when kopia is unavailable in check mode.
-    - Empty when the module fails after setting.
+    - Empty when the module fails after running kopia.
   returned: always
   type: dict
   sample:
@@ -277,7 +277,7 @@ def ensure_present(module):
     if module.check_mode and not kopia_available(module):
         module.exit_json(changed=True, maintenance={})
 
-    current = maintenance_info(module)
+    current = maintenance_info(module, failed_result={"maintenance": {}})
     predicted = deepcopy(current)
     flags = []
 
@@ -309,7 +309,7 @@ def ensure_present(module):
     rc, _dummy, stderr = kopia_command(module, ["maintenance", "set"] + flags)
 
     if rc != 0:
-        module.fail_json(msg=f"unable to set kopia maintenance settings: {stderr.strip()}")
+        module.fail_json(msg=f"unable to set kopia maintenance settings: {stderr.strip()}", maintenance={})
 
     current = maintenance_info(module, failed_result={"changed": True, "maintenance": {}})
 

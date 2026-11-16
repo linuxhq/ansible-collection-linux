@@ -27,9 +27,22 @@ bugfixes:
   - kopia_repository - report ``changed`` when ``kopia repository create``
     fails after initializing the storage, when connecting to the new
     repository or setting its default global policy and maintenance owner
-    fails, and say that this setup is not retried by a later run. Report
+    fails, and say that this setup is not retried by a later run, which
+    connects to the repository, or finds it connected, without it. Report
     ``changed`` as well when ``kopia repository connect`` fails after saving
     the connection, such as when persisting the password fails.
-  - kopia_repository, kopia_policy, kopia_maintenance - document that the
-    returned ``repository``, ``policy`` or ``maintenance`` is empty when the
-    module fails after connecting or creating, importing or setting.
+  - kopia_repository - report ``changed`` when ``kopia repository create``
+    fails to write the format blob after writing the ``kopia.blobcfg`` blob,
+    and say that ``kopia.blobcfg`` must be removed from the storage before the
+    repository can be created. The module reported no change, and later runs
+    failed with ``found existing data in storage location``.
+  - kopia_repository - treat the host as not connected after a failed
+    ``kopia repository connect`` only when ``kopia repository status`` reports
+    that the repository is not connected. Any other failure to read the status
+    now fails reporting a change, as kopia may have saved the connection,
+    instead of reporting no change.
+  - kopia_repository, kopia_policy, kopia_maintenance, kopia_snapshot - return
+    an empty ``repository``, ``policy``, ``maintenance`` or ``snapshot`` when
+    the module fails after running kopia, also before any change, such as
+    when reading the current state fails or the host is connected to a
+    different repository, instead of leaving the key out, and document it.

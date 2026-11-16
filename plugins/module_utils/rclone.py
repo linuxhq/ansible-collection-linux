@@ -311,9 +311,7 @@ def config_body(text):
             return data[position:].replace(b"\r", b"").replace(b"\n", b"")
 
         if stripped.startswith("RCLONE_ENCRYPT_V"):
-            raise ValueError(
-                "unsupported or unrecognized configuration encryption header, which this module cannot read"
-            )
+            raise ValueError("configuration encryption header not supported by this module")
 
         return None
 

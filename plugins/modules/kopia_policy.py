@@ -152,7 +152,7 @@ policy:
     - In check mode, when a change would be made, the desired policy from
       O(policy), without the values kopia does not store.
     - Empty when kopia is unavailable in check mode.
-    - Empty when the module fails after importing.
+    - Empty when the module fails after running kopia.
   returned: when O(state=present)
   type: dict
   sample:
@@ -227,7 +227,7 @@ def ensure_present(module):
 
     target = module.params["target"]
     desired = policy_normalize(snake_dict_to_camel_dict(module.params["policy"]))
-    current = policy_export(module, target)
+    current = policy_export(module, target, failed_result={"policy": {}})
 
     if current is not None and same_value(policy_normalize(current), desired):
         module.exit_json(changed=False, policy=camel_dict_to_snake_dict(prune_empty(current)))
@@ -242,7 +242,7 @@ def ensure_present(module):
     rc, _dummy, stderr = kopia_command(module, ["policy", "import", "--from-file", source])
 
     if rc != 0:
-        module.fail_json(msg=f"unable to import kopia policy {target}: {stderr.strip()}")
+        module.fail_json(msg=f"unable to import kopia policy {target}: {stderr.strip()}", policy={})
 
     current = policy_export(module, target, failed_result={"changed": True, "policy": {}})
 

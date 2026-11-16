@@ -1,15 +1,22 @@
 ---
 bugfixes:
   - rclone_config_encryption - document under ``content`` that a file whose
-    first line other than blank and comment lines starts with
-    ``RCLONE_ENCRYPT_V`` but, trimmed of whitespace, is not exactly
+    first line other than blank and comment lines, trimmed of whitespace,
+    starts with ``RCLONE_ENCRYPT_V`` but is not exactly
     ``RCLONE_ENCRYPT_V0:``, such as an ``RCLONE_ENCRYPT_V1:`` header or a
     damaged ``RCLONE_ENCRYPT_V0:`` line with the payload on it, fails even
-    when ``content`` is set. The failure message now calls it an unsupported
-    or unrecognized configuration encryption header, which the module cannot
-    read, instead of asking to update rclone.
+    when ``content`` is set, and that, like rclone, the module reads lines in
+    pieces of 4096 bytes, so a longer line counts as several. The failure
+    message now calls it a configuration encryption header not supported by
+    this module instead of asking to update rclone.
+  - rclone_config_encryption - document under ``content`` that a file whose
+    encrypted payload is damaged is replaced, while one with an unsupported
+    encryption header fails.
   - rclone_config_encryption - name the configuration file in the failure
-    message when pycryptodome is missing, and name pycryptodomex there as well,
-    since either library is accepted.
+    message when neither pycryptodome nor pycryptodomex is installed, and name
+    pycryptodomex there as well, since either library is accepted.
+  - rclone_config_encryption - say in the check mode details that the
+    configuration is not inspected when neither pycryptodome nor
+    pycryptodomex is available.
   - rclone_obscure, rclone_deobscure - name pycryptodomex as well as
     pycryptodome in the failure when neither library is installed.
