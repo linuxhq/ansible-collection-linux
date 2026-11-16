@@ -9,7 +9,8 @@ bugfixes:
     connected to the same path on another sftp server port or account, or to
     an azure container in another storage domain, fails instead of reporting
     no change. A ``storage_domain`` that is not stored is compared as
-    ``blob.core.windows.net``, the domain kopia uses then.
+    ``blob.core.windows.net``, the domain kopia uses then, and ``port`` as the
+    number kopia reads from it, so ``"+22"`` matches a stored ``22``.
   - kopia_repository - document that kopia refuses a Boolean flag given a
     value, such as ``embed_credentials`` set to the string ``"true"``, before
     it changes anything.

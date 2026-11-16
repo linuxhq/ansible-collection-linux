@@ -109,9 +109,11 @@ notes:
     contains a NUL byte or a setting that is not valid UTF-8, and on Debian 12
     likewise C(/etc/default/keyboard), where it keeps the X11 keyboard
     settings. A keyboard change whose request would rewrite such a file after
-    another request is sent then fails before any setting is written, also in
-    check mode. When that request is the first one sent,
-    C(systemd-localed) refuses it before anything is changed. The module
+    another request is sent, or to convert the settings after writing its own
+    file, then fails before any setting is written, also in check mode, as
+    C(systemd-localed) only logs a refused conversion. When the first request
+    sent would rewrite such a file as its own, C(systemd-localed) refuses it
+    before anything is changed. The module
     reads these files only when they are regular files, and otherwise reads
     them as missing.
   - The console settings rewrite C(/etc/vconsole.conf), and so do the X11
@@ -488,25 +490,28 @@ def debian_family():
 def keyboard_rewrites(module, version, keymap, convert_keymap, keyboard):
     """Return the environment files systemd-localed rewrites for the keyboard changes.
 
-    Each is returned with the option causing it and the request that rewrites it, once for each such request.
+    Each is returned with the option causing it, the request that rewrites it, once for each such request, and
+    whether the request rewrites it to convert the settings, after its own write, which then stays applied while
+    systemd-localed only logs the refused conversion.
     """
     rewrites = []
     convert_x11 = all(module.params[name] is None for name in VCONSOLE_SETTINGS)
 
     if keymap is not None:
-        rewrites.append((VCONSOLE_CONF, first_requested(module, VCONSOLE_SETTINGS), "SetVConsoleKeyboard"))
+        rewrites.append((VCONSOLE_CONF, first_requested(module, VCONSOLE_SETTINGS), "SetVConsoleKeyboard", False))
 
     if keyboard is not None and (convert_x11 or version >= X11_VCONSOLE_VERSION):
         # SetX11Keyboard stores the converted console keymap there, and from systemd 253 always the X11 settings too
-        rewrites.append((VCONSOLE_CONF, first_requested(module, X11_SETTINGS), "SetX11Keyboard"))
+        option = first_requested(module, X11_SETTINGS)
+        rewrites.append((VCONSOLE_CONF, option, "SetX11Keyboard", version < X11_VCONSOLE_VERSION))
 
     if (keyboard is not None or convert_keymap) and version < X11_VCONSOLE_VERSION and debian_family():
         # SetVConsoleKeyboard stores the converted X11 settings there too
         if convert_keymap:
-            rewrites.append((DEBIAN_KEYBOARD, "vconsole_keymap", "SetVConsoleKeyboard"))
+            rewrites.append((DEBIAN_KEYBOARD, "vconsole_keymap", "SetVConsoleKeyboard", True))
 
         if keyboard is not None:
-            rewrites.append((DEBIAN_KEYBOARD, first_requested(module, X11_SETTINGS), "SetX11Keyboard"))
+            rewrites.append((DEBIAN_KEYBOARD, first_requested(module, X11_SETTINGS), "SetX11Keyboard", False))
 
     return rewrites
 
@@ -556,7 +561,8 @@ def ensure_present(module):
     ]
 
     # systemd-localed refuses the first request before anything is written, but a later one only after the earlier
-    # requests are applied, so a value sd-bus refuses and a file it refuses to rewrite are checked for those first
+    # requests are applied, so a value sd-bus refuses and a file it refuses to rewrite are checked for those first, and
+    # so is a file any request rewrites to convert the settings after its own write
     later = requests[1:]
 
     if "SetVConsoleKeyboard" in later:
@@ -567,8 +573,8 @@ def ensure_present(module):
 
     checked = set()
 
-    for path, option, method in keyboard_rewrites(module, version, keymap, convert_keymap, keyboard):
-        if method not in later or path in checked:
+    for path, option, method, converted in keyboard_rewrites(module, version, keymap, convert_keymap, keyboard):
+        if not (converted or method in later) or path in checked:
             continue
 
         checked.add(path)

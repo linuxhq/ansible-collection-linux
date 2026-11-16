@@ -30,8 +30,10 @@ description:
     O(storage=sftp) C(username), given in O(options) or O(secrets), differs
     from the connected storage configuration. A C(storage_domain) that is not
     stored is compared as C(blob.core.windows.net), the domain kopia uses
-    then. A number in these options is compared as the text passed to kopia,
-    so V(20261115) matches a stored V("20261115"), and that text is the
+    then. C(port) is compared as the number kopia reads from it, which it
+    reads as a decimal number and truncates, so V("+22") matches a stored
+    V(22). Another number in these options is compared as the text passed to
+    kopia, so V(20261115) matches a stored V("20261115"), and that text is the
     number as Python formats it, as described in O(options). A leading V(~)
     in the C(path) of V(filesystem) storage is resolved to the home directory
     first, as kopia does, and that C(path) is compared as a normalized path,
@@ -305,6 +307,9 @@ STORAGE_KEYS = {
 # webdav also takes a username, which only authenticates there, so it identifies only an sftp repository
 STORAGE_TYPE_KEYS = {"sftp": {"username": "username"}}
 
+# kingpin reads an int flag as a float and truncates it, so "+22" or "22.0" set the port 22
+INT_OPTIONS = ("port",)
+
 # kopia uses this azure storage domain when none is stored
 STORAGE_DEFAULTS = {"storageDomain": "blob.core.windows.net"}
 
@@ -361,6 +366,17 @@ def unsaved_options(module):
             unsaved.add(option)
 
     return unsaved
+
+
+def kingpin_int(value):
+    """Return value as text of the number kopia's flag parser reads from it, a float truncated, or as given."""
+    if isinstance(value, bool):
+        return str(value)
+
+    try:
+        return str(int(float(value)))
+    except (OverflowError, ValueError):
+        return str(value)
 
 
 def identifying_keys(storage):
@@ -458,7 +474,7 @@ def storage_mismatch(module, status):
         if value is None:
             continue
 
-        value = str(value)
+        value = kingpin_int(value) if option in INT_OPTIONS else str(value)
         # kopia leaves out an empty value, and stores the sftp port as a number
         stored = str(config.get(key) or STORAGE_DEFAULTS.get(key, ""))
         if storage_value(storage, option, stored) != storage_value(storage, option, value):

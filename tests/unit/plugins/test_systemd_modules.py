@@ -828,7 +828,7 @@ def test_locale_version_not_read_without_change(monkeypatch, run_module, systemd
         # a console change on a host that is not Debian rewrites only /etc/vconsole.conf
         ({"locale": {"lang": "C.UTF-8"}, "vconsole_keymap": "de"}, ["vconsole"]),
         # the first request is refused by systemd-localed before anything is written, so its file is not read
-        ({"vconsole_keymap": "de"}, []),
+        ({"vconsole_keymap_toggle": "de"}, []),
         # X11 settings that are not converted leave it alone on systemd 252
         ({"vconsole_keymap": "us", "x11_layout": "de"}, []),
     ],
@@ -1010,8 +1010,7 @@ def test_locale_unloadable_keyboard_file_fails_before_any_write(
     [
         # the keyboard request is the first one sent, so systemd-localed refuses it before anything is written
         ("vconsole", VCONSOLE_UTF8, 252, False, {"vconsole_keymap": "de"}, ["SetVConsoleKeyboard"]),
-        ("vconsole", VCONSOLE_UTF8, 252, False, {"x11_layout": "de"}, ["SetX11Keyboard"]),
-        ("keyboard", KEYBOARD_UTF8, 252, True, {"vconsole_keymap": "de"}, ["SetVConsoleKeyboard"]),
+        ("vconsole", VCONSOLE_UTF8, 253, False, {"x11_layout": "de"}, ["SetX11Keyboard"]),
         ("keyboard", KEYBOARD_UTF8, 252, True, {"x11_layout": "de"}, ["SetX11Keyboard"]),
         # the configured locale matches, so nothing is sent before it
         (
@@ -1032,13 +1031,32 @@ def test_locale_unloadable_keyboard_file_left_to_systemd_for_first_request(
     assert [entry.args[2] for entry in mutate.call_args_list] == methods
 
 
+@pytest.mark.parametrize(
+    "file,content,debian,params,option",
+    [
+        # SetVConsoleKeyboard writes /etc/vconsole.conf, then only logs a refused conversion into the X11 settings
+        ("keyboard", KEYBOARD_UTF8, True, {"vconsole_keymap": "de"}, "vconsole_keymap"),
+        # SetX11Keyboard writes the X11 settings, then only logs a refused conversion into the console keymap
+        ("vconsole", VCONSOLE_UTF8, False, {"x11_layout": "de"}, "x11_layout"),
+    ],
+)
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_locale_unloadable_conversion_file_fails_for_first_request(
+    monkeypatch, run_module, keyboard_files, systemd_version, file, content, debian, params, option, check_mode
+):
+    mutate = locale_module(monkeypatch, keyboard_files, systemd_version, file, content, 252, debian)
+    result = run_module(systemd_locale, params, check_mode)
+    assert result["failed"] and result["msg"].startswith(f"unable to set {option}: {keyboard_files[file]} contains ")
+    mutate.assert_not_called()
+
+
 @pytest.mark.parametrize("check_mode", [False, True])
 def test_locale_unloadable_keyboard_file_for_later_keyboard_request(
     monkeypatch, run_module, keyboard_files, systemd_version, check_mode
 ):
     # SetX11Keyboard follows SetVConsoleKeyboard, so the file it rewrites is checked before either is sent
     mutate = locale_module(monkeypatch, keyboard_files, systemd_version, "keyboard", KEYBOARD_UTF8, 252, True)
-    result = run_module(systemd_locale, {"vconsole_keymap": "de", "x11_layout": "de"}, check_mode)
+    result = run_module(systemd_locale, {"vconsole_keymap_toggle": "de", "x11_layout": "de"}, check_mode)
     assert result["failed"] and result["msg"].startswith(f"unable to set x11_layout: {keyboard_files['keyboard']} ")
     mutate.assert_not_called()
 

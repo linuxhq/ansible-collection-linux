@@ -2387,6 +2387,10 @@ def test_mkdir_all_paths_cuts_parents_as_go_does(path, paths):
         ("sftp", {"path": "/p", "host": "h", "port": 22, "username": "u"}, {"port": 2222}, "port is 22, not 2222"),
         ("sftp", {"path": "/p", "host": "h", "port": 22, "username": "u"}, {"username": "v"}, "username is u, not v"),
         ("sftp", {"path": "/p", "host": "h", "port": 2222, "username": "u"}, {"port": 2222, "username": "u"}, None),
+        # kingpin reads an int flag as a float and truncates it
+        ("sftp", {"path": "/p", "host": "h", "port": 22, "username": "u"}, {"port": "+22"}, None),
+        ("sftp", {"path": "/p", "host": "h", "port": 22, "username": "u"}, {"port": "22.5"}, None),
+        ("sftp", {"path": "/p", "host": "h", "port": 22, "username": "u"}, {"port": "x"}, "port is 22, not x"),
         ("azure", {"container": "c", "storageDomain": "blob.core.usgovcloudapi.net"}, {}, None),
         (
             "azure",
