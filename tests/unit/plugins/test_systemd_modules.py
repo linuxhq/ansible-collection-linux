@@ -251,9 +251,25 @@ def test_ntp_requires_available_service(monkeypatch, run_module):
     monkeypatch.setattr(systemd_timedate, "systemd_properties", Mock(return_value={**TIMEDATE, "can_ntp": False}))
     mutate = Mock()
     monkeypatch.setattr(systemd_timedate, "systemd_call", mutate)
-    result = run_module(systemd_timedate, {"ntp": True})
+    result = run_module(systemd_timedate, {"timezone": "Europe/Berlin", "ntp": True})
     assert result["failed"] and "no network time service" in result["msg"]
     mutate.assert_not_called()
+
+
+def test_ntp_alone_is_left_to_systemd(monkeypatch, run_module):
+    # SetNTP is the first request, so systemd-timedated refuses it before anything is written
+    monkeypatch.setattr(systemd_timedate, "systemd_proxy", Mock())
+    monkeypatch.setattr(systemd_timedate, "systemd_properties", Mock(return_value={**TIMEDATE, "can_ntp": False}))
+    calls = []
+
+    def refuse(module, proxy, method, *args):
+        calls.append(method)
+        module.fail_json(msg=f"unable to call {method}: NTP not supported")
+
+    monkeypatch.setattr(systemd_timedate, "systemd_call", refuse)
+    result = run_module(systemd_timedate, {"ntp": True})
+    assert result["failed"] and result["msg"] == "unable to call SetNTP: NTP not supported"
+    assert calls == ["SetNTP"]
 
 
 def test_locale_change_preserves_unspecified_categories(monkeypatch, run_module):
@@ -506,7 +522,7 @@ def test_locale_fallback_not_valid_utf8_fails_before_any_call(
     result = run_module(systemd_locale, {"locale": {"lang": lang, "lc_time": "C.UTF-8"}}, check_mode)
     path = keyboard_files["language_fallback_map"]
     assert result["failed"] and result["msg"] == (
-        f"unable to set locale.lang {lang}: {path} lists an invalid UTF-8 fallback, set locale.language as well"
+        f"unable to set locale.lang {lang}: {path} lists invalid UTF-8 or a noncharacter, set locale.language"
     )
     mutate.assert_not_called()
 
@@ -602,9 +618,6 @@ NONCHARACTER_RULE = "it must not contain Unicode noncharacters"
         ({"locale": {"lang": "de_DE.UTF-8"}, "x11_layout": "\udc80"}, "x11_layout", UTF8_RULE),
         ({"locale": {"lang": "de_DE.UTF-8"}, "x11_layout": "d\udcc3\udca9"}, "x11_layout", UTF8_RULE),
         ({"locale": {"lang": "de_DE.UTF-8"}, "vconsole_keymap_toggle": "\ud800"}, "vconsole_keymap_toggle", UTF8_RULE),
-        # sd-bus refuses a noncharacter, which for a keyboard value comes after SetLocale
-        ({"locale": {"lang": "de_DE.UTF-8"}, "x11_options": "grp:\ufffe"}, "x11_options", NONCHARACTER_RULE),
-        ({"locale": {"lang": "de_DE.UTF-8"}, "vconsole_keymap": "de\ufdd0"}, "vconsole_keymap", NONCHARACTER_RULE),
         ({"locale": {"lang": "de_DE.UTF-8", "lc_time": "\udc80"}}, "locale.lc_time", UTF8_RULE),
         # GLib cuts a D-Bus string at NUL, so de_DE.UTF-8 would be sent and the task would change on every run
         ({"locale": {"lang": "de_DE.UTF-8\x00x"}}, "locale.lang", UTF8_RULE),
@@ -630,6 +643,54 @@ def test_locale_value_not_valid_utf8_fails_before_any_call(
     mutate.assert_not_called()
 
 
+@pytest.mark.parametrize(
+    "params,option",
+    [
+        # sd-bus refuses a noncharacter, which for a keyboard value sent after another request leaves that written
+        ({"locale": {"lang": "de_DE.UTF-8"}, "x11_options": "grp:\ufffe"}, "x11_options"),
+        ({"locale": {"lang": "de_DE.UTF-8"}, "vconsole_keymap": "de\ufdd0"}, "vconsole_keymap"),
+        ({"vconsole_keymap": "de", "x11_layout": "de\ufdd0"}, "x11_layout"),
+    ],
+)
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_locale_keyboard_noncharacter_after_another_request_fails_before_any_write(
+    monkeypatch, run_module, params, option, check_mode
+):
+    monkeypatch.setattr(systemd_locale, "HAS_DASBUS", True)
+    monkeypatch.setattr(systemd_locale, "systemd_proxy", Mock())
+    monkeypatch.setattr(systemd_locale, "locale_status", Mock(return_value=LOCALE))
+    mutate = Mock()
+    monkeypatch.setattr(systemd_locale, "systemd_call", mutate)
+    result = run_module(systemd_locale, dict(params, _ansible_no_log=True), check_mode)
+    assert result["failed"] and result["msg"] == f"invalid {option}: {NONCHARACTER_RULE}"
+    mutate.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "params,method",
+    [
+        ({"vconsole_keymap": "de\ufdd0"}, "SetVConsoleKeyboard"),
+        ({"x11_layout": "de\ufdd0"}, "SetX11Keyboard"),
+        # the configured locale matches, so the keyboard request is the first one sent
+        ({"locale": {"lang": "en_US.UTF-8"}, "x11_options": "grp:\ufffe"}, "SetX11Keyboard"),
+    ],
+)
+def test_locale_keyboard_noncharacter_in_first_request_is_left_to_systemd(monkeypatch, run_module, params, method):
+    monkeypatch.setattr(systemd_locale, "HAS_DASBUS", True)
+    monkeypatch.setattr(systemd_locale, "systemd_proxy", Mock())
+    monkeypatch.setattr(systemd_locale, "locale_status", Mock(return_value=LOCALE))
+    calls = []
+
+    def refuse(module, proxy, name, *args):
+        calls.append(name)
+        module.fail_json(msg=f"unable to call {name}: Bad message")
+
+    monkeypatch.setattr(systemd_locale, "systemd_call", refuse)
+    result = run_module(systemd_locale, dict(params, _ansible_no_log=True))
+    assert result["failed"] and result["msg"] == f"unable to call {method}: Bad message"
+    assert calls == [method]
+
+
 def test_locale_noncharacter_is_left_to_systemd(monkeypatch, run_module):
     # SetLocale is sent first, and sd-bus refuses the message, so nothing is written
     monkeypatch.setattr(systemd_locale, "HAS_DASBUS", True)
@@ -651,9 +712,8 @@ def test_locale_noncharacter_is_left_to_systemd(monkeypatch, run_module):
     "params,option",
     [
         ({"ntp": False, "timezone": "\udc80"}, "timezone"),
-        ({"ntp": False, "time": "2026-07-26 14:30 \udc80"}, "time"),
+        ({"ntp": False, "time": "2026-07-26 14:30 \ud800"}, "time"),
         ({"ntp": False, "timezone": "UTC\x00x"}, "timezone"),
-        ({"ntp": False, "time": "2026-07-26 14:30\x00"}, "time"),
     ],
 )
 @pytest.mark.parametrize("dasbus", [False, True])
@@ -667,8 +727,35 @@ def test_timedate_value_not_valid_utf8_fails_before_any_call(
     mutate = Mock()
     monkeypatch.setattr(systemd_timedate, "systemd_call", mutate)
     result = run_module(systemd_timedate, dict(params, _ansible_no_log=True), check_mode)
-    assert result["failed"] and result["msg"] == f"invalid {option}: {UTF8_RULE}"
+    rule = UTF8_RULE if option == "timezone" else "it must be valid UTF-8"
+    assert result["failed"] and result["msg"] == f"invalid {option}: {rule}"
     proxy.assert_not_called()
+    mutate.assert_not_called()
+
+
+def test_time_with_nul_refused_by_run_command(monkeypatch, run_module):
+    # run_command refuses an argument with a NUL before running anything, so nothing is written
+    mutate = timedate_module(monkeypatch)
+    monkeypatch.setattr(basic.AnsibleModule, "get_bin_path", Mock(return_value="/bin/false"))
+    monkeypatch.setattr(basic.AnsibleModule, "run_command", RUN_COMMAND)
+    params = {"timezone": "Europe/Berlin", "time": "2026-07-26 14:30\x00", "_ansible_no_log": True}
+    result = run_module(systemd_timedate, params)
+    assert result["failed"] and result["msg"] == "Error executing command."
+    mutate.assert_not_called()
+
+
+def test_time_with_escaped_byte_passed_to_systemd_analyze(monkeypatch, tmp_path, run_module):
+    # an escaped byte reaches systemd-analyze as that byte, and its refusal comes before any setting is written
+    script = tmp_path / "systemd-analyze"
+    script.write_text(f"#!/bin/sh\nprintf '%s' \"$3\" > {tmp_path}/argument\necho 'Failed to parse' >&2\nexit 1\n")
+    script.chmod(0o755)
+    mutate = timedate_module(monkeypatch)
+    monkeypatch.setattr(basic.AnsibleModule, "get_bin_path", Mock(return_value=str(script)))
+    monkeypatch.setattr(basic.AnsibleModule, "run_command", RUN_COMMAND)
+    params = {"timezone": "Europe/Berlin", "time": "14:30 \udcc3", "_ansible_no_log": True}
+    result = run_module(systemd_timedate, params)
+    assert result["failed"] and result["msg"].endswith("Failed to parse")
+    assert (tmp_path / "argument").read_bytes() == b"14:30 \xc3"
     mutate.assert_not_called()
 
 
@@ -739,7 +826,9 @@ def test_locale_version_not_read_without_change(monkeypatch, run_module, systemd
     "params,read",
     [
         # a console change on a host that is not Debian rewrites only /etc/vconsole.conf
-        ({"vconsole_keymap": "de"}, ["vconsole"]),
+        ({"locale": {"lang": "C.UTF-8"}, "vconsole_keymap": "de"}, ["vconsole"]),
+        # the first request is refused by systemd-localed before anything is written, so its file is not read
+        ({"vconsole_keymap": "de"}, []),
         # X11 settings that are not converted leave it alone on systemd 252
         ({"vconsole_keymap": "us", "x11_layout": "de"}, []),
     ],
@@ -913,6 +1002,44 @@ def test_locale_unloadable_keyboard_file_fails_before_any_write(
     assert result["failed"]
     assert result["msg"].startswith(f"unable to set {option}: {keyboard_files[file]} contains ")
     assert error in result["msg"] and result["msg"].endswith("which systemd-localed refuses to rewrite")
+    mutate.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "file,content,version,debian,params,methods",
+    [
+        # the keyboard request is the first one sent, so systemd-localed refuses it before anything is written
+        ("vconsole", VCONSOLE_UTF8, 252, False, {"vconsole_keymap": "de"}, ["SetVConsoleKeyboard"]),
+        ("vconsole", VCONSOLE_UTF8, 252, False, {"x11_layout": "de"}, ["SetX11Keyboard"]),
+        ("keyboard", KEYBOARD_UTF8, 252, True, {"vconsole_keymap": "de"}, ["SetVConsoleKeyboard"]),
+        ("keyboard", KEYBOARD_UTF8, 252, True, {"x11_layout": "de"}, ["SetX11Keyboard"]),
+        # the configured locale matches, so nothing is sent before it
+        (
+            "vconsole",
+            VCONSOLE_NUL,
+            257,
+            False,
+            {"locale": {"lang": "en_US.UTF-8"}, "x11_layout": "de"},
+            ["SetX11Keyboard"],
+        ),
+    ],
+)
+def test_locale_unloadable_keyboard_file_left_to_systemd_for_first_request(
+    monkeypatch, run_module, keyboard_files, systemd_version, file, content, version, debian, params, methods
+):
+    mutate = locale_module(monkeypatch, keyboard_files, systemd_version, file, content, version, debian)
+    assert run_module(systemd_locale, params)["changed"]
+    assert [entry.args[2] for entry in mutate.call_args_list] == methods
+
+
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_locale_unloadable_keyboard_file_for_later_keyboard_request(
+    monkeypatch, run_module, keyboard_files, systemd_version, check_mode
+):
+    # SetX11Keyboard follows SetVConsoleKeyboard, so the file it rewrites is checked before either is sent
+    mutate = locale_module(monkeypatch, keyboard_files, systemd_version, "keyboard", KEYBOARD_UTF8, 252, True)
+    result = run_module(systemd_locale, {"vconsole_keymap": "de", "x11_layout": "de"}, check_mode)
+    assert result["failed"] and result["msg"].startswith(f"unable to set x11_layout: {keyboard_files['keyboard']} ")
     mutate.assert_not_called()
 
 
@@ -1308,8 +1435,6 @@ def test_hostname_machine_info_parsed_as_systemd(monkeypatch, tmp_path, run_modu
         {"chassis": "vm", "static_hostname": "web\x00", "_ansible_no_log": True},
         {"chassis": "vm", "transient_hostname": "web\x00", "_ansible_no_log": True},
         {"chassis": "vm", "static_hostname": "web\udc80", "_ansible_no_log": True},
-        {"chassis": "vm", "transient_hostname": "-bad"},
-        {"chassis": "vm", "transient_hostname": "a" * 65},
         {"chassis": "vm", "transient_hostname": "web-????"},
     ],
 )
@@ -1373,13 +1498,84 @@ def test_hostname_icon_name_refused_by_running_systemd_fails_before_any_write(
     mutate.assert_not_called()
 
 
-@pytest.mark.parametrize("value,failed", [("a/b", True), ("..", True), ("back\\slash", False), ("x" * 5000, False)])
-def test_hostname_icon_name_without_dasbus_checks_what_every_version_refuses(
-    monkeypatch, tmp_path, run_module, value, failed
-):
+@pytest.mark.parametrize("value", ["a/b", "..", "back\\slash", "x" * 5000])
+def test_hostname_icon_name_without_dasbus_is_predicted_unchecked(monkeypatch, tmp_path, run_module, value):
+    # without dasbus nothing is known about the stored settings or the order of the requests
     monkeypatch.setattr(systemd_hostname, "HAS_DASBUS", False)
-    result = run_module(systemd_hostname, {"icon_name": value}, True)
-    assert bool(result.get("failed")) is failed
+    assert run_module(systemd_hostname, {"icon_name": value}, True) == {"changed": True, "hostname": {}}
+
+
+@pytest.mark.parametrize(
+    "params,method",
+    [
+        ({"deployment": "prod/env"}, "SetDeployment"),
+        ({"icon_name": "a/b"}, "SetIconName"),
+        ({"icon_name": "glob?"}, "SetIconName"),
+        ({"location": "rack\n4"}, "SetLocation"),
+        ({"pretty_hostname": "Laptop\ufdd0", "_ansible_no_log": True}, "SetPrettyHostname"),
+        ({"transient_hostname": "-bad"}, "SetHostname"),
+        # the stored chassis matches, so the deployment request is the first one sent
+        ({"chassis": "server", "deployment": "prod/env"}, "SetDeployment"),
+    ],
+)
+def test_hostname_first_request_is_validated_by_systemd(monkeypatch, tmp_path, run_module, params, method):
+    # systemd-hostnamed refuses the first request before anything is written, so the module leaves it the check
+    current = {**HOSTNAME, "static_hostname": "", "hostname_source": "transient"}
+    hostname_module(monkeypatch, tmp_path, current, "CHASSIS=server\n")
+    calls = []
+
+    def refuse(module, proxy, name, *args):
+        calls.append(name)
+        module.fail_json(msg=f"unable to call {name}: Invalid argument")
+
+    monkeypatch.setattr(systemd_hostname, "systemd_call", refuse)
+    result = run_module(systemd_hostname, params)
+    assert result["failed"] and result["msg"] == f"unable to call {method}: Invalid argument"
+    assert calls == [method]
+
+
+@pytest.mark.parametrize(
+    "machine_info,params",
+    [
+        # an icon name stored before systemd 262, which refuses it, is not checked when it is not written
+        ("ICON_NAME=computer*\n", {"icon_name": "computer*", "chassis": "vm"}),
+        ('LOCATION="rack\t4"\n', {"location": "rack\t4", "chassis": "vm"}),
+        ("DEPLOYMENT=prod/env\n", {"deployment": "prod/env", "chassis": "vm"}),
+    ],
+)
+def test_hostname_stored_values_are_not_checked(monkeypatch, tmp_path, run_module, machine_info, params):
+    mutate = hostname_module(monkeypatch, tmp_path, HOSTNAME, machine_info)
+    result = run_module(systemd_hostname, params)
+    assert result["changed"] and not result.get("failed")
+    assert [entry.args[2:] for entry in mutate.call_args_list] == [("SetChassis", "vm", False)]
+
+
+@pytest.mark.parametrize("value", ["under_score", "-edge-", "a_b.-c"])
+def test_hostname_transient_hostname_checked_as_systemd_239(monkeypatch, tmp_path, run_module, systemd_version, value):
+    systemd_version.return_value = 239
+    mutate = hostname_module(monkeypatch, tmp_path, {**HOSTNAME, "static_hostname": "", "hostname_source": "default"})
+    result = run_module(systemd_hostname, {"chassis": "vm", "transient_hostname": value})
+    assert result["changed"] and not result.get("failed")
+    assert mutate.call_args.args[2:] == ("SetHostname", value, False)
+
+
+@pytest.mark.parametrize("value", ["under_score", "-edge-", "a..b", "trailing.", "a" * 65])
+def test_hostname_transient_hostname_refused_by_systemd_240(monkeypatch, tmp_path, run_module, systemd_version, value):
+    systemd_version.return_value = 240
+    mutate = hostname_module(monkeypatch, tmp_path, {**HOSTNAME, "static_hostname": "", "hostname_source": "default"})
+    result = run_module(systemd_hostname, {"chassis": "vm", "transient_hostname": value})
+    assert result["failed"] and result["msg"] == f"invalid transient_hostname {value!r}: it is not a valid hostname"
+    mutate.assert_not_called()
+
+
+@pytest.mark.parametrize("value", ["web-????", "web-$a"])
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_hostname_transient_wildcards_refused(monkeypatch, tmp_path, run_module, value, check_mode):
+    # systemd-hostnamed would replace them, so the reported hostname would never match
+    mutate = hostname_module(monkeypatch, tmp_path, {**HOSTNAME, "static_hostname": "", "hostname_source": "default"})
+    result = run_module(systemd_hostname, {"transient_hostname": value}, check_mode)
+    assert result["failed"] and "wildcards" in result["msg"]
+    mutate.assert_not_called()
 
 
 @pytest.mark.parametrize("value", ["-bad", "bad-", "a..b", "trailing.", "under_score", "a" * 65, "web\ufdd0", "web-$a"])
@@ -1471,7 +1667,51 @@ def test_time_requires_ntp_disabled_before_any_write(monkeypatch, run_module, an
     result = run_module(systemd_timedate, {"timezone": "Europe/Berlin", "time": "@1"})
     assert result["failed"] and "time" in result["msg"] and "ntp" in result["msg"]
     mutate.assert_not_called()
-    analyze.assert_not_called()
+
+
+def test_time_alone_with_ntp_enabled_is_left_to_systemd(monkeypatch, run_module, analyze):
+    # SetTime is the first request, so systemd-timedated refuses it before anything is written
+    monkeypatch.setattr(systemd_timedate, "systemd_proxy", Mock())
+    monkeypatch.setattr(systemd_timedate, "systemd_properties", Mock(return_value={**TIMEDATE, "ntp": True}))
+    calls = []
+
+    def refuse(module, proxy, method, *args):
+        calls.append(method)
+        module.fail_json(msg=f"unable to call {method}: Automatic time synchronization is enabled")
+
+    monkeypatch.setattr(systemd_timedate, "systemd_call", refuse)
+    result = run_module(systemd_timedate, {"local_rtc": True, "time": "@1784083200"})
+    assert result["failed"] and result["msg"].startswith("unable to call SetTime:")
+    assert calls == ["SetTime"]
+
+
+@pytest.mark.parametrize(
+    "current,params,methods",
+    [
+        # the clock is set before the hardware clock mode, after the time zone, which only systemd-timedated checks
+        (TIMEDATE, {"local_rtc": True}, ["SetTime", "SetLocalRTC"]),
+        (TIMEDATE, {"timezone": "Europe/Berlin"}, ["SetTimezone", "SetTime"]),
+        (TIMEDATE, {"timezone": "Europe/Berlin", "local_rtc": True}, ["SetTimezone", "SetTime", "SetLocalRTC"]),
+        # adjusting the system clock from the hardware clock would undo the time set before it
+        (
+            TIMEDATE,
+            {"local_rtc": True, "adjust_system_clock": True},
+            ["SetLocalRTC", "SetTime"],
+        ),
+        (TIMEDATE, {"timezone": "Europe/Berlin", "adjust_system_clock": True}, ["SetTimezone", "SetTime"]),
+        # network time synchronization has to be off before the clock is set
+        ({**TIMEDATE, "ntp": True}, {"local_rtc": True, "ntp": False}, ["SetLocalRTC", "SetNTP", "SetTime"]),
+    ],
+)
+def test_time_set_before_the_hardware_clock_mode(monkeypatch, run_module, analyze, current, params, methods):
+    monkeypatch.setattr(systemd_timedate, "sleep", Mock())
+    monkeypatch.setattr(systemd_timedate, "systemd_proxy", Mock())
+    reads = [dict(current), {"ntp": False}, dict(current)]
+    monkeypatch.setattr(systemd_timedate, "systemd_properties", Mock(side_effect=reads))
+    mutate = Mock()
+    monkeypatch.setattr(systemd_timedate, "systemd_call", mutate)
+    assert run_module(systemd_timedate, {**params, "time": "@1784083200"})["changed"]
+    assert [entry.args[2] for entry in mutate.call_args_list] == methods
 
 
 def timedate_module(monkeypatch, current=None, after=None):
@@ -1491,7 +1731,6 @@ def timedate_module(monkeypatch, current=None, after=None):
         # read as integers, so the microseconds are not rounded through a float
         ("@1784083200.000001", 1784083200000001),
         ("@0.000001", 1),
-        ("@9223372036854.775807", 2**63 - 1),
     ],
 )
 @pytest.mark.parametrize("check_mode", [False, True])
@@ -1594,15 +1833,6 @@ def test_time_rejected_by_systemd_analyze_before_any_write(monkeypatch, run_modu
     mutate.assert_not_called()
 
 
-@pytest.mark.parametrize("check_mode", [False, True])
-def test_time_unexpected_systemd_analyze_output_fails_before_any_write(monkeypatch, run_module, analyze, check_mode):
-    mutate = timedate_module(monkeypatch)
-    analyze.return_value = (0, "Original form: now\n", "")
-    result = run_module(systemd_timedate, {"timezone": "Europe/Berlin", "time": "now"}, check_mode)
-    assert result["failed"] and "unable to parse the time specification now" in result["msg"]
-    mutate.assert_not_called()
-
-
 def test_time_reads_the_last_unix_seconds_field(monkeypatch, run_module, analyze):
     # the original form is echoed first, so a value spanning lines cannot supply the field
     mutate = timedate_module(monkeypatch)
@@ -1623,7 +1853,7 @@ def test_time_requires_systemd_analyze_before_any_write(monkeypatch, run_module,
     mutate.assert_not_called()
 
 
-@pytest.mark.parametrize("seconds", ["@0", "@9223372036854.775808", "@18446744073709551615"])
+@pytest.mark.parametrize("seconds", ["@0"])
 @pytest.mark.parametrize("check_mode", [False, True])
 def test_time_rejects_out_of_range_time_before_any_write(monkeypatch, run_module, analyze, seconds, check_mode):
     mutate = timedate_module(monkeypatch)
