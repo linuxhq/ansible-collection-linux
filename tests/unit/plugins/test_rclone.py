@@ -57,7 +57,7 @@ def test_filter_invalid_type(plugin, value):
 def test_filter_missing_crypto(plugin, monkeypatch):
     monkeypatch.setattr(plugin, "HAS_PYCRYPTODOME", False)
     function = next(iter(plugin.FilterModule().filters().values()))
-    with pytest.raises(AnsibleFilterError, match="requires the pycryptodome library"):
+    with pytest.raises(AnsibleFilterError, match="requires the pycryptodome or pycryptodomex library"):
         function("test")
 
 
@@ -135,9 +135,13 @@ def test_plaintext_is_not_encrypted(text):
 def test_config_header_and_wrapped_payload():
     assert rclone.config_body("# comment\n; comment\n\n RCLONE_ENCRYPT_V0: \nabcd\r\nefgh\n") == b"abcdefgh"
     with pytest.raises(
-        ValueError, match="^unsupported configuration encryption version, which this module cannot read$"
+        ValueError, match="^unsupported or unrecognized configuration encryption header, which this module cannot read$"
     ):
         rclone.config_body("RCLONE_ENCRYPT_V1:\nAAAA")
+
+    # a damaged V0 marker line with the payload on it is not the marker, which rclone refuses too
+    with pytest.raises(ValueError, match="^unsupported or unrecognized configuration encryption header, "):
+        rclone.config_body("RCLONE_ENCRYPT_V0:AAAA\n")
 
     with pytest.raises(ValueError, match="too short"):
         rclone.decrypt_config("RCLONE_ENCRYPT_V0:\nAAAA", "secret")

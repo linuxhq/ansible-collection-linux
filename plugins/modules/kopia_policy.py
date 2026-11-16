@@ -85,13 +85,16 @@ options:
         before any V(:), as kopia would store a different source.
       - kopia makes a bare directory path absolute and cleans it into the
         policy target.
-      - Policy manifest IDs are not accepted, because C(kopia policy import)
-        reads every target as a path.
-      - A target that starts with V(-) is rejected before kopia runs, also in
-        check mode, because C(kopia policy export), C(kopia policy show) and
-        C(kopia policy delete) read it as a command-line flag, such as
-        C(--global) for the global policy. Write the global policy as
-        V((global)) and a relative path starting with V(-) as V(./-name).
+      - A target of 32 lowercase hexadecimal digits is rejected before kopia
+        runs, also in check mode, because C(kopia policy export),
+        C(kopia policy show) and C(kopia policy delete) read it as a manifest
+        ID, such as that of another policy or of a snapshot, whose source they
+        use instead, while C(kopia policy import) reads it as a path. Write a
+        relative directory with such a name as V(./name).
+      - A target that starts with V(-) is passed to kopia as a target, never as
+        a command-line flag, so V(--global) is a relative directory path, and
+        V(-svc@host:/path) names the client user V(-svc). The global policy is
+        V((global)).
       - Passed to kopia as given, so V(~) and environment variables are not
         expanded.
       - A target that is not valid UTF-8, such as one with a lone surrogate
@@ -149,6 +152,7 @@ policy:
     - In check mode, when a change would be made, the desired policy from
       O(policy), without the values kopia does not store.
     - Empty when kopia is unavailable in check mode.
+    - Empty when the module fails after importing.
   returned: when O(state=present)
   type: dict
   sample:
@@ -261,7 +265,7 @@ def ensure_absent(module):
     if module.check_mode:
         module.exit_json(changed=True)
 
-    rc, _dummy, stderr = kopia_command(module, ["policy", "delete", target])
+    rc, _dummy, stderr = kopia_command(module, ["policy", "delete", "--", target])
 
     if rc != 0:
         module.fail_json(msg=f"unable to delete kopia policy {target}: {stderr.strip()}")

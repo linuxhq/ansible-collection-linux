@@ -31,6 +31,14 @@ description:
     with C(kopia repository disconnect) first to switch repositories.
   - With O(storage=from-config), the existing connection is not compared, so
     a host already connected to any repository is left untouched.
+  - C(kopia repository create) can fail after it has initialized the
+    storage, when connecting to the new repository or setting its default
+    global policy and maintenance owner fails. The module then fails reporting
+    a change, and a later run connects to the repository without retrying
+    that setup, which kopia only does when it creates a repository.
+  - When C(kopia repository connect) fails after kopia saved the connection,
+    such as when persisting the password fails, the module fails reporting a
+    change, and a later run finds the host connected.
 options:
   config_file:
     description:
@@ -171,6 +179,7 @@ repository:
     - Repository status reported by C(kopia repository status).
     - Empty in check mode when a connection would be made, and when kopia is
       unavailable in check mode.
+    - Empty when the module fails after connecting or creating.
   returned: always
   type: dict
   sample:
@@ -237,6 +246,10 @@ EMBEDDED_OPTIONS = {
 
 # kopia keeps the sftp file path when the matching data option is also given
 SFTP_DATA_OPTIONS = {"keyfile": "key_data", "known_hosts": "known_hosts_data"}
+
+# kopia repository create reports these once it has initialized the storage, when connecting to the new repository or
+# setting its default global policy and maintenance owner fails
+CREATE_INITIALIZED_ERRORS = ("unable to connect to repository", "error populating repository")
 
 
 def unsaved_options(module):
@@ -371,6 +384,13 @@ def not_initialized(storage, stderr):
     return storage == "filesystem" and "cannot access storage path" in stderr and "no such file or directory" in stderr
 
 
+def connected(module, password):
+    """Return whether kopia reports a connection, such as one kopia saved before it failed."""
+    rc, _dummy, _dummy = kopia_command(module, ["repository", "status", "--json"], password=password)
+
+    return rc == 0
+
+
 def ensure_present(module):
     check_option_values(module)
 
@@ -400,6 +420,13 @@ def ensure_present(module):
     if rc != 0 and not_initialized(module.params["storage"], stderr):
         rc, _dummy, stderr = kopia_command(module, ["repository", "create"] + target, password=password)
 
+        if rc != 0 and any(error in stderr for error in CREATE_INITIALIZED_ERRORS):
+            msg = (
+                f"created the kopia repository in {description}, but kopia failed afterwards, so its default global "
+                f"policy and maintenance owner may not be set, and a later run does not retry them: {stderr.strip()}"
+            )
+            module.fail_json(changed=True, msg=msg, repository={})
+
         if rc != 0:
             module.fail_json(msg=f"unable to create the kopia repository in {description}: {stderr.strip()}")
 
@@ -409,6 +436,11 @@ def ensure_present(module):
             if rc != 0:
                 msg = f"created the kopia repository in {description}, but validating the provider failed and is not retried on a later run: {stderr.strip()}"
                 module.fail_json(changed=True, msg=msg, repository={})
+
+    # kopia saves the connection before it persists the password, which can still fail
+    if rc != 0 and connected(module, password):
+        msg = f"connected to the kopia repository in {description}, but kopia reported an error: {stderr.strip()}"
+        module.fail_json(changed=True, msg=msg, repository={})
 
     if rc != 0:
         module.fail_json(msg=f"unable to connect to the kopia repository in {description}: {stderr.strip()}")

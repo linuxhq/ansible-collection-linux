@@ -80,10 +80,16 @@ def hostname_files(monkeypatch, tmp_path):
 
 @pytest.fixture(autouse=True)
 def keyboard_files(monkeypatch, tmp_path):
-    """Point the locale module at keyboard files under tmp_path that do not exist until a test writes them."""
-    files = {"vconsole": tmp_path / "vconsole.conf", "keyboard": tmp_path / "keyboard"}
+    """Point the locale module at keyboard files and a language fallback map under tmp_path that do not exist until a
+    test writes them."""
+    files = {
+        "vconsole": tmp_path / "vconsole.conf",
+        "keyboard": tmp_path / "keyboard",
+        "language_fallback_map": tmp_path / "language-fallback-map",
+    }
     monkeypatch.setattr(systemd_locale, "VCONSOLE_CONF", str(files["vconsole"]))
     monkeypatch.setattr(systemd_locale, "DEBIAN_KEYBOARD", str(files["keyboard"]))
+    monkeypatch.setattr(systemd_locale, "LANGUAGE_FALLBACK_MAP", str(files["language_fallback_map"]))
     monkeypatch.setattr(systemd_locale, "debian_family", Mock(return_value=False))
     return files
 
@@ -274,7 +280,7 @@ def test_locale_sends_only_requested_variables(monkeypatch, run_module, check_mo
     "configured,params,expected",
     [
         # localed derives LANGUAGE from a sent LANG, so an unchanged LANG is not sent
-        ({"lang": "en_AU", "language": "en_AU"}, {"lang": "en_AU", "lc_time": "C.UTF-8"}, ["LC_TIME=C.UTF-8"]),
+        ({"lang": "en_AU", "language": "en_US"}, {"lang": "en_AU", "lc_time": "C.UTF-8"}, ["LC_TIME=C.UTF-8"]),
         # localed drops LC_TIME equal to the merged LANG, so the change converges without sending LANG
         ({"lang": "en_AU", "lc_time": "C.UTF-8"}, {"lang": "en_AU", "lc_time": "en_AU"}, ["LC_TIME=en_AU"]),
         # a requested LANGUAGE is sent with a changed LANG so the fallback map does not replace it
@@ -283,6 +289,7 @@ def test_locale_sends_only_requested_variables(monkeypatch, run_module, check_mo
             {"lang": "en_AU", "language": "en_US"},
             ["LANG=en_AU", "LANGUAGE=en_US"],
         ),
+        # without a requested LANGUAGE, a changed LANG is sent alone, so localed applies its fallback map
         ({"lang": "en_US", "language": "en_US"}, {"lang": "en_AU"}, ["LANG=en_AU"]),
     ],
 )
@@ -294,6 +301,68 @@ def test_locale_sends_only_changed_variables(monkeypatch, run_module, configured
     monkeypatch.setattr(systemd_locale, "systemd_call", mutate)
     assert run_module(systemd_locale, {"locale": params})["changed"]
     assert mutate.call_args.args[2:] == ("SetLocale", expected, False)
+
+
+# the map systemd ships, with the line ends, comments and malformed lines find_language_fallback() skips
+LANGUAGE_FALLBACK_MAP = (
+    "# comment\r\n"
+    "\n"
+    "  # indented comment en_AU fr_FR\n"
+    "en_NZ en_NZ:en_GB extra\n"
+    "csb_PL csb:pl\n"
+    " \ten_AU \t en_AU:en_GB \r\n"
+    "en_AU later:entry\n"
+)
+
+
+@pytest.mark.parametrize(
+    "configured,params,language",
+    [
+        # localed sets LANGUAGE from its fallback map for a sent LANG without LANGUAGE, replacing the configured one
+        ({"lang": "en_US.UTF-8", "language": "en_US"}, {"lang": "en_AU"}, "en_AU:en_GB"),
+        ({"lang": "en_US.UTF-8"}, {"lang": "en_AU", "lc_time": "C.UTF-8"}, "en_AU:en_GB"),
+        # an empty LANGUAGE counts as not set
+        ({"lang": "en_US.UTF-8", "language": "en_US"}, {"lang": "en_AU", "language": ""}, "en_AU:en_GB"),
+        # a requested LANGUAGE is sent with the changed LANG
+        ({"lang": "en_US.UTF-8", "language": "en_US"}, {"lang": "en_AU", "language": "en_US"}, "en_US"),
+        ({"lang": "en_US.UTF-8", "language": "en_US"}, {"lang": "en_AU", "language": "fr_FR"}, "fr_FR"),
+        # the map is matched exactly, and a line without two fields is ignored
+        ({"lang": "en_US.UTF-8", "language": "en_US"}, {"lang": "en_AU.UTF-8"}, "en_US"),
+        ({"lang": "en_US.UTF-8", "language": "en_US"}, {"lang": "en_NZ"}, "en_US"),
+        ({"lang": "en_US.UTF-8", "language": "en_US"}, {"lang": "#"}, "en_US"),
+        # an unchanged LANG is not sent, so localed keeps the configured LANGUAGE
+        ({"lang": "en_AU", "language": "en_US"}, {"lang": "en_AU", "lc_time": "C.UTF-8"}, "en_US"),
+        ({"lang": "en_AU"}, {"lang": "en_AU", "lc_time": "C.UTF-8"}, None),
+    ],
+)
+def test_locale_check_mode_predicts_language_fallback(
+    monkeypatch, run_module, keyboard_files, configured, params, language
+):
+    keyboard_files["language_fallback_map"].write_bytes(LANGUAGE_FALLBACK_MAP.encode())
+    monkeypatch.setattr(systemd_locale, "HAS_DASBUS", True)
+    monkeypatch.setattr(systemd_locale, "systemd_proxy", Mock())
+    monkeypatch.setattr(systemd_locale, "locale_status", Mock(return_value={**LOCALE, "locale": configured}))
+    mutate = Mock()
+    monkeypatch.setattr(systemd_locale, "systemd_call", mutate)
+    result = run_module(systemd_locale, {"locale": params}, True)
+    assert result["changed"] and result["locale"]["locale"]["language"] == language
+    mutate.assert_not_called()
+
+
+@pytest.mark.parametrize("directory", [False, True])
+def test_locale_check_mode_without_language_fallback_map_keeps_language(
+    monkeypatch, run_module, keyboard_files, directory
+):
+    # localed ignores a map that is missing or that it cannot read, such as a directory
+    if directory:
+        keyboard_files["language_fallback_map"].mkdir()
+
+    monkeypatch.setattr(systemd_locale, "HAS_DASBUS", True)
+    monkeypatch.setattr(systemd_locale, "systemd_proxy", Mock())
+    configured = {"lang": "en_US.UTF-8", "language": "en_US"}
+    monkeypatch.setattr(systemd_locale, "locale_status", Mock(return_value={**LOCALE, "locale": configured}))
+    result = run_module(systemd_locale, {"locale": {"lang": "en_AU"}}, True)
+    assert result["changed"] and result["locale"]["locale"]["language"] == "en_US"
 
 
 @pytest.mark.parametrize("check_mode", [False, True])

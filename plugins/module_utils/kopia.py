@@ -3,6 +3,7 @@
 
 import json
 import os
+import re
 
 ACTION_COMMAND_OMITEMPTY = {"args": [], "mode": "", "path": "", "script": "", "timeout": 0}
 
@@ -43,6 +44,9 @@ POLICY_OMITEMPTY = {
 
 # kopia stores both fields of each scheduling.timeOfDay entry, even when zero
 TIME_OF_DAY = {"hour": 0, "min": 0}
+
+# kopia names each manifest, such as a policy or a snapshot, with 16 random bytes in lowercase hexadecimal
+MANIFEST_ID = re.compile(r"[0-9a-f]{32}")
 
 
 def kopia_flags(options):
@@ -181,7 +185,8 @@ def reads_as_user_host(path):
 def snapshot_source(module, path, operation):
     # the path is passed absolute, so a name such as "--all" or "(global)" stays a path, and kopia adds its own client
     # user and host; kopia reads an absolute path in which an "@" comes before any ":" as user@host or
-    # user@host:path, so only such a path is qualified with the client user and host
+    # user@host:path, so only such a path is qualified with the client user and host, whose user can start with "-",
+    # so callers pass the source after "--"
     absolute = absolute_path(path)
 
     if not reads_as_user_host(absolute):
@@ -247,7 +252,8 @@ def maintenance_info(module, failed_result=None):
 
 def policy_export(module, target, failed_result=None):
     failed_result = failed_result or {}
-    rc, stdout, stderr = kopia_command(module, ["policy", "export", target])
+    # after "--", kopia reads a target starting with "-", such as "--global", as a path, as policy import does
+    rc, stdout, stderr = kopia_command(module, ["policy", "export", "--", target])
 
     if rc == 0:
         try:
@@ -266,13 +272,15 @@ def policy_export(module, target, failed_result=None):
 
 
 def check_policy_target(module, target):
-    """Fail before kopia runs for a target that kopia policy export, show and delete would read as a flag."""
-    # kopia policy import reads every target as a path, but the other commands read "--global" as the global policy
-    if target.startswith("-"):
+    """Fail before kopia runs for a target that kopia policy export, show and delete would read as a manifest ID."""
+    # kopia policy import reads every target as a path, but the other commands look a target up as a manifest ID
+    # first, such as the ID of another policy or of a snapshot, whose source they then use
+    if MANIFEST_ID.fullmatch(target):
         module.fail_json(
             msg=(
-                f"invalid target {target}: kopia reads a target starting with '-' as a command-line flag; "
-                "use (global) for the global policy, or prefix a relative path with ./"
+                f"invalid target {target}: kopia policy export, show and delete read a target of 32 lowercase "
+                "hexadecimal digits as a manifest ID, such as that of a policy or a snapshot, while kopia policy "
+                f"import reads it as a path; write a relative directory with such a name as ./{target}"
             )
         )
 

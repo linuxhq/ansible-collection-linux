@@ -126,6 +126,7 @@ maintenance:
     - In check mode, when a change would be made, the settings reported by
       kopia with the requested changes applied, as the module predicts them.
     - Empty when kopia is unavailable in check mode.
+    - Empty when the module fails after setting.
   returned: always
   type: dict
   sample:

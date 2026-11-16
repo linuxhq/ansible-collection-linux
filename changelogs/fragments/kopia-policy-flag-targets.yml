@@ -1,12 +1,35 @@
 ---
 bugfixes:
+  - kopia_policy, kopia_policy_info - pass ``target`` to ``kopia policy
+    export``, ``show`` and ``delete`` after ``--``. These commands read a
+    target starting with ``-`` as a command-line flag, so ``state=absent``
+    with ``target=--global`` deleted the global policy, and ``state=present``
+    imported a policy for a relative path while comparing against the global
+    policy, reporting a change on every run. Such a target is now read as
+    ``kopia policy import`` reads it, as a relative path, or as ``user@host``
+    or ``user@host:/path`` for a client user starting with ``-``.
   - kopia_policy, kopia_policy_info - fail before running kopia, also in check
-    mode, when ``target`` starts with ``-``. ``kopia policy export``, ``show``
-    and ``delete`` read such a target as a command-line flag, so
-    ``state=absent`` with ``target=--global`` deleted the global policy, and
-    ``state=present`` imported a policy for a relative path while comparing
-    against the global policy, reporting a change on every run.
+    mode, when ``target`` is 32 lowercase hexadecimal digits. ``kopia policy
+    export``, ``show`` and ``delete`` read such a target as a manifest ID,
+    such as that of another policy or of a snapshot, so ``state=absent`` with
+    a snapshot ID deleted the policy of the snapshot's source,
+    ``state=present`` imported a policy for a relative path every run, and
+    ``kopia_policy_info`` returned the policy of another target.
+  - kopia_snapshot, kopia_snapshot_info - pass the source to ``kopia snapshot
+    list`` after ``--``, so a path listed as ``user@host:/path`` for a client
+    user starting with ``-`` is listed instead of being read as a flag, which
+    made ``kopia_snapshot`` return an empty ``snapshot`` after taking it and
+    ``kopia_snapshot_info`` fail.
   - kopia_repository, kopia_policy, kopia_maintenance - report ``changed``
     when kopia fails after the repository was connected or created, the policy
     imported or the maintenance settings set, such as when validating the
     provider or reading the result back fails.
+  - kopia_repository - report ``changed`` when ``kopia repository create``
+    fails after initializing the storage, when connecting to the new
+    repository or setting its default global policy and maintenance owner
+    fails, and say that this setup is not retried by a later run. Report
+    ``changed`` as well when ``kopia repository connect`` fails after saving
+    the connection, such as when persisting the password fails.
+  - kopia_repository, kopia_policy, kopia_maintenance - document that the
+    returned ``repository``, ``policy`` or ``maintenance`` is empty when the
+    module fails after connecting or creating, importing or setting.

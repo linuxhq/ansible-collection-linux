@@ -25,12 +25,19 @@ notes:
     configured, so a configured variable it would now refuse, such as a
     C(LANGUAGE) list written by an installer, does not block changes to the
     others.
-  - When O(locale.lang) changes and O(locale.language) is not set,
-    C(systemd-localed) may derive C(LANGUAGE) from its own language fallback
-    map, replacing the configured one. Check mode cannot predict that value,
-    so the reported C(language) field can differ from the one a real run
-    produces. A set O(locale.language) is sent together with a changed
-    O(locale.lang), so it is kept.
+  - When O(locale.lang) changes and O(locale.language) is not set, or is
+    empty, which counts as not set, C(systemd-localed) sets C(LANGUAGE) from
+    its language fallback map when the new C(LANG) is listed there exactly,
+    such as V(en_AU:en_GB) for V(en_AU), replacing the configured one. The
+    module reads that map from C(/usr/share/systemd/language-fallback-map),
+    where systemd installs it, to predict C(LANGUAGE) in check mode. When
+    the module cannot read that file, it predicts no fallback, as
+    C(systemd-localed) does for a map it cannot read. A different map set by
+    E(SYSTEMD_LANGUAGE_FALLBACK_MAP) in the environment of
+    C(systemd-localed) is not read, so the C(language) field check mode
+    reports can then differ from the one a real run produces.
+  - A set O(locale.language) is sent together with a changed O(locale.lang),
+    so it is kept unless it equals the resulting C(LANG).
   - On EL, C(systemd-localed) rejects a locale that is not installed on the
     machine, so install it first. On Debian, it enables a missing locale in
     C(/etc/locale.gen) and runs C(locale-gen) before it returns, which can take
@@ -96,9 +103,10 @@ options:
       - Variables left unset are not touched. C(systemd-localed) merges a partial
         request into the variables already configured and offers no way to clear
         one, so an empty value is ignored rather than unsetting the variable.
-      - C(systemd-localed) also drops any variable whose value matches
-        O(locale.lang), so setting one to the same value as O(locale.lang) leaves
-        it unset rather than reporting a change on every run.
+      - C(systemd-localed) also drops any variable whose value matches the
+        resulting C(LANG), which is O(locale.lang) or, when that is not set, the
+        configured C(LANG), so setting one to that value leaves it unset rather
+        than reporting a change on every run.
       - Every value must be a locale that exists on the machine, such as
         V(en_US.UTF-8) or V(C.UTF-8).
     type: dict
@@ -252,10 +260,13 @@ locale:
     x11_variant: ''
 """
 
+import re
+
 from ansible.module_utils import distro
 from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.linux.plugins.module_utils.systemd import (
+    ENV_WHITESPACE,
     HAS_DASBUS,
     LOCALE_VARIABLES,
     check_utf8,
@@ -277,6 +288,9 @@ LOCALE_MERGE_VERSION = 239
 X11_VCONSOLE_VERSION = 253
 
 VCONSOLE_CONF = "/etc/vconsole.conf"
+
+# systemd-localed reads its language fallback map here, a path fixed when systemd is built
+LANGUAGE_FALLBACK_MAP = "/usr/share/systemd/language-fallback-map"
 
 # Debian's systemd-localed before 253 keeps the X11 settings in this file instead of the X11 configuration
 DEBIAN_KEYBOARD = "/etc/default/keyboard"
@@ -308,6 +322,30 @@ def locale_request(requested, configured):
         request["language"] = requested["language"]
 
     return request
+
+
+def language_fallback(lang):
+    """Return the LANGUAGE systemd-localed's fallback map lists for lang, or None, as find_language_fallback() does."""
+    try:
+        with open(LANGUAGE_FALLBACK_MAP, "rb") as handle:
+            text = handle.read().decode("utf-8", errors="surrogateescape")
+    except OSError:
+        # systemd-localed ignores a map it cannot read
+        return None
+
+    for line in re.split(r"[\r\n]", text):
+        line = line.strip(ENV_WHITESPACE)
+
+        # systemd skips empty lines and comments and ignores a line without exactly two fields; the map systemd ships
+        # quotes no field
+        if not line or line.startswith("#"):
+            continue
+
+        fields = re.split(r"[ \t]+", line)
+        if len(fields) == 2 and fields[0] == lang:
+            return fields[1]
+
+    return None
 
 
 def vconsole_change(module, current):
@@ -415,10 +453,18 @@ def ensure_present(module):
             module.fail_json(msg=f"unable to set {option}: {path} {error}, which systemd-localed refuses to rewrite")
 
     if locale is not None:
+        request = locale_request(locale_present(module.params["locale"]), locale_present(current["locale"]))
+
+        # localed sets LANGUAGE from its fallback map when LANG is sent without LANGUAGE, before it merges the rest
+        if "lang" in request and "language" not in request:
+            language = language_fallback(request["lang"])
+
+            if language is not None:
+                locale = dict(locale, language=language)
+
         simplified = locale_simplify(locale)
 
         predicted["locale"] = {name: simplified.get(name) for name in LOCALE_VARIABLES}
-        request = locale_request(locale_present(module.params["locale"]), locale_present(current["locale"]))
 
         pending.append(("SetLocale", (locale_setting(request), False)))
 
