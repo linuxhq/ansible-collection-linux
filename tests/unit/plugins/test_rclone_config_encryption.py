@@ -393,8 +393,7 @@ def test_unsupported_encryption_message_names_path(tmp_path, run_module, state, 
 
     result = run_module(plugin, params, check_mode)
     assert result["failed"] and result["msg"] == (
-        f"unable to read configuration file {path}: unsupported or unrecognized configuration encryption header,"
-        " which this module cannot read"
+        f"unable to read configuration file {path}: configuration encryption header not supported by this module"
     )
     assert path.read_text() == header
 

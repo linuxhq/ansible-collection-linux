@@ -189,7 +189,7 @@ CLIENT = {"clientOptions": {"hostname": "host", "username": "root"}}
 )
 def test_snapshot_source_is_qualified_as_kopia_records_it(monkeypatch, module_factory, path, source):
     monkeypatch.setattr(kopia, "working_directory", lambda: "/work")
-    monkeypatch.setattr(kopia, "repository_status", lambda module, password=None: CLIENT)
+    monkeypatch.setattr(kopia, "repository_status", lambda module, **kwargs: CLIENT)
     assert kopia.snapshot_source(module_factory({"password": None}), path, "list") == source
 
 
@@ -223,7 +223,7 @@ def test_reads_as_user_host_follows_parse_source_info(path, expected):
     ],
 )
 def test_snapshot_source_with_at_sign_fails(monkeypatch, module_factory, invoke, status, reason):
-    monkeypatch.setattr(kopia, "repository_status", lambda module, password=None: status)
+    monkeypatch.setattr(kopia, "repository_status", lambda module, **kwargs: status)
     result = invoke(kopia.snapshot_source, module_factory({"password": None}), "/a@b", "list snapshots")
     assert result["failed"] and result["msg"].startswith("unable to list snapshots of /a@b: ")
     assert reason in result["msg"]

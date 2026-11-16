@@ -31,11 +31,16 @@ notes:
     such as V(en_AU:en_GB) for V(en_AU), replacing the configured one. The
     module reads that map from C(/usr/share/systemd/language-fallback-map),
     where systemd installs it, to predict C(LANGUAGE) in check mode. When
-    the module cannot read that file, it predicts no fallback, as
-    C(systemd-localed) does for a map it cannot read. A different map set by
+    the module cannot read that file, or reaches a line that
+    C(systemd-localed) cannot read or split into fields, it predicts no
+    fallback, as C(systemd-localed) then sets none. A different map set by
     E(SYSTEMD_LANGUAGE_FALLBACK_MAP) in the environment of
     C(systemd-localed) is not read, so the C(language) field check mode
     reports can then differ from the one a real run produces.
+  - C(systemd-localed) writes that fallback without the validation it applies
+    to the requested values, so on systemd 256 and later C(LANGUAGE) can
+    become a list such as V(en_AU:en_GB), which O(locale.language) cannot set
+    again.
   - A set O(locale.language) is sent together with a changed O(locale.lang),
     so it is kept unless it equals the resulting C(LANG).
   - On EL, C(systemd-localed) rejects a locale that is not installed on the
@@ -230,7 +235,10 @@ locale:
     - Locale and keyboard settings reported by C(systemd-localed).
     - The C(locale) field holds the locale variables, and variables that are not
       configured are returned as V(none), so it can be fed straight back into
-      O(locale).
+      O(locale). On systemd 256 and later, C(language) can be a list such as
+      V(en_AU:en_GB), which C(systemd-localed) sets from its language fallback
+      map but refuses through O(locale.language), so feeding it back fails
+      wherever it differs from the configured C(LANGUAGE).
     - In check mode, the settings that would change are predicted from the
       options.
     - Empty when dasbus is unavailable in check mode.
@@ -260,7 +268,9 @@ locale:
     x11_variant: ''
 """
 
+import os
 import re
+import stat
 
 from ansible.module_utils import distro
 from ansible.module_utils.basic import AnsibleModule
@@ -291,6 +301,11 @@ VCONSOLE_CONF = "/etc/vconsole.conf"
 
 # systemd-localed reads its language fallback map here, a path fixed when systemd is built
 LANGUAGE_FALLBACK_MAP = "/usr/share/systemd/language-fallback-map"
+
+# systemd's read_line() fails for a line of this many bytes or more
+LONG_LINE_MAX = 1024 * 1024
+
+MAP_READ_SIZE = 65536
 
 # Debian's systemd-localed before 253 keeps the X11 settings in this file instead of the X11 configuration
 DEBIAN_KEYBOARD = "/etc/default/keyboard"
@@ -324,26 +339,105 @@ def locale_request(requested, configured):
     return request
 
 
+def map_fields(line):
+    """Split a map line into fields as strv_split_full() with EXTRACT_UNQUOTE does, or return None where it fails.
+
+    Whitespace separates fields, single and double quotes are removed, and a backslash takes the next character as it
+    is. An unbalanced quote or a trailing backslash is an error.
+    """
+    fields = []
+    field = None
+    quote = None
+    chars = iter(line)
+
+    for char in chars:
+        if char == "\\":
+            char = next(chars, None)
+            if char is None:
+                return None
+
+            field = (field or "") + char
+        elif quote:
+            if char == quote:
+                quote = None
+            else:
+                field += char
+        elif char in "'\"":
+            quote = char
+            field = field or ""
+        elif char in ENV_WHITESPACE:
+            if field is not None:
+                fields.append(field)
+                field = None
+        else:
+            field = (field or "") + char
+
+    if quote:
+        return None
+
+    if field is not None:
+        fields.append(field)
+
+    return fields
+
+
+def map_lines(handle):
+    """Yield the lines of a map as systemd's read_line() reads them, ending at a carriage return, a line feed or a NUL.
+
+    Yields None and stops for a line read_line() refuses as too long.
+    """
+    pending = b""
+
+    while True:
+        block = handle.read(MAP_READ_SIZE)
+        lines = re.split(b"[\r\n\0]", pending + block)
+        # the last piece can continue in the next block, unless the file has ended
+        pending = lines.pop() if block else b""
+
+        for line in lines + ([pending] if not block else []):
+            if len(line) >= LONG_LINE_MAX:
+                yield None
+                return
+
+            yield line.decode("utf-8", errors="surrogateescape")
+
+        if not block:
+            return
+
+        if len(pending) >= LONG_LINE_MAX:
+            yield None
+            return
+
+
 def language_fallback(lang):
-    """Return the LANGUAGE systemd-localed's fallback map lists for lang, or None, as find_language_fallback() does."""
+    """Return the LANGUAGE systemd-localed's fallback map lists for lang, or None, as find_language_fallback() does.
+
+    systemd reads the map until the first line listing lang with exactly two fields, skipping empty lines, comments
+    and lines with another number of fields, and stops without a fallback at a line it cannot read or split.
+    """
     try:
         with open(LANGUAGE_FALLBACK_MAP, "rb") as handle:
-            text = handle.read().decode("utf-8", errors="surrogateescape")
+            # systemd would read a device such as /dev/zero without end, so only a regular file is read
+            if not stat.S_ISREG(os.fstat(handle.fileno()).st_mode):
+                return None
+
+            for line in map_lines(handle):
+                if line is None:
+                    return None
+
+                line = line.strip(ENV_WHITESPACE)
+                if not line or line.startswith("#"):
+                    continue
+
+                fields = map_fields(line)
+                if fields is None:
+                    return None
+
+                if len(fields) == 2 and fields[0] == lang:
+                    return fields[1]
     except OSError:
         # systemd-localed ignores a map it cannot read
         return None
-
-    for line in re.split(r"[\r\n]", text):
-        line = line.strip(ENV_WHITESPACE)
-
-        # systemd skips empty lines and comments and ignores a line without exactly two fields; the map systemd ships
-        # quotes no field
-        if not line or line.startswith("#"):
-            continue
-
-        fields = re.split(r"[ \t]+", line)
-        if len(fields) == 2 and fields[0] == lang:
-            return fields[1]
 
     return None
 
@@ -455,11 +549,12 @@ def ensure_present(module):
     if locale is not None:
         request = locale_request(locale_present(module.params["locale"]), locale_present(current["locale"]))
 
-        # localed sets LANGUAGE from its fallback map when LANG is sent without LANGUAGE, before it merges the rest
-        if "lang" in request and "language" not in request:
+        # localed sets LANGUAGE from its fallback map when LANG is sent without LANGUAGE, before it merges the rest,
+        # and keeps the configured one for an empty fallback; a real run reads the result back instead
+        if module.check_mode and "lang" in request and "language" not in request:
             language = language_fallback(request["lang"])
 
-            if language is not None:
+            if language:
                 locale = dict(locale, language=language)
 
         simplified = locale_simplify(locale)

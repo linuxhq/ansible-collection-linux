@@ -6,4 +6,4 @@ bugfixes:
     as encrypted rather than as the plain text written, instead of writing it
     and then reporting a change on every later run or failing on the next run.
     A ``content`` beginning with such a header is refused in check mode too,
-    even without pycryptodome.
+    even when neither pycryptodome nor pycryptodomex is available.

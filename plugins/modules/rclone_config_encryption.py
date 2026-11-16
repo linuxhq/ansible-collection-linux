@@ -40,8 +40,10 @@ options:
         P(ansible.builtin.template#lookup) lookup.
       - When set, the file is created if it does not exist, and an existing file
         that cannot be opened with O(password), because the password differs or
-        the encrypted content is damaged, is replaced rather than failing, which
-        is what makes a password rotation a single run.
+        the encrypted payload is damaged, is replaced rather than failing, which
+        is what makes a password rotation a single run. A file with an
+        encryption header this module does not support fails instead, as
+        described below.
       - Treated as a secret and kept out of logs, like O(password).
       - Content containing a lone surrogate code point, such as U+D800, which a
         JSON value can carry, is rejected before anything is read or written
@@ -49,13 +51,14 @@ options:
         bytes that are not valid UTF-8, are written as those bytes.
       - When omitted, the file must already exist and only its encryption state
         is managed, and a file that cannot be opened with O(password) fails.
-      - A file whose first line other than blank and comment lines starts
-        with C(RCLONE_ENCRYPT_V) fails before anything is written, even when
-        O(content) is set, unless that whole line, trimmed of whitespace, is
-        C(RCLONE_ENCRYPT_V0:). This covers a version this module does not
-        support, such as C(RCLONE_ENCRYPT_V1:), and a damaged
-        C(RCLONE_ENCRYPT_V0:) line with the payload on it, which rclone
-        refuses as well.
+      - A file whose first line other than blank and comment lines, trimmed
+        of whitespace, starts with C(RCLONE_ENCRYPT_V) fails before anything is
+        written, even when O(content) is set, unless that line, trimmed of
+        whitespace, is exactly C(RCLONE_ENCRYPT_V0:). This covers a version
+        this module does not support, such as C(RCLONE_ENCRYPT_V1:), and a
+        damaged C(RCLONE_ENCRYPT_V0:) line with the payload on it, which rclone
+        refuses as well. Like rclone, the module reads lines in pieces of 4096
+        bytes, so a longer line counts as several.
     type: str
   password:
     description:
@@ -114,7 +117,7 @@ attributes:
   check_mode:
     description: Predicts changes without modifying the target.
     support: full
-    details: Reports a potential change without inspecting the configuration when pycryptodome is unavailable.
+    details: Reports a potential change without inspecting the configuration when neither pycryptodome nor pycryptodomex is available.
   diff_mode:
     description: Returns the decrypted configuration before and after the change.
     support: full

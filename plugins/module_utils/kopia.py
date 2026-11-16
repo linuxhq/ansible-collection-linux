@@ -182,20 +182,21 @@ def reads_as_user_host(path):
     return 0 < at < colon or (at >= 0 and colon < 0)
 
 
-def snapshot_source(module, path, operation):
+def snapshot_source(module, path, operation, failed_result=None):
     # the path is passed absolute, so a name such as "--all" or "(global)" stays a path, and kopia adds its own client
     # user and host; kopia reads an absolute path in which an "@" comes before any ":" as user@host or
     # user@host:path, so only such a path is qualified with the client user and host, whose user can start with "-",
     # so callers pass the source after "--"
+    failed_result = failed_result or {}
     absolute = absolute_path(path)
 
     if not reads_as_user_host(absolute):
         return absolute
 
-    status = repository_status(module, password=module.params["password"])
+    status = repository_status(module, password=module.params["password"], failed_result=failed_result)
 
     if status is None:
-        module.fail_json(msg=f"unable to {operation} of {path}: repository is not connected")
+        module.fail_json(msg=f"unable to {operation} of {path}: repository is not connected", **failed_result)
 
     options = status.get("clientOptions") if isinstance(status, dict) else None
     options = options if isinstance(options, dict) else {}
@@ -203,7 +204,9 @@ def snapshot_source(module, path, operation):
     hostname = options.get("hostname")
 
     if not isinstance(username, str) or not username or not isinstance(hostname, str) or not hostname:
-        module.fail_json(msg=f"unable to {operation} of {path}: kopia did not report the client user and host")
+        module.fail_json(
+            msg=f"unable to {operation} of {path}: kopia did not report the client user and host", **failed_result
+        )
 
     # kopia splits user@host:/path at the first "@" and the first ":", so a host may contain "@"
     if "@" in username or ":" in username or ":" in hostname:
@@ -212,7 +215,8 @@ def snapshot_source(module, path, operation):
                 f"unable to {operation} of {path}: kopia cannot list {absolute}, a path in which an '@' comes before "
                 f"any ':', for client "
                 f"user {username!r} on host {hostname!r}, as it splits user@host:/path at the first '@' and ':'"
-            )
+            ),
+            **failed_result,
         )
 
     return f"{username}@{hostname}:{absolute}"
@@ -221,20 +225,27 @@ def snapshot_source(module, path, operation):
 # The read helpers below add failed_result to a failure, such as changed=True when the caller has already written.
 
 
-def repository_status(module, password=None, failed_result=None):
+def repository_status(module, password=None, failed_result=None, context=None):
+    """Return the status kopia reports, or None only when kopia reports that the repository is not connected.
+
+    Any other failure fails the module, its message starting with context when given.
+    """
     failed_result = failed_result or {}
+    prefix = f"{context}; " if context else ""
     rc, stdout, stderr = kopia_command(module, ["repository", "status", "--json"], password=password)
 
     if rc == 0:
         try:
             return json.loads(stdout)
         except ValueError:
-            module.fail_json(msg=f"unable to parse kopia repository status output: {stdout.strip()}", **failed_result)
+            module.fail_json(
+                msg=f"{prefix}unable to parse kopia repository status output: {stdout.strip()}", **failed_result
+            )
 
     if "repository is not connected" in stderr:
         return None
 
-    module.fail_json(msg=f"unable to query kopia repository status: {stderr.strip()}", **failed_result)
+    module.fail_json(msg=f"{prefix}unable to query kopia repository status: {stderr.strip()}", **failed_result)
 
 
 def maintenance_info(module, failed_result=None):

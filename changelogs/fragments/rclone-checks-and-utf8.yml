@@ -1,8 +1,9 @@
 ---
 bugfixes:
   - rclone_config_encryption - check the password and that ``path`` exists
-    when ``content`` is unset before the pycryptodome check, so check mode
-    without pycryptodome fails where a real run would.
+    when ``content`` is unset before checking for pycryptodome or
+    pycryptodomex, so check mode without either library fails where a real
+    run would.
   - rclone_config_encryption - name the configuration file when the password
     is invalid.
   - rclone_deobscure - return bytes that are not valid UTF-8, which

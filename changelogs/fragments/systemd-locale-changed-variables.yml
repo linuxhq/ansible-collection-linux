@@ -10,7 +10,17 @@ bugfixes:
     ``systemd-localed`` sets from its language fallback map,
     ``/usr/share/systemd/language-fallback-map``, when ``lang`` changes
     without a set ``language``. Check mode reported the configured
-    ``LANGUAGE`` instead.
+    ``LANGUAGE`` instead. The map is read only in check mode, as a real run
+    reads the result back, and line by line as ``systemd-localed`` reads it,
+    with quotes removed, backslash escapes, a NUL ending a line, and no
+    fallback after a line it cannot read or split, such as one of 1 MiB or
+    more or one with an unbalanced quote. A map that is not a regular file,
+    such as a link to ``/dev/zero``, gives no fallback.
+  - systemd_locale - document that ``systemd-localed`` writes the fallback
+    ``LANGUAGE`` without validating it, so on systemd 256 and later it can be
+    a list such as ``en_AU:en_GB``, which ``locale.language`` cannot set
+    again, and that the returned ``language`` then cannot be fed back where
+    it differs from the configured one.
   - systemd_locale - document that a set ``language`` is kept unless it equals
     the resulting ``LANG``, that an empty ``language`` counts as not set, and
     that ``systemd-localed`` drops any variable equal to the resulting

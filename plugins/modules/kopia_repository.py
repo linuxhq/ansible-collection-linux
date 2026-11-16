@@ -34,11 +34,18 @@ description:
   - C(kopia repository create) can fail after it has initialized the
     storage, when connecting to the new repository or setting its default
     global policy and maintenance owner fails. The module then fails reporting
-    a change, and a later run connects to the repository without retrying
-    that setup, which kopia only does when it creates a repository.
+    a change, and a later run connects to it, or finds it connected, without
+    retrying that setup, which kopia only does when it creates a repository.
+  - C(kopia repository create) can also fail after writing the
+    C(kopia.blobcfg) blob, when writing the format blob fails. The module then
+    fails reporting a change, as the storage holds a partial repository, and
+    creating the repository fails until C(kopia.blobcfg) is removed from the
+    storage.
   - When C(kopia repository connect) fails after kopia saved the connection,
     such as when persisting the password fails, the module fails reporting a
-    change, and a later run finds the host connected.
+    change, and a later run finds the host connected. When the connection
+    status cannot be read after C(kopia repository connect) fails, the module
+    fails reporting a change, as kopia may have saved the connection.
 options:
   config_file:
     description:
@@ -179,7 +186,7 @@ repository:
     - Repository status reported by C(kopia repository status).
     - Empty in check mode when a connection would be made, and when kopia is
       unavailable in check mode.
-    - Empty when the module fails after connecting or creating.
+    - Empty when the module fails after running kopia.
   returned: always
   type: dict
   sample:
@@ -250,6 +257,9 @@ SFTP_DATA_OPTIONS = {"keyfile": "key_data", "known_hosts": "known_hosts_data"}
 # kopia repository create reports these once it has initialized the storage, when connecting to the new repository or
 # setting its default global policy and maintenance owner fails
 CREATE_INITIALIZED_ERRORS = ("unable to connect to repository", "error populating repository")
+
+# kopia repository create reports this when writing the format blob fails after it wrote the kopia.blobcfg blob
+CREATE_PARTIAL_ERROR = "unable to write format blob"
 
 
 def unsaved_options(module):
@@ -384,13 +394,6 @@ def not_initialized(storage, stderr):
     return storage == "filesystem" and "cannot access storage path" in stderr and "no such file or directory" in stderr
 
 
-def connected(module, password):
-    """Return whether kopia reports a connection, such as one kopia saved before it failed."""
-    rc, _dummy, _dummy = kopia_command(module, ["repository", "status", "--json"], password=password)
-
-    return rc == 0
-
-
 def ensure_present(module):
     check_option_values(module)
 
@@ -398,13 +401,14 @@ def ensure_present(module):
         module.exit_json(changed=True, repository={})
 
     password = module.params["password"]
-    status = repository_status(module, password=password)
+    status = repository_status(module, password=password, failed_result={"repository": {}})
 
     if status is not None:
         mismatch = storage_mismatch(module, status)
         if mismatch:
             module.fail_json(
-                msg=f"already connected to a different repository than {storage_description(module)}: {mismatch}"
+                msg=f"already connected to a different repository than {storage_description(module)}: {mismatch}",
+                repository={},
             )
 
         module.exit_json(changed=False, repository=camel_dict_to_snake_dict(status))
@@ -427,8 +431,18 @@ def ensure_present(module):
             )
             module.fail_json(changed=True, msg=msg, repository={})
 
+        if rc != 0 and CREATE_PARTIAL_ERROR in stderr:
+            msg = (
+                f"kopia failed to create the repository in {description} after writing its kopia.blobcfg blob, so "
+                "the storage holds a partial repository, and creating it fails until kopia.blobcfg is removed from "
+                f"the storage: {stderr.strip()}"
+            )
+            module.fail_json(changed=True, msg=msg, repository={})
+
         if rc != 0:
-            module.fail_json(msg=f"unable to create the kopia repository in {description}: {stderr.strip()}")
+            module.fail_json(
+                msg=f"unable to create the kopia repository in {description}: {stderr.strip()}", repository={}
+            )
 
         if module.params["validate_provider"]:
             rc, _dummy, stderr = kopia_command(module, ["repository", "validate-provider"], password=password)
@@ -437,13 +451,25 @@ def ensure_present(module):
                 msg = f"created the kopia repository in {description}, but validating the provider failed and is not retried on a later run: {stderr.strip()}"
                 module.fail_json(changed=True, msg=msg, repository={})
 
-    # kopia saves the connection before it persists the password, which can still fail
-    if rc != 0 and connected(module, password):
-        msg = f"connected to the kopia repository in {description}, but kopia reported an error: {stderr.strip()}"
-        module.fail_json(changed=True, msg=msg, repository={})
-
     if rc != 0:
-        module.fail_json(msg=f"unable to connect to the kopia repository in {description}: {stderr.strip()}")
+        # kopia saves the connection before it persists the password, which can still fail
+        status = repository_status(
+            module,
+            password=password,
+            failed_result={"changed": True, "repository": {}},
+            context=(
+                f"unable to connect to the kopia repository in {description}, and kopia may have saved the "
+                f"connection: {stderr.strip()}"
+            ),
+        )
+
+        if status is not None:
+            msg = f"connected to the kopia repository in {description}, but kopia reported an error: {stderr.strip()}"
+            module.fail_json(changed=True, msg=msg, repository={})
+
+        module.fail_json(
+            msg=f"unable to connect to the kopia repository in {description}: {stderr.strip()}", repository={}
+        )
 
     status = repository_status(module, password=password, failed_result={"changed": True, "repository": {}})
 
