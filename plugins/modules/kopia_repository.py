@@ -474,8 +474,8 @@ def storage_mismatch(module, status):
         if value is None:
             continue
 
-        value = kingpin_int(value) if option in INT_OPTIONS else str(value)
-        # kopia leaves out an empty value, and stores the sftp port as a number
+        # kopia leaves out an empty value, using its default then, and stores the sftp port as a number
+        value = (kingpin_int(value) if option in INT_OPTIONS else str(value)) or STORAGE_DEFAULTS.get(key, "")
         stored = str(config.get(key) or STORAGE_DEFAULTS.get(key, ""))
         if storage_value(storage, option, stored) != storage_value(storage, option, value):
             if option in module.params["secrets"]:

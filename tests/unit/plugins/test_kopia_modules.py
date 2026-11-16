@@ -2400,6 +2400,7 @@ def test_mkdir_all_paths_cuts_parents_as_go_does(path, paths):
         ),
         # kopia uses its default domain when none is stored
         ("azure", {"container": "c"}, {"storage_domain": "blob.core.windows.net"}, None),
+        ("azure", {"container": "c"}, {"storage_domain": ""}, None),
         # a webdav username only authenticates, so it does not identify the repository
         ("webdav", {"url": "https://dav.example.com/kopia", "username": "u"}, {"username": "v"}, None),
     ],
