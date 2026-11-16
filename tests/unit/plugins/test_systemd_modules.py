@@ -740,7 +740,8 @@ def test_time_with_nul_refused_by_run_command(monkeypatch, run_module):
     monkeypatch.setattr(basic.AnsibleModule, "run_command", RUN_COMMAND)
     params = {"timezone": "Europe/Berlin", "time": "2026-07-26 14:30\x00", "_ansible_no_log": True}
     result = run_module(systemd_timedate, params)
-    assert result["failed"] and result["msg"] == "Error executing command."
+    # ansible-core 2.11 reports the error itself, later versions a generic message
+    assert result["failed"] and result["msg"] in ("Error executing command.", "embedded null byte")
     mutate.assert_not_called()
 
 
