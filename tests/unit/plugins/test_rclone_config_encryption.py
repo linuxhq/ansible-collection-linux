@@ -137,10 +137,8 @@ def test_unassigned_password_character_is_rejected(monkeypatch, tmp_path, run_mo
     params = {"path": str(path), "password": "pw" + UNASSIGNED, "state": state, "content": "config"}
     result = run_module(plugin, params, check_mode)
     assert not path.exists()
-    unassigned = f"character U+1CCF0 is unassigned in Unicode {unicodedata.unidata_version}, the version of this Python"
-    assert result["failed"] and result["msg"] == (
-        f"invalid password for configuration file {path}: {unassigned}, so its normalization may differ from rclone's"
-    )
+    message = f"character U+1CCF0 is unassigned in this Python's Unicode {unicodedata.unidata_version}, so rclone may normalize it differently"
+    assert result["failed"] and result["msg"] == f"invalid password for configuration file {path}: {message}"
 
 
 @pytest.mark.parametrize(
@@ -168,10 +166,8 @@ def test_long_combining_run_password_is_rejected(
     params = {"path": str(path), "password": password, "state": state, "content": "config"}
     result = run_module(plugin, params, check_mode)
     assert not path.exists()
-    run = "password has more than 30 consecutive combining characters, marks or Hangul jamo"
-    assert result["failed"] and result["msg"] == (
-        f"invalid password for configuration file {path}: {run}, which rclone normalizes differently"
-    )
+    message = "password has more than 30 consecutive combining characters, marks or Hangul jamo, which rclone normalizes differently"
+    assert result["failed"] and result["msg"] == f"invalid password for configuration file {path}: {message}"
 
 
 @pytest.mark.skipif(
@@ -228,9 +224,8 @@ def test_surrogate_content_character_is_rejected(
     params = {"path": str(path), "password": "secret", "state": state, "content": f"[remote]{character}\n"}
     result = run_module(plugin, params, check_mode)
     assert not path.exists()
-    surrogate = f"character U+{ord(character):04X} is a surrogate"
     assert result["failed"] and result["msg"] == (
-        f"invalid content for configuration file {path}: {surrogate}, which is not valid UTF-8"
+        f"invalid content for configuration file {path}: character U+{ord(character):04X} is a surrogate, which is not valid UTF-8"
     )
 
 
@@ -413,8 +408,7 @@ def test_path_with_surrogate_is_rejected_before_file_access(
     params = {"path": path, "password": "secret", "state": state, "content": "config", "_ansible_no_log": True}
     result = run_module(plugin, params, check_mode)
     label = path.encode("utf-8", "backslashreplace").decode("utf-8")
-    escaped = "other than U+DC80 to U+DCFF, which stand for bytes that are not valid UTF-8"
-    msg = f"invalid path {label}: it contains U+{ord(character):04X}, a lone surrogate code point {escaped}"
+    msg = f"invalid path {label}: U+{ord(character):04X} is a lone surrogate that stands for no byte, unlike U+DC80 to U+DCFF"
     assert result == {"failed": True, "msg": msg}
     assert sorted(tmp_path.iterdir()) == []
 
@@ -424,7 +418,8 @@ def test_path_with_nul_is_rejected_before_file_access(monkeypatch, tmp_path, run
     monkeypatch.setattr(plugin.os.path, "realpath", Mock(side_effect=AssertionError("must not access files")))
     params = {"path": f"{tmp_path}/a\x00b", "password": "secret", "content": "config", "_ansible_no_log": True}
     result = run_module(plugin, params, check_mode)
-    msg = f"invalid path {tmp_path}/a\x00b: it contains a NUL character, which a file path cannot contain"
+    # the message escapes the NUL character, so it is printable and can be logged
+    msg = f"invalid path {tmp_path}/a\\x00b: it contains a NUL character, which a file path cannot contain"
     assert result == {"failed": True, "msg": msg}
     assert sorted(tmp_path.iterdir()) == []
 
@@ -432,6 +427,84 @@ def test_path_with_nul_is_rejected_before_file_access(monkeypatch, tmp_path, run
 def test_path_with_escaped_bytes_is_accepted(module_factory):
     # U+DC80 to U+DCFF stand for the bytes that are not valid UTF-8, which a Linux file name can hold
     plugin.check_path(module_factory(), "/etc/rclone/r\udcff\udc80.conf")
+
+
+def test_path_check_does_not_depend_on_the_filesystem_encoding(monkeypatch, module_factory):
+    # os.fsencode follows the locale, which may not be UTF-8; a path is checked for code points that are no bytes
+    def ascii_fsencode(path):
+        return path.encode("ascii")
+
+    monkeypatch.setattr(plugin.os, "fsencode", ascii_fsencode)
+    plugin.check_path(module_factory(), "/etc/rclone/r\u00e9\udcff.conf")
+
+
+@pytest.mark.parametrize("state", ["present", "absent"])
+def test_path_with_escaped_bytes_is_returned_escaped(tmp_path, run_module, state):
+    # Ansible 2.19 and later refuse a result that is not valid UTF-8, so the returned path escapes U+DC80 to U+DCFF
+    try:
+        os.close(os.open(os.fsencode(tmp_path) + b"/probe\xff", os.O_CREAT | os.O_WRONLY))
+        os.remove(os.fsencode(tmp_path) + b"/probe\xff")
+    except OSError:
+        pytest.skip("the file system refuses names that are not valid UTF-8")
+
+    path = f"{tmp_path}/r\udcff.conf"
+    params = {"path": path, "password": "secret", "state": state, "content": "config", "_ansible_no_log": True}
+    result = run_module(plugin, params)
+    assert result == {"changed": True, "encrypted": state == "present", "path": f"{tmp_path}/r\\udcff.conf"}
+    assert os.listdir(os.fsencode(tmp_path)) == [b"r\xff.conf"]
+
+
+def test_messages_escape_bytes_of_the_resolved_path(tmp_path, run_module):
+    # an ASCII path can resolve through a symbolic link to a name with bytes that are not valid UTF-8
+    link = tmp_path / "rclone.conf"
+    os.symlink(os.fsencode(tmp_path) + b"/r\xff.conf", os.fsencode(link))
+    result = run_module(plugin, {"path": str(link), "password": "secret"})
+    assert result == {"failed": True, "msg": f"configuration file does not exist: {tmp_path}/r\\udcff.conf"}
+    result["msg"].encode("utf-8")
+
+
+@pytest.mark.parametrize(
+    "params, message",
+    [
+        ({"owner": "p36-no-such-user"}, "failed to look up user p36-no-such-user"),
+        ({"owner": "root\x00", "_ansible_no_log": True}, "failed to look up user root\\x00"),
+        ({"group": "p36-no-such-group"}, "failed to look up group p36-no-such-group"),
+        ({"group": "x\udcff", "_ansible_no_log": True}, "failed to look up group x\\udcff"),
+        ({"mode": "u+z"}, "mode u+z must be in octal or symbolic form"),
+        ({"mode": "0x9"}, "mode 0x9 must be in octal or symbolic form"),
+    ],
+)
+@pytest.mark.parametrize("state", ["present", "absent"])
+@pytest.mark.parametrize("existing", [False, True])
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_file_attributes_are_checked_before_writing(tmp_path, run_module, params, message, state, existing, check_mode):
+    # Ansible applies them after the file is written, so the configuration changed before the failure
+    path = tmp_path / "rclone.conf"
+    if existing:
+        path.write_text("old")
+
+    result = run_module(
+        plugin, {"path": str(path), "password": "secret", "state": state, "content": "new", **params}, check_mode
+    )
+    assert result == {"failed": True, "msg": f"unable to manage configuration file {path}: {message}"}
+    assert (path.read_text() if existing else path.exists()) == ("old" if existing else False)
+
+
+@pytest.mark.parametrize(
+    "params", [{"owner": str(os.getuid())}, {"group": str(os.getgid())}, {"mode": "u=rw,g=r,o="}, {"mode": "0640"}]
+)
+def test_valid_file_attributes_are_applied(tmp_path, run_module, params):
+    import grp
+    import pwd
+
+    path = tmp_path / "rclone.conf"
+    named = {"owner": pwd.getpwuid(os.getuid()).pw_name} if "owner" in params else {}
+    named = {"group": grp.getgrgid(os.getgid()).gr_name} if "group" in params else named
+    for values in (params, named):
+        result = run_module(plugin, {"path": str(path), "password": "secret", "content": "config", **values})
+        assert not result.get("failed"), result
+
+    assert rclone.decrypt_config(path.read_text(), "secret") == b"config"
 
 
 @pytest.mark.parametrize("state", ["present", "absent"])

@@ -3,37 +3,44 @@ bugfixes:
   - kopia_policy - fail before running kopia, also in check mode, when a
     ``policy`` key matches one of kopia's policy fields only ignoring case,
     such as ``keeplatest``, ``Retention`` or ``KEEP_LATEST``, naming the
-    field, or otherwise converts to capitalization kopia does not report.
-    kopia matched such a key to its field ignoring case and stored the
+    field. kopia matched such a key to its field ignoring case and stored the
     policy, but reported the field in camelCase, so the task reported a
     change on every run. Write keys in snake_case or in kopia's camelCase.
-  - kopia_policy, kopia_policy_info, kopia_maintenance, kopia_repository,
-    kopia_snapshot, kopia_snapshot_info - fail before running kopia, also in
-    check mode, when a policy target or value, a maintenance owner, a storage
-    option or secret, or a snapshot path, description or tag is not valid
-    UTF-8, such as text with a lone surrogate code point. kopia recorded such
-    text with U+FFFD in its place, so a policy was imported again on every
-    run while ``state=absent`` reported no change and left it in place, the
-    maintenance owner was set on every run, and the next run failed against
-    the module's own repository connection. Some such values made the module
-    fail with a traceback. A failure names the option or key, never a value.
-    For kopia_repository, kopia saves the storage options and secrets in its
-    configuration and connects again from that copy, so a value such as an
-    sftp ``keyfile`` with such text could create a repository that never
-    connected. Only the file paths kopia reads and never saves pass U+DC80
-    to U+DCFF to kopia as the bytes Ansible uses them for, and are rejected
-    only for another lone surrogate code point, which cannot be passed to
-    kopia. These are ``file`` and ``token_file`` with
-    ``storage=from-config``, ``root_ca_pem_path`` with ``storage=s3`` and
-    ``embed_rclone_config`` with ``storage=rclone``, whose contents kopia
-    saves instead, and, with ``embed_credentials`` set to the Boolean
-    ``true``, ``credentials_file`` with ``storage=gcs`` or
+    Keys are matched as Go folds them, so the Kelvin sign matches ``k`` and
+    the long s matches ``s``, but the dotless i matches no field.
+  - kopia_policy - fail before running kopia, also in check mode, when two
+    ``policy`` keys convert to the same key, such as ``keep_latest`` and
+    ``keepLatest``. One of the values was dropped without notice.
+  - kopia_policy - document that kopia refuses a ``policy`` key that matches
+    none of its fields when it imports the policy, before it changes it, and
+    that check mode cannot predict that failure. In check mode, such a key
+    that is not valid UTF-8 is returned escaped.
+  - kopia_policy, kopia_maintenance, kopia_repository, kopia_snapshot - fail
+    before running kopia, also in check mode, when a ``policy`` value, the
+    ``target`` with ``state=present``, a maintenance ``owner``, a storage
+    option or secret value, or a snapshot ``path`` is not valid UTF-8, such
+    as text with a lone surrogate code point. kopia recorded such text with
+    U+FFFD in its place, so a policy was imported again on every run, the
+    maintenance owner was set on every run, the snapshots of the path were
+    not found, and the next run failed against the module's own repository
+    connection. Some such values made the module fail with a traceback. A
+    failure names the option or key, never a value. For kopia_repository,
+    kopia saves the storage options and secrets in its configuration and
+    connects again from that copy, so a value such as an sftp ``keyfile``
+    with such text could create a repository that never connected. Only the
+    file paths kopia reads and never saves pass U+DC80 to U+DCFF to kopia as
+    the bytes Ansible uses them for, and are rejected only for another lone
+    surrogate code point, which cannot be passed to kopia. These are ``file``
+    and ``token_file`` with ``storage=from-config``, ``root_ca_pem_path``
+    with ``storage=s3`` and ``embed_rclone_config`` with ``storage=rclone``,
+    whose contents kopia saves instead, and, with ``embed_credentials`` set to
+    the Boolean ``true``, ``credentials_file`` with ``storage=gcs`` or
     ``storage=gdrive`` and, with ``storage=sftp`` when ``external`` is not
-    given or is ``false``, ``keyfile`` when ``key_data`` is not given or
-    empty and ``known_hosts`` when ``known_hosts_data`` is not given or
-    empty, which kopia replaces with the file contents.
-  - kopia_snapshot_info - document the UTF-8 requirement under ``path``,
-    which the module checks, instead of ``config_file``.
+    given or is ``false``, ``keyfile`` when ``key_data`` is not given or empty
+    and ``known_hosts`` when ``known_hosts_data`` is not given or empty,
+    which kopia replaces with the file contents.
+  - kopia_snapshot_info - document the UTF-8 handling under ``path``, which
+    the module checks, instead of ``config_file``.
   - kopia_maintenance, kopia_policy - document that the returned
     ``maintenance`` and ``policy`` are the predicted settings in check mode
     when a change would be made, and empty when kopia is unavailable in check

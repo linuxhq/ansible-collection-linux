@@ -21,9 +21,11 @@ notes:
   - Requires a running C(systemd-timedated) reachable on the system D-Bus, so the
     module does not work in a container or chroot without systemd.
   - A O(time) or O(timezone) value that is not valid UTF-8, such as one with a
-    lone surrogate code point, or that contains a NUL character or a Unicode
-    noncharacter, such as U+FFFE, is rejected before any setting is written,
-    also in check mode.
+    lone surrogate code point, or that contains a NUL character, is rejected
+    before any setting is written, also in check mode. A Unicode
+    noncharacter, such as U+FFFE, is refused by C(systemd-analyze) in O(time)
+    and by systemd's D-Bus library in O(timezone), which is sent first, so
+    either refusal leaves nothing written.
 options:
   adjust_system_clock:
     description:
@@ -61,6 +63,10 @@ options:
         V(2026-07-26 14:30 UTC). Newer systemd releases also accept a time
         zone name suffix, such as V(2026-07-26 14:30 Europe/Berlin), which
         systemd 252 refuses.
+      - C(systemd-analyze timestamp) requires systemd 243 or later. On
+        systemd 239 to 242 setting it fails with
+        C(unable to parse the time specification) before any setting is
+        written.
       - V(now) and relative times are resolved right before the module sets
         the clock, after the other settings in the same task are applied, as
         C(timedatectl set-time now) does.
@@ -195,14 +201,17 @@ def wait_for_ntp(module, proxy, ntp):
 
     while systemd_properties(module, proxy, [("ntp", "NTP")])["ntp"] != ntp:
         if monotonic() >= deadline:
-            unchanged = f"network time synchronization did not change within {NTP_TIMEOUT} seconds"
-            module.fail_json(msg=f"unable to set ntp to {ntp}: {unchanged}")
+            module.fail_json(
+                msg=f"unable to set ntp to {ntp}: network time synchronization did not change within {NTP_TIMEOUT} seconds"
+            )
 
         sleep(0.5)
 
 
 def ensure_present(module):
-    check_utf8(module, [(name, module.params[name]) for name in ("timezone", "time")])
+    # SetTimezone is sent first and systemd-analyze parses the time before any write, so a noncharacter, which sd-bus
+    # and systemd-analyze refuse, leaves nothing written
+    check_utf8(module, [(name, module.params[name]) for name in ("timezone", "time")], noncharacters=False)
 
     if module.check_mode and not HAS_DASBUS:
         module.exit_json(

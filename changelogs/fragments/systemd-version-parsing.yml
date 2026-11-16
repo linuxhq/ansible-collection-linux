@@ -6,7 +6,14 @@ bugfixes:
     ``.`` is removed from the static hostname, before systemd 258 ``?`` is
     removed as well, and before systemd 254 a comment ending in ``\`` continues
     onto the next line of ``/etc/machine-info``, so a stored value is no longer
-    misread on EL 9, EL 10, Debian 12 and Debian 13.
+    misread on EL 9, EL 10, Debian 12 and Debian 13. Quoted values are read
+    as systemd 239 and 240 read them, dropping a backslash before any
+    character, also in single quotes, and as systemd 241 to 246 read them,
+    keeping a backslash in double quotes except before ``"`` and dropping an
+    escaped carriage return. Document that the version is the one the
+    service manager reports, which after an upgrade without a reboot or
+    ``systemctl daemon-reexec`` can be older than the running
+    ``systemd-hostnamed`` or ``systemd-localed``.
   - systemd_timedate - read the current time for ``time=now`` right before
     setting the clock, after the other settings and the wait for the
     ``ntp`` change, so the clock is no longer set back by the time they took.

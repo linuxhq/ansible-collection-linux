@@ -33,9 +33,10 @@ def test_obscure_reveals_original_bytes():
 
 @pytest.mark.parametrize("plaintext", ["\ud800", "a\udc7fb", "x\udbff"])
 @pytest.mark.parametrize("function", [rclone.obscure, rclone_obscure.rclone_obscure])
-def test_obscure_rejects_surrogate_that_is_no_byte(function, plaintext):
-    error = AnsibleFilterError if function is rclone_obscure.rclone_obscure else ValueError
-    with pytest.raises(error, match=r"character U\+D[89ABC][0-9A-F]{2} is a surrogate, which is not valid UTF-8"):
+def test_obscure_fails_for_surrogate_that_is_no_byte(function, plaintext):
+    # the codec error names the character; the filter reports it as a filter error
+    error = AnsibleFilterError if function is rclone_obscure.rclone_obscure else UnicodeEncodeError
+    with pytest.raises(error, match=r"can't encode character '\\ud[89abc][0-9a-f]{2}' .*surrogates not allowed"):
         function(plaintext)
 
 
@@ -81,6 +82,15 @@ def test_deobscure_round_trips_invalid_utf8(function, data):
     assert revealed == data.decode("utf-8", "surrogateescape")
     assert rclone.obscure(revealed) == obscured
     assert rclone_obscure.rclone_obscure(revealed) == obscured
+
+
+@pytest.mark.parametrize("data", [b"", b"short", b"x" * 15])
+def test_deobscure_value_shorter_than_the_iv_fails(data):
+    # pycryptodome refuses an IV shorter than the AES block, so the filter fails without a check of its own
+    with pytest.raises(
+        AnsibleFilterError, match=r"Incorrect length for counter byte string \(\d+ bytes, expected 16\)"
+    ):
+        rclone_deobscure.rclone_deobscure("\n" + rclone.base64_urlsafe_encode(data))
 
 
 def test_base64_newlines_and_binary():
@@ -147,11 +157,8 @@ def test_config_header_and_wrapped_payload():
 
 RCLONE_OBSCURED = "rBC881X_mHbsCyx3DSUR8DhvJ6EaxsNN68rbOveoFA"
 RCLONE_CONFIG_PASSWORD = "vector-config-pass"
-RCLONE_CONFIG = (
-    "# Encrypted rclone configuration File\n\n"
-    "RCLONE_ENCRYPT_V0:\n"
-    "G8SDbQkHqQM2prjC2y1CdVERxlam3EJFe2BFSg1NO64uzmahBcvcL9gH0biZIXjtztDGYv2z0OHDT9QIAmv1"
-)
+RCLONE_CONFIG_PAYLOAD = "G8SDbQkHqQM2prjC2y1CdVERxlam3EJFe2BFSg1NO64uzmahBcvcL9gH0biZIXjtztDGYv2z0OHDT9QIAmv1"
+RCLONE_CONFIG = f"# Encrypted rclone configuration File\n\nRCLONE_ENCRYPT_V0:\n{RCLONE_CONFIG_PAYLOAD}"
 
 
 def test_rclone_obscure_vector():

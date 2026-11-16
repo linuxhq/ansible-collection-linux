@@ -34,10 +34,10 @@ description:
     C(user@host) or C(user@host:path), and rejects one with no V(:) whose only
     V(@) is its last character, so when the absolute path is such a path, such
     as V(/home/alice@example.com) or V(/srv/backup@), it is listed by the
-    source kopia records, C(user@host:/path), taken from the snapshot kopia printed or, when
-    it printed none, from the client user and host reported by
-    C(kopia repository status). A path with a V(:) before its first V(@), such
-    as V(/srv/a:b@c), is read as a path.
+    source kopia records, C(user@host:/path), taken from the snapshot kopia
+    printed or, when it printed none, from the client user and host reported
+    by C(kopia repository status). A path with a V(:) before its first V(@),
+    such as V(/srv/a:b@c), is read as a path.
   - kopia splits C(user@host:/path) at the first V(@) and the first V(:), so an
     absolute path in which an V(@) comes before any V(:) cannot be listed when
     the client user contains V(@) or V(:), such as V(alice@corp.example.com),
@@ -62,21 +62,25 @@ options:
         C(~/.config/kopia), not in the working directory, so write V(./name)
         for a file in the working directory.
       - The module fails before kopia runs, also in check mode, when the file,
-        or kopia's default one when this is unset, exists and is not a regular
-        file, such as a directory or a FIFO, which kopia fails or waits
-        reading.
-      - A path with a NUL character, or a lone surrogate code point other than
-        U+DC80 to U+DCFF, cannot be passed to kopia, so it is rejected before
-        kopia runs, also in check mode. U+DC80 to U+DCFF, which Ansible uses
-        for bytes that are not valid UTF-8, are passed as those bytes.
+        or kopia's default one when this is unset, is a FIFO or a character
+        device, on which kopia can wait forever. So is the password file kopia
+        reads when O(password) is not given, named after the file with
+        C(.kopia-password) added. kopia reports any other file it cannot read,
+        such as a directory.
+      - A path with a NUL character, which the module cannot look up, or a
+        lone surrogate code point from U+D800 to U+DC7F, which cannot be passed
+        to kopia, is rejected before kopia runs, also in check mode. U+DC80 to
+        U+DCFF, which Ansible uses for bytes that are not valid UTF-8, are
+        passed as those bytes.
     type: path
   description:
     description:
       - Description recorded on the snapshot.
-      - A description that is not valid UTF-8, such as one with a lone
-        surrogate code point, is rejected before kopia runs, also in check
-        mode, because kopia records it with U+FFFD in its place. So is one
-        with a NUL character, which cannot be passed to kopia.
+      - A description with a lone surrogate code point from U+D800 to U+DC7F,
+        which cannot be passed to kopia, is rejected before kopia runs, also in
+        check mode. U+DC80 to U+DCFF, which Ansible uses for bytes that are not
+        valid UTF-8, are passed as those bytes, which kopia records with U+FFFD
+        in their place.
     type: str
   password:
     description:
@@ -89,10 +93,10 @@ options:
         added. When there is none, such as for a connection made with
         C(persist_credentials) set to V(false), the module fails rather than
         kopia waiting for the password on its standard input.
-      - An empty password, which kopia reads as no password, or one with a NUL
-        character or a lone surrogate code point other than U+DC80 to U+DCFF,
-        which cannot be passed to kopia, is rejected before kopia runs, also in
-        check mode.
+      - kopia reads an empty password as no password, so it reads the
+        persisted one, as when the password is not given.
+      - kopia removes whitespace around the password, so a password of only
+        whitespace is an empty password.
     type: str
   path:
     description:
@@ -102,8 +106,7 @@ options:
       - A path that is not valid UTF-8, such as one with a lone surrogate code
         point, which Ansible uses for a byte that is not valid UTF-8, is
         rejected before kopia runs, also in check mode, because kopia records
-        it with U+FFFD in its place and cannot list its snapshots. So is one
-        with a NUL character, which cannot be passed to kopia.
+        it with U+FFFD in its place and cannot list its snapshots.
     type: path
     required: true
   tags:
@@ -120,10 +123,11 @@ options:
         value can still be a number, because Ansible keeps the type a template
         renders, so convert it with C(| string), as in
         V("{{ build_number | string }}").
-      - A key or value that is not valid UTF-8, such as one with a lone
-        surrogate code point, is rejected before kopia runs, also in check
-        mode, because kopia records it with U+FFFD in its place. So is one
-        with a NUL character, which cannot be passed to kopia.
+      - A key or value with a lone surrogate code point from U+D800 to
+        U+DC7F, which cannot be passed to kopia, is rejected before kopia runs,
+        also in check mode. U+DC80 to U+DCFF, which Ansible uses for bytes that
+        are not valid UTF-8, are passed as those bytes, which kopia records with
+        U+FFFD in their place.
     type: dict
 requirements:
   - kopia
@@ -172,10 +176,12 @@ snapshot:
       C(tag:role).
     - Empty in check mode and when the snapshot manifest cannot be read back.
     - Empty when the module fails before running kopia, such as for an option
-      value the module rejects. Not returned when Ansible rejects the
-      arguments, such as a missing required option, a value of the wrong type
-      or an invalid choice, or when the kopia command is not found.
-  returned: unless Ansible rejects the arguments or the kopia command is not found
+      value the module rejects. Not returned when Ansible rejects the arguments,
+      such as a missing required option, a value of the wrong type or an invalid
+      choice, or fails to log them, such as for a lone surrogate code point in
+      an option that is not secret, or when the kopia command is not found or
+      cannot be started, such as for a NUL character in a value passed to it.
+  returned: unless Ansible rejects or cannot log the arguments or start kopia
   type: dict
   sample:
     id: k9c8f0b1c2d3e4f5
@@ -202,27 +208,21 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
 )
 
 OPERATION = "create kopia snapshot"
-SOURCE_KEYS = ("userName", "host", "path")
 
 
 def created_manifest(stdout):
+    # kopia prints nothing when it skips an identical snapshot
     try:
-        manifest = json.loads(stdout)
+        return json.loads(stdout)
     except ValueError:
         return {}
-
-    return manifest if isinstance(manifest, dict) else {}
 
 
 def listed_source(manifest, source):
     # a source qualified as user@host:/path is listed as kopia recorded it when it printed one
     recorded = manifest.get("source")
 
-    if (
-        reads_as_user_host(source)
-        and isinstance(recorded, dict)
-        and all(isinstance(recorded.get(key), str) and recorded[key] for key in SOURCE_KEYS)
-    ):
+    if reads_as_user_host(source) and isinstance(recorded, dict):
         return "{userName}@{host}:{path}".format(**recorded)
 
     return source
@@ -236,10 +236,7 @@ def list_snapshots(module, source):
     if rc != 0:
         return None
 
-    try:
-        return json.loads(stdout) or []
-    except ValueError:
-        return None
+    return json.loads(stdout)
 
 
 def find_snapshot(snapshots, snapshot_id):
@@ -263,9 +260,13 @@ def ensure_present(module):
     path = module.params["path"]
 
     check_connection(module, failed_result={"snapshot": {}})
+    # kopia records a path with U+FFFD in place of bytes that are not valid UTF-8, so it cannot list its snapshots by
+    # the path, and run_command cannot pass U+D800 to U+DC7F to kopia
+    check_utf8(module, [("path", path)], failed_result={"snapshot": {}})
     check_utf8(
         module,
-        [(name, module.params[name]) for name in ("path", "description", "tags")],
+        [(name, module.params[name]) for name in ("description", "tags")],
+        errors="surrogateescape",
         failed_result={"snapshot": {}},
     )
 
@@ -274,8 +275,10 @@ def ensure_present(module):
             module.fail_json(msg=f"invalid tag key {key!r}: kopia splits tags at the first ':'", snapshot={})
 
         if not isinstance(value, str):
-            spelling = "pass it as a string, for example quoted or with the string filter"
-            module.fail_json(msg=f"tag {key!r} value is not a string; {spelling}", snapshot={})
+            module.fail_json(
+                msg=f"tag {key!r} value is not a string; pass it as a string, for example quoted or with the string filter",
+                snapshot={},
+            )
 
     if module.check_mode:
         if reads_as_user_host(absolute_path(path)) and kopia_available(module):
@@ -305,9 +308,8 @@ def ensure_present(module):
         # also in the final repository flush, which leaves the snapshot unsaved
         snapshots = list_snapshots(module, listed_source(manifest, source))
         if snapshots is None:
-            reason = "but kopia reported errors and the snapshots could not be listed"
             module.fail_json(
-                msg=f"kopia snapshot {snapshot_id} of {path} may have been created, {reason}: {stderr.strip()}",
+                msg=f"kopia snapshot {snapshot_id} of {path} may have been created, but kopia reported errors and could not list it: {stderr.strip()}",
                 changed=True,
                 snapshot={},
             )

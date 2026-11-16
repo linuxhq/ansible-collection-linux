@@ -32,13 +32,16 @@ options:
         C(~/.config/kopia), not in the working directory, so write V(./name)
         for a file in the working directory.
       - The module fails before kopia runs, also in check mode, when the file,
-        or kopia's default one when this is unset, exists and is not a regular
-        file, such as a directory or a FIFO, which kopia fails or waits
-        reading.
-      - A path with a NUL character, or a lone surrogate code point other than
-        U+DC80 to U+DCFF, cannot be passed to kopia, so it is rejected before
-        kopia runs, also in check mode. U+DC80 to U+DCFF, which Ansible uses
-        for bytes that are not valid UTF-8, are passed as those bytes.
+        or kopia's default one when this is unset, is a FIFO or a character
+        device, on which kopia can wait forever. So is the password file kopia
+        reads, named after the file with
+        C(.kopia-password) added. kopia reports any other file it cannot read,
+        such as a directory.
+      - A path with a NUL character, which the module cannot look up, or a
+        lone surrogate code point from U+D800 to U+DC7F, which cannot be passed
+        to kopia, is rejected before kopia runs, also in check mode. U+DC80 to
+        U+DCFF, which Ansible uses for bytes that are not valid UTF-8, are
+        passed as those bytes.
     type: path
 requirements:
   - kopia
@@ -65,9 +68,11 @@ maintenance:
     - Durations are in nanoseconds and sizes in bytes, as reported by kopia.
     - Empty when the module fails, and when kopia is unavailable in check mode.
       Not returned when Ansible rejects the arguments, such as a missing
-      required option, a value of the wrong type or an invalid choice, or when
-      the kopia command is not found.
-  returned: unless Ansible rejects the arguments or the kopia command is not found
+      required option, a value of the wrong type or an invalid choice, or fails
+      to log them, such as for a lone surrogate code point in an option that is
+      not secret, or when the kopia command is not found or cannot be started,
+      such as for a NUL character in a value passed to it.
+  returned: unless Ansible rejects or cannot log the arguments or start kopia
   type: dict
   sample:
     extend_object_locks: false

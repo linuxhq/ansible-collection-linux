@@ -9,7 +9,10 @@ breaking_changes:
     space before it (``14:30UTC``), a comma after the weekday
     (``Sun, 2026-07-26 14:30``), ``TODAY`` or another case of ``today``,
     ``yesterday`` and ``tomorrow``, surrounding whitespace, ``12.34.56``, and
-    on systemd 257 a lowercase ``utc`` suffix.
+    on systemd 257 a lowercase ``utc`` suffix. ``systemd-analyze timestamp``
+    exists from systemd 243, so on systemd 239 to 242 setting ``time`` fails
+    with ``unable to parse the time specification`` before any setting is
+    written.
 bugfixes:
   - systemd_timedate - reject digits other than ASCII ``0`` to ``9`` and
     whitespace other than ASCII in a ``time`` timestamp, such as

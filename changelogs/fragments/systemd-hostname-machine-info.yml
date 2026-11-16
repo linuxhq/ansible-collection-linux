@@ -5,10 +5,12 @@ bugfixes:
     of the computed D-Bus properties, so an empty ``icon_name`` no longer
     reports a change on every run and a ``chassis`` that matches the detected
     fallback is written to the file.
-  - systemd_hostname - validate every option before writing any setting, so an
-    invalid ``deployment``, ``icon_name``, ``location``, ``pretty_hostname``,
-    ``static_hostname`` or ``transient_hostname`` fails without leaving earlier
-    settings applied.
+  - systemd_hostname - validate every option except ``static_hostname``
+    before writing any setting, so an invalid ``deployment``, ``icon_name``,
+    ``location``, ``pretty_hostname`` or ``transient_hostname`` fails without
+    leaving earlier settings applied. ``static_hostname`` is written first and
+    validated by ``systemd-hostnamed``, so a value it refuses also fails before
+    anything is changed.
   - systemd_hostname - compare ``static_hostname`` against ``/etc/hostname``
     instead of the reported static hostname, so a hostname with ``?``
     wildcards, which systemd 258 and later substitute, no longer reports a

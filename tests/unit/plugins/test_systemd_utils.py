@@ -105,7 +105,7 @@ def test_missing_dasbus(monkeypatch, module_factory, invoke):
 
 
 def test_locale_normalization_and_preservation(module_factory):
-    proxy = SimpleNamespace(Locale=["LANG=en_US.UTF-8", "LC_TIME=de_DE.UTF-8", "LANGUAGE=en:de", "malformed"])
+    proxy = SimpleNamespace(Locale=["LANG=en_US.UTF-8", "LC_TIME=de_DE.UTF-8", "LANGUAGE=en:de"])
     result = systemd.locale_status(module_factory(), proxy)
     assert result["locale"]["lang"] == "en_US.UTF-8"
     assert result["locale"]["lc_time"] == "de_DE.UTF-8"
@@ -130,7 +130,8 @@ def test_systemd_version(monkeypatch, module_factory, version, expected):
     assert systemd.systemd_proxy.call_args.args[1] == "systemd1"
 
 
-@pytest.mark.parametrize("proxy", [SimpleNamespace(), SimpleNamespace(Version=""), SimpleNamespace(Version="v252")])
+# a distribution can build systemd with any version tag, so the property need not start with the version number
+@pytest.mark.parametrize("proxy", [SimpleNamespace(Version=""), SimpleNamespace(Version="v252")])
 def test_systemd_version_unreadable(monkeypatch, module_factory, invoke, proxy):
     monkeypatch.setattr(systemd, "systemd_proxy", Mock(return_value=proxy))
     result = invoke(systemd.systemd_version, module_factory())
@@ -188,6 +189,43 @@ def test_parse_env_file_reports_whether_systemd_loads_it(text, loadable):
 def test_parse_env_file_escaped_comment_follows_version(version, expected):
     text = "# note \\\nPRETTY_HOSTNAME=Foo\n"
     assert systemd.parse_env_file(text, version)[0].get("PRETTY_HOSTNAME", "") == expected
+
+
+@pytest.mark.parametrize(
+    "text,version,expected",
+    [
+        # systemd 239 and 240 drop the backslash before any character in quotes, also in single quotes
+        ('KEY="a\\$b\\x\\"c"', 239, 'a$bx"c'),
+        ('KEY="a\\$b\\x\\"c"', 240, 'a$bx"c'),
+        ("KEY='a\\'b'", 239, "a'b"),
+        ("KEY='a\\'b'", 240, "a'b"),
+        ('KEY="cr\\\rx"', 240, "crx"),
+        # systemd 241 to 246 keep it except before a double quote, and drop an escaped carriage return
+        ('KEY="a\\$b\\x\\"c"', 241, 'a\\$b\\x"c'),
+        ('KEY="a\\$b\\x\\"c"', 246, 'a\\$b\\x"c'),
+        ("KEY='a\\b'", 241, "a\\b"),
+        ('KEY="cr\\\rx"', 246, "crx"),
+        # systemd 247 and later drop it only before a character that needs escaping, and keep an escaped return
+        ('KEY="a\\$b\\x\\"c"', 247, 'a$b\\x"c'),
+        ("KEY='a\\b'", 247, "a\\b"),
+        ('KEY="cr\\\rx"', 247, "cr\\\rx"),
+    ],
+)
+def test_parse_env_file_quotes_follow_version(text, version, expected):
+    assert systemd.parse_env_file(text, version)[0]["KEY"] == expected
+
+
+@pytest.mark.parametrize(
+    "version,entries,error",
+    [
+        # systemd 239 parses a file up to its first NUL byte, as the end of the text
+        (239, {"KEYMAP": "us", "FONT": "ca"}, None),
+        (240, {}, "contains a NUL byte"),
+        (262, {}, "contains a NUL byte"),
+    ],
+)
+def test_load_env_file_nul_follows_version(version, entries, error):
+    assert systemd.load_env_file(b"KEYMAP=us\nFONT=ca\x00f\nXKBLAYOUT=de\n", version) == (entries, error)
 
 
 @pytest.mark.parametrize(
@@ -316,6 +354,44 @@ def test_open_regular_skips_other_files_without_blocking(tmp_path, kind):
     finally:
         signal.alarm(0)
         signal.signal(signal.SIGALRM, previous)
+
+
+def test_open_regular_does_not_open_a_device(monkeypatch, tmp_path):
+    path = tmp_path / "file"
+    path.symlink_to("/dev/null")
+    monkeypatch.setattr(systemd.os, "open", Mock(side_effect=AssertionError("a device must not be opened")))
+    assert systemd.open_regular(str(path)) is None
+
+
+def test_open_regular_rechecks_the_opened_file(monkeypatch, tmp_path):
+    # a regular file replaced by a device between the check and the open is still not read
+    path = tmp_path / "file"
+    path.write_bytes(b"data")
+    replaced = tmp_path / "replaced"
+    replaced.symlink_to("/dev/null")
+    real_open = os.open
+    monkeypatch.setattr(systemd.os, "open", lambda name, flags: real_open(str(replaced), flags))
+    assert systemd.open_regular(str(path)) is None
+
+
+@pytest.mark.parametrize(
+    "settings,noncharacters,message",
+    [
+        ([("name", "a\x00b")], True, "invalid name: it must be valid UTF-8 without NUL characters"),
+        ([("name", "a\udc80")], False, "invalid name: it must be valid UTF-8 without NUL characters"),
+        ([("name", "a\ufdd0")], True, "invalid name: it must not contain Unicode noncharacters"),
+        ([("name", "a\U0010ffff")], True, "invalid name: it must not contain Unicode noncharacters"),
+    ],
+)
+def test_check_utf8_refuses(module_factory, invoke, settings, noncharacters, message):
+    result = invoke(systemd.check_utf8, module_factory(), settings, noncharacters)
+    assert result["failed"] and result["msg"] == message
+
+
+def test_check_utf8_noncharacters_can_be_left_to_systemd(module_factory):
+    module = module_factory()
+    systemd.check_utf8(module, [("name", "a\ufdd0\ufffe"), ("other", None), ("empty", "")], noncharacters=False)
+    module.fail_json.assert_not_called()
 
 
 def test_open_regular_raises_for_a_missing_file(tmp_path):
