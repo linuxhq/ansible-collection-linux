@@ -1,0 +1,15 @@
+---
+bugfixes:
+  - rclone_config_encryption - fail before any file is read or written when
+    ``path`` contains a NUL character or a lone surrogate code point other
+    than U+DC80 to U+DCFF, which cannot name a file. The module failed with
+    a traceback. U+DC80 to U+DCFF, which Ansible uses for bytes that are not
+    valid UTF-8, still stand for those bytes.
+  - rclone_config_encryption - say that a file that cannot be opened with
+    ``password`` is encrypted with a different password or its encrypted
+    payload is damaged, as the ``state=absent`` failure does, instead of
+    saying the file is damaged.
+  - rclone_config_encryption - document that ``state=absent`` refuses plain
+    text beginning with an rclone encryption header because rclone would read
+    it as encrypted or refuse an unsupported or damaged header, not only
+    because it reads it as encrypted.

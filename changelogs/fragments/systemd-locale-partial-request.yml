@@ -6,9 +6,10 @@ bugfixes:
     ``en_US:en``, no longer makes every later locale change fail.
   - systemd_locale - document that ``systemd-localed`` refuses a list in
     ``locale.language``, such as ``en_AU:en_GB``, on systemd 256 and later,
-    which refuse ``:`` in locale values, and from systemd 247 wherever it
-    checks that each locale is installed instead of generating it with
-    ``locale-gen``, as on EL, where it reports the list as not installed.
+    which refuse ``:`` in locale values, and from systemd 246 wherever it
+    checks that each locale is installed, which systemd 246 and 247 always do
+    and systemd 248 to 255 do unless they generate it with ``locale-gen``, as
+    on EL, where it reports the list as not installed.
 breaking_changes:
   - systemd_locale - requires systemd 239 or later, the first version whose
     systemd-localed merges a partial locale request instead of clearing the

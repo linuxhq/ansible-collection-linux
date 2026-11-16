@@ -56,7 +56,26 @@ HANGUL_JAMO = range(0x1100, 0x1200)
 BACKWARD_COMBINING = frozenset({0x16D67})
 
 # Unicode White_Space, which Go's strings.TrimSpace removes. str.strip() also removes U+001C to U+001F.
-GO_WHITESPACE = "\t\n\v\f\r \x85\xa0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000"
+GO_WHITESPACE = "".join(
+    chr(code)
+    for code in (
+        0x09,
+        0x0A,
+        0x0B,
+        0x0C,
+        0x0D,
+        0x20,
+        0x85,
+        0xA0,
+        0x1680,
+        *range(0x2000, 0x200B),
+        0x2028,
+        0x2029,
+        0x202F,
+        0x205F,
+        0x3000,
+    )
+)
 
 
 def base64_urlsafe_encode(data):

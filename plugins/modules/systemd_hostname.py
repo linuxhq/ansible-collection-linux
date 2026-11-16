@@ -30,11 +30,16 @@ description:
   - O(static_hostname) is compared against C(/etc/hostname), the file
     C(systemd-hostnamed) stores it in, read as systemd reads it, from the first
     line that is neither empty nor a comment, with surrounding whitespace and
-    invalid characters removed as the running systemd version removes them. A
-    missing file, or one without a valid hostname, means no static hostname is
-    stored. So does a file that is not a regular file, or one with a line of
-    1 MiB or more before the hostname, which C(systemd-hostnamed) fails to
-    read and ignores.
+    invalid characters removed as the running systemd version removes them,
+    so systemd 239, which ends a line only at a line feed or a NUL, also
+    keeps V(_) and every V(-). A missing file, or one without a valid
+    hostname, means no static hostname is stored. So does a file the module
+    cannot read, such as one it may not access, or one with a line of 1 MiB
+    or more before the hostname, which C(systemd-hostnamed) 246 and later
+    ignore, while earlier versions fail to start.
+  - The module reads C(/etc/hostname) only when it is a regular file, and
+    otherwise reads no static hostname. C(systemd-hostnamed) may block
+    reading a file that is not a regular file, such as a FIFO.
   - Every option is validated before any setting is written, so an invalid
     value fails without leaving earlier settings applied. O(static_hostname) is
     written first, so a value the running systemd refuses also fails before
@@ -219,7 +224,6 @@ import re
 import string
 
 from ansible.module_utils.basic import AnsibleModule
-from ansible.module_utils.common.text.converters import to_native
 
 from ansible_collections.linuxhq.linux.plugins.module_utils.systemd import (
     ENV_WHITESPACE,
@@ -261,6 +265,9 @@ DEPLOYMENT = re.compile(r"[A-Za-z0-9.:-]+\Z")
 HOSTNAME_LABEL = r"[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?"
 HOSTNAME = re.compile(rf"{HOSTNAME_LABEL}(?:\.{HOSTNAME_LABEL})*\Z")
 HOSTNAME_CHARACTERS = frozenset(string.ascii_letters + string.digits)
+HOSTNAME_CHARACTERS_239 = HOSTNAME_CHARACTERS | frozenset("-_")
+# the first systemd that keeps only letters, digits and hyphens between dots in a hostname it reads
+HOSTNAME_LDH_VERSION = 240
 HOSTNAME_MAX = 64
 ICON_NAME_UNSAFE = re.compile(r"[\x00-\x1f\x7f\\'\"*?\[/]")
 NAME_MAX = 255
@@ -289,9 +296,8 @@ def validate_settings(module):
         )
 
     if params["icon_name"] and not icon_name_valid(params["icon_name"]):
-        module.fail_json(
-            msg=f"invalid icon_name {params['icon_name']!r}: it must be a valid file name without backslashes, quotes or glob characters"
-        )
+        rule = "it must be a valid file name without backslashes, quotes or glob characters"
+        module.fail_json(msg=f"invalid icon_name {params['icon_name']!r}: {rule}")
 
     if params["static_hostname"] and not hostname_valid(params["static_hostname"].replace("?", "0")):
         module.fail_json(msg=f"invalid static_hostname {params['static_hostname']!r}: it is not a valid hostname")
@@ -307,8 +313,35 @@ def read_machine_info(module, version):
     return {param: entries.get(key, "") for key, param in MACHINE_INFO_KEYS.items()}, error
 
 
+def hostname_cleanup_239(value):
+    """Normalize a hostname as hostname_cleanup() of systemd 239 does."""
+    # systemd 239 first shortens the line to 64 bytes, then keeps '_' and every '-', and drops one trailing '.'
+    value = value.encode("utf-8", "surrogateescape")[:HOSTNAME_MAX].decode("utf-8", "surrogateescape")
+    result = []
+    dot = True
+
+    for character in value:
+        if character == ".":
+            if dot:
+                continue
+
+            result.append(character)
+            dot = True
+        elif character in HOSTNAME_CHARACTERS_239:
+            result.append(character)
+            dot = False
+
+    if dot and result:
+        result.pop()
+
+    return "".join(result)
+
+
 def hostname_cleanup(value, version):
     """Normalize a hostname as hostname_cleanup() of the given systemd version does."""
+    if version < HOSTNAME_LDH_VERSION:
+        return hostname_cleanup_239(value)
+
     # systemd 258 and later keep '?' wildcards, and 262 and later '$' tokens too
     allowed = HOSTNAME_CHARACTERS | frozenset("?$" if version >= 262 else "?" if version >= 258 else "")
     result = []
@@ -347,14 +380,14 @@ def hostname_cleanup(value, version):
 def read_static_hostname(module, version):
     """Read the static hostname as systemd's read_etc_hostname() does, an unusable one reading as unset."""
     try:
-        # systemd-hostnamed ignores a file it cannot read, such as a directory; the module reads only a regular file
+        # systemd-hostnamed 246 and later ignore a file they cannot read, such as one with a line too long, and earlier
+        # ones fail to start; a file that is not regular can make it block, so the module reads only a regular file
         handle = open_regular(HOSTNAME_FILE)
         if handle is None:
             return ""
 
         with handle:
-            for line in read_lines(handle):
-                # read_line() fails for a line too long, and systemd-hostnamed then ignores the file
+            for line in read_lines(handle, version):
                 if line is None:
                     return ""
 
@@ -363,12 +396,15 @@ def read_static_hostname(module, version):
                 if line and not line.startswith("#"):
                     hostname = hostname_cleanup(line, version)
 
-                    # newer systemd accepts '?' wildcards and '$' tokens in a stored hostname, where this module does not
+                    # systemd 239 accepts any hostname left after the cleanup, such as one with '_'
+                    if version < HOSTNAME_LDH_VERSION:
+                        return hostname
+
+                    # newer systemd accepts '?' wildcards and '$' tokens in a stored hostname, unlike this module
                     return hostname if hostname_valid(hostname.replace("?", "0").replace("$", "0")) else ""
-    except FileNotFoundError:
+    except OSError:
+        # such as a missing file, a symbolic link loop, a denied access or an I/O error
         return ""
-    except OSError as error:
-        module.fail_json(msg=f"unable to read {HOSTNAME_FILE}: {to_native(error)}")
 
     return ""
 
@@ -416,9 +452,8 @@ def ensure_present(module):
             continue
 
         if machine_info_error and param in MACHINE_INFO_KEYS.values():
-            module.fail_json(
-                msg=f"unable to set {param}: {MACHINE_INFO} {machine_info_error}, which systemd-hostnamed refuses to rewrite"
-            )
+            refused = "which systemd-hostnamed refuses to rewrite"
+            module.fail_json(msg=f"unable to set {param}: {MACHINE_INFO} {machine_info_error}, {refused}")
 
         if param == "static_hostname":
             predicted["hostname"] = value or default or current["hostname"]
@@ -431,9 +466,8 @@ def ensure_present(module):
 
     if transient and predicted["hostname"] != transient:
         if predicted["static_hostname"]:
-            module.fail_json(
-                msg=f"unable to set the transient hostname: the static hostname {predicted['static_hostname']} takes precedence"
-            )
+            static = f"the static hostname {predicted['static_hostname']} takes precedence"
+            module.fail_json(msg=f"unable to set the transient hostname: {static}")
 
         predicted["hostname"] = transient
         predicted["hostname_source"] = "transient"

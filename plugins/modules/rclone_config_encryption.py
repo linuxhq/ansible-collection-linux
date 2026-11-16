@@ -95,6 +95,10 @@ options:
     description:
       - Path to the rclone configuration file to manage.
       - Must already exist unless O(content) is set.
+      - A path with a NUL character or a lone surrogate code point other than
+        U+DC80 to U+DCFF is rejected before any file is read or written,
+        because it cannot name a file. U+DC80 to U+DCFF, which Ansible uses
+        for bytes that are not valid UTF-8, stand for those bytes.
     type: path
     required: true
   state:
@@ -104,9 +108,10 @@ options:
         be written, O(content) or the decrypted configuration, begins with an
         rclone encryption header such as C(RCLONE_ENCRYPT_V0:), after any blank
         or comment lines, the module fails before writing anything, because
-        rclone would read the file as encrypted rather than as the plain text
-        written. The lines are read as described for O(content), trimmed of
-        whitespace and in pieces of up to 4096 bytes.
+        rclone would not read it as the plain text written. It reads it as
+        encrypted, or refuses an unsupported or damaged header. The lines are
+        read as described for O(content), trimmed of whitespace and in pieces
+        of up to 4096 bytes.
     type: str
     choices:
       - absent
@@ -290,9 +295,24 @@ def check_plain_text(module, path, plain):
         readable = False
 
     if not readable:
-        module.fail_json(
-            msg=f"plain text for configuration file {path} begins with an rclone encryption header, so rclone would not read it as plain text"
-        )
+        header = "begins with an rclone encryption header, so rclone would not read it as plain text"
+        module.fail_json(msg=f"plain text for configuration file {path} {header}")
+
+
+def check_path(module, path):
+    """Fail before any file access for a path that cannot name a file, which os functions refuse with a traceback."""
+    label = path.encode("utf-8", "backslashreplace").decode("utf-8")
+
+    if "\x00" in path:
+        module.fail_json(msg=f"invalid path {label}: it contains a NUL character, which a file path cannot contain")
+
+    # U+DC80 to U+DCFF stand for the bytes that are not valid UTF-8, but another lone surrogate stands for none
+    try:
+        os.fsencode(path)
+    except UnicodeEncodeError as error:
+        character = f"U+{ord(error.object[error.start]):04X}"
+        escaped = "other than U+DC80 to U+DCFF, which stand for bytes that are not valid UTF-8"
+        module.fail_json(msg=f"invalid path {label}: it contains {character}, a lone surrogate code point {escaped}")
 
 
 def ensure_present(module, path):
@@ -302,9 +322,8 @@ def ensure_present(module, path):
 
     if desired is None:
         if encrypted and current is None:
-            module.fail_json(
-                msg=f"configuration file {path} is already encrypted with a different password or is damaged"
-            )
+            encrypted_with = "is already encrypted with a different password or its encrypted payload is damaged"
+            module.fail_json(msg=f"configuration file {path} {encrypted_with}")
 
         desired = current
     else:
@@ -329,9 +348,8 @@ def ensure_absent(module, path):
 
     if desired is None:
         if encrypted and current is None:
-            module.fail_json(
-                msg=f"unable to decrypt configuration file {path}, wrong or missing password or damaged encrypted payload"
-            )
+            reason = "wrong or missing password or damaged encrypted payload"
+            module.fail_json(msg=f"unable to decrypt configuration file {path}, {reason}")
 
         desired = current
 
@@ -371,6 +389,7 @@ def main():
     )
 
     password = module.params["password"]
+    check_path(module, module.params["path"])
     path = os.path.realpath(module.params["path"])
 
     if password is not None:
@@ -384,10 +403,8 @@ def main():
         try:
             to_bytes(module.params["content"], errors="surrogate_or_strict")
         except UnicodeEncodeError as error:
-            character = f"character U+{ord(error.object[error.start]):04X}"
-            module.fail_json(
-                msg=f"invalid content for configuration file {path}: {character} is a surrogate, which is not valid UTF-8"
-            )
+            surrogate = f"character U+{ord(error.object[error.start]):04X} is a surrogate, which is not valid UTF-8"
+            module.fail_json(msg=f"invalid content for configuration file {path}: {surrogate}")
 
         if module.params["state"] == "absent":
             check_plain_text(module, path, module.params["content"])
