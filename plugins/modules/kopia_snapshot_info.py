@@ -12,6 +12,9 @@ short_description: Gather information about kopia snapshots
 description:
   - Gather the snapshots held in the connected kopia repository, as reported by
     C(kopia snapshot list).
+notes:
+  - While another client upgrades the repository format, kopia fails rather
+    than waiting for the upgrade to end.
 options:
   config_file:
     description:
@@ -19,6 +22,18 @@ options:
       - Defaults to kopia's own configuration path when unset.
       - Ansible expands a leading V(~) and environment variables in it, as for
         any C(path) option, before it is passed to kopia.
+      - kopia looks up a bare file name, without a directory, in its
+        configuration directory, C($XDG_CONFIG_HOME/kopia) or
+        C(~/.config/kopia), not in the working directory, so write V(./name)
+        for a file in the working directory.
+      - The module fails before kopia runs, also in check mode, when the file,
+        or kopia's default one when this is unset, exists and is not a regular
+        file, such as a directory or a FIFO, which kopia fails or waits
+        reading.
+      - A path with a NUL character, or a lone surrogate code point other than
+        U+DC80 to U+DCFF, cannot be passed to kopia, so it is rejected before
+        kopia runs, also in check mode. U+DC80 to U+DCFF, which Ansible uses
+        for bytes that are not valid UTF-8, are passed as those bytes.
     type: path
   password:
     description:
@@ -26,6 +41,15 @@ options:
       - Only needed when the repository configuration does not already hold the
         key, and exported to the kopia CLI as E(KOPIA_PASSWORD) rather than
         placed on the command line.
+      - When it is not given, kopia reads the password persisted next to the
+        configuration file, in a file named after it with C(.kopia-password)
+        added. When there is none, such as for a connection made with
+        C(persist_credentials) set to V(false), the module fails rather than
+        kopia waiting for the password on its standard input.
+      - An empty password, which kopia reads as no password, or one with a NUL
+        character or a lone surrogate code point other than U+DC80 to U+DCFF,
+        which cannot be passed to kopia, is rejected before kopia runs, also in
+        check mode.
     type: str
   path:
     description:
@@ -37,8 +61,10 @@ options:
       - Made absolute and cleaned, as kopia does, and listed by that path, to
         which kopia adds the client user and host. kopia reads a bare path in
         which an V(@) comes before any V(:) as C(user@host) or
-        C(user@host:path), so when the absolute path is such a path, such as
-        V(/home/alice@example.com), it is listed as the source
+        C(user@host:path), and rejects one with no V(:) whose only V(@) is its
+        last character, so when the absolute path is such a path, such as
+        V(/home/alice@example.com) or V(/srv/backup@), it is listed as the
+        source
         C(user@host:/path), with the client user and host reported by
         C(kopia repository status), as kopia records it. A path with a V(:)
         before its first V(@), such as V(/srv/a:b@c), is read as a path.
@@ -51,7 +77,8 @@ options:
       - A path that is not valid UTF-8, such as one with a lone surrogate code
         point, which Ansible uses for a byte that is not valid UTF-8, is
         rejected before kopia runs, also in check mode, because kopia records
-        it with U+FFFD in its place and cannot list its snapshots.
+        it with U+FFFD in its place and cannot list its snapshots. So is one
+        with a NUL character, which cannot be passed to kopia.
     type: path
 requirements:
   - kopia
@@ -85,9 +112,11 @@ snapshots:
       well, each under its own C(source).
     - Keys under C(tags) are returned as kopia reports them, such as
       C(tag:role).
-    - Empty when the module fails. Not returned when the kopia command is not
-      found.
-  returned: always
+    - Empty when the module fails, and when kopia is unavailable in check mode.
+      Not returned when Ansible rejects the arguments, such as a missing
+      required option, a value of the wrong type or an invalid choice, or when
+      the kopia command is not found.
+  returned: unless Ansible rejects the arguments or the kopia command is not found
   type: list
   elements: dict
   sample:
@@ -107,6 +136,7 @@ from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.common.dict_transformations import camel_dict_to_snake_dict
 
 from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
+    check_connection,
     check_utf8,
     kopia_available,
     kopia_command,
@@ -117,6 +147,7 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
 def list_snapshots(module):
     failed_result = {"snapshots": []}
 
+    check_connection(module, failed_result=failed_result)
     check_utf8(module, [("path", module.params["path"])], failed_result=failed_result)
 
     if module.check_mode and not kopia_available(module):

@@ -14,6 +14,14 @@ description:
   - The desired policy is compared against C(kopia policy export) and applied
     with C(kopia policy import), which replaces the defined policy for the
     target, so O(policy) always describes the complete desired policy.
+notes:
+  - kopia reads the repository password persisted next to the configuration
+    file, in a file named after it with C(.kopia-password) added. When there
+    is none, such as for a connection made with C(persist_credentials) set to
+    V(false), the module fails rather than kopia waiting for the password on
+    its standard input.
+  - While another client upgrades the repository format, kopia fails rather
+    than waiting for the upgrade to end.
 options:
   config_file:
     description:
@@ -21,6 +29,18 @@ options:
       - Defaults to kopia's own configuration path when unset.
       - Ansible expands a leading V(~) and environment variables in it, as for
         any C(path) option, before it is passed to kopia.
+      - kopia looks up a bare file name, without a directory, in its
+        configuration directory, C($XDG_CONFIG_HOME/kopia) or
+        C(~/.config/kopia), not in the working directory, so write V(./name)
+        for a file in the working directory.
+      - The module fails before kopia runs, also in check mode, when the file,
+        or kopia's default one when this is unset, exists and is not a regular
+        file, such as a directory or a FIFO, which kopia fails or waits
+        reading.
+      - A path with a NUL character, or a lone surrogate code point other than
+        U+DC80 to U+DCFF, cannot be passed to kopia, so it is rejected before
+        kopia runs, also in check mode. U+DC80 to U+DCFF, which Ansible uses
+        for bytes that are not valid UTF-8, are passed as those bytes.
     type: path
   policy:
     description:
@@ -31,14 +51,16 @@ options:
         C(keepLatest). Write keys in snake_case, such as V(keep_latest), or in
         kopia's camelCase, such as V(keepLatest).
       - kopia matches keys to its fields ignoring case, but reports them in
-        camelCase, so a key that converts to other capitalization, such as
-        V(Retention) or V(KEEP_LATEST), would never match. Such a key, one that
-        starts with an upper-case letter, contains two upper-case letters in a
-        row, ends with an upper-case letter or contains a character other than
-        an ASCII letter or digit once converted, is rejected before kopia runs,
-        also in check mode. A key written without its word breaks, such as
-        V(keeplatest), cannot be told apart from a field name and reports a
-        change on every run.
+        camelCase, so a key that converts to other capitalization would never
+        match. A key that matches one of kopia's policy fields only ignoring
+        case once converted, such as V(keeplatest), V(Retention) or
+        V(KEEP_LATEST), is rejected before kopia runs, also in check mode,
+        naming the field. So is any other key that starts with an upper-case
+        letter, contains two upper-case letters in a row, ends with an
+        upper-case letter or contains a character other than an ASCII letter or
+        digit once converted.
+      - kopia rejects a key that matches none of its policy fields when it
+        imports the policy, before it changes the policy.
       - Text that is not valid UTF-8, such as a lone surrogate code point, in a
         key or value is rejected before kopia runs, also in check mode, because
         kopia records it with U+FFFD in its place.
@@ -68,10 +90,13 @@ options:
       - kopia reads a target in which an V(@) comes before any V(:) as
         C(user@host) or C(user@host:path), so a directory whose path is such a
         path, such as V(/home/alice@example.com), must be written as
-        C(user@host:/path). A path with a V(:) before its first V(@), such as
-        V(/srv/a:b@c), is read as a directory path. A target that starts with
-        V(@) and contains V(:), such as V(@host:/path), is read as a relative
-        directory path.
+        C(user@host:/path). kopia rejects a target with no V(:) whose only V(@)
+        is its last character, such as V(/srv/backup@), so the module rejects
+        it before kopia runs, also in check mode, and such a directory must be
+        written as C(user@host:/path) too. A path with a V(:) before its first
+        V(@), such as V(/srv/a:b@c), is read as a directory path. A target that
+        starts with V(@) and contains V(:), such as V(@host:/path), is read as
+        a relative directory path.
       - kopia stores the user, host and path of C(user@host) and
         C(user@host:/path) as given. To match the snapshots of the client, the
         user and host must be the C(clientOptions.username) and
@@ -99,7 +124,8 @@ options:
         expanded.
       - A target that is not valid UTF-8, such as one with a lone surrogate
         code point, is rejected before kopia runs, also in check mode, because
-        kopia records it with U+FFFD in its place.
+        kopia records it with U+FFFD in its place. So is a target or a policy
+        key or value with a NUL character.
     type: str
     required: true
 requirements:
@@ -152,8 +178,10 @@ policy:
     - In check mode, when a change would be made, the desired policy from
       O(policy), without the values kopia does not store.
     - Empty when kopia is unavailable in check mode.
-    - Empty when the module fails, also for an invalid option before kopia
-      runs. Not returned when the kopia command is not found.
+    - Empty when the module fails, also for an option value the module rejects
+      before kopia runs. Not returned when Ansible rejects the arguments, such
+      as a missing required option, a value of the wrong type or an invalid
+      choice, or when the kopia command is not found.
   returned: when O(state=present)
   type: dict
   sample:
@@ -177,11 +205,14 @@ from ansible.module_utils.common.dict_transformations import (
 )
 
 from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
+    POLICY_FIELDS,
+    check_connection,
     check_policy_target,
     check_utf8,
     kopia_available,
     kopia_command,
     policy_export,
+    policy_field_mismatch,
     policy_normalize,
     prune_empty,
     same_value,
@@ -195,36 +226,54 @@ def camel_key(key):
     return next(iter(snake_dict_to_camel_dict({key: None})))
 
 
-def check_policy_keys(module, value, name):
-    """Fail naming the first key that converts to a capitalization kopia does not report."""
+def snake_key(key):
+    return next(iter(camel_dict_to_snake_dict({key: None})))
+
+
+def check_policy_keys(module, value, name, fields=None):
+    """Fail naming the first key that converts to a capitalization kopia does not report.
+
+    fields holds kopia's field names for value, see POLICY_FIELDS, or None when they are unknown.
+    """
     if isinstance(value, dict):
         for key, item in value.items():
             child = f"{name}.{key}"
+            camel = camel_key(key)
 
             # kopia matches field names ignoring case, so it accepts such a key, then reports the field in camelCase
-            if not POLICY_KEY.fullmatch(camel_key(key)):
+            field = policy_field_mismatch(camel, fields)
+            if field:
+                matched = f"which it matches to its field {field} ignoring case, so the policy would never match"
+                spelling = f"write {field}" if snake_key(field) == field else f"write {snake_key(field)} or {field}"
+                module.fail_json(
+                    msg=f"invalid policy key {child}: kopia reads it as {camel}, {matched}; {spelling}", policy={}
+                )
+
+            # a later kopia can add a field that such a key matches only ignoring case
+            if not POLICY_KEY.fullmatch(camel):
                 reason = "which kopia matches ignoring case but reports in camelCase, so the policy would never match"
                 spelling = "write it in snake_case, such as keep_latest, or in kopia's camelCase, such as keepLatest"
                 module.fail_json(
-                    msg=f"invalid policy key {child}: kopia reads it as {camel_key(key)}, {reason}; {spelling}",
+                    msg=f"invalid policy key {child}: kopia reads it as {camel}, {reason}; {spelling}",
                     policy={},
                 )
 
-            check_policy_keys(module, item, child)
+            check_policy_keys(module, item, child, fields.get(camel) if isinstance(fields, dict) else None)
 
     elif isinstance(value, list):
         for index, item in enumerate(value):
-            check_policy_keys(module, item, f"{name}[{index}]")
+            check_policy_keys(module, item, f"{name}[{index}]", fields[0] if isinstance(fields, list) else None)
 
 
 def ensure_present(module):
+    check_connection(module, failed_result={"policy": {}})
     check_utf8(
         module,
         [("target", module.params["target"]), ("policy", module.params["policy"])],
         failed_result={"policy": {}},
     )
     check_policy_target(module, module.params["target"], failed_result={"policy": {}})
-    check_policy_keys(module, module.params["policy"], "policy")
+    check_policy_keys(module, module.params["policy"], "policy", POLICY_FIELDS)
 
     if module.check_mode and not kopia_available(module):
         module.exit_json(changed=True, policy={})
@@ -254,6 +303,7 @@ def ensure_present(module):
 
 
 def ensure_absent(module):
+    check_connection(module)
     check_utf8(module, [("target", module.params["target"])])
     check_policy_target(module, module.params["target"])
 

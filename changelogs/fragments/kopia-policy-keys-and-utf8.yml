@@ -1,11 +1,12 @@
 ---
 bugfixes:
   - kopia_policy - fail before running kopia, also in check mode, when a
-    ``policy`` key converts to capitalization kopia does not report, such as
-    ``Retention`` or ``KEEP_LATEST``. kopia matched such a key to its field
-    ignoring case and stored the policy, but reported the field in camelCase,
-    so the task reported a change on every run. Write keys in snake_case or
-    in kopia's camelCase.
+    ``policy`` key matches one of kopia's policy fields only ignoring case,
+    such as ``keeplatest``, ``Retention`` or ``KEEP_LATEST``, naming the
+    field, or otherwise converts to capitalization kopia does not report.
+    kopia matched such a key to its field ignoring case and stored the
+    policy, but reported the field in camelCase, so the task reported a
+    change on every run. Write keys in snake_case or in kopia's camelCase.
   - kopia_policy, kopia_policy_info, kopia_maintenance, kopia_repository,
     kopia_snapshot, kopia_snapshot_info - fail before running kopia, also in
     check mode, when a policy target or value, a maintenance owner, a storage

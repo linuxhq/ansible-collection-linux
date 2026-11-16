@@ -18,11 +18,82 @@ def test_command_keeps_password_out_of_argv(module_factory):
     module.get_bin_path.return_value = "/usr/bin/kopia"
     module.run_command = Mock(return_value=(0, "result", ""))
     assert kopia.kopia_command(module, ["repository", "status"], password="secret") == (0, "result", "")
+    # kopia gets a pipe on its standard input, so it fails rather than waits for a password on a terminal, and fails
+    # rather than waits while another client upgrades the repository format
     module.run_command.assert_called_once_with(
         ["/usr/bin/kopia", "--config-file=/tmp/config with spaces", "repository", "status"],
-        environ_update={"KOPIA_CHECK_FOR_UPDATES": "false", "KOPIA_PASSWORD": "secret"},
+        data="\n",
+        binary_data=True,
+        environ_update={
+            "KOPIA_CHECK_FOR_UPDATES": "false",
+            "KOPIA_PASSWORD": "secret",
+            "KOPIA_REPO_UPGRADE_NO_BLOCK": "true",
+        },
         expand_user_and_vars=False,
     )
+
+
+@pytest.mark.parametrize(
+    "config_file,environ,expected",
+    [
+        ("/etc/kopia/repository.config", {}, "/etc/kopia/repository.config"),
+        ("./repository.config", {}, "./repository.config"),
+        ("repository.config", {"XDG_CONFIG_HOME": "/xdg"}, "/xdg/kopia/repository.config"),
+        ("repository.config", {"HOME": "/home/u"}, "/home/u/.config/kopia/repository.config"),
+        (None, {"HOME": "/home/u"}, "/home/u/.config/kopia/repository.config"),
+        (None, {"KOPIA_CONFIG_PATH": "other.config", "XDG_CONFIG_HOME": "/xdg"}, "/xdg/kopia/other.config"),
+    ],
+)
+def test_config_path_is_resolved_as_kopia_does(monkeypatch, module_factory, config_file, environ, expected):
+    for name in ("KOPIA_CONFIG_PATH", "XDG_CONFIG_HOME"):
+        monkeypatch.delenv(name, raising=False)
+
+    for name, value in environ.items():
+        monkeypatch.setenv(name, value)
+
+    assert kopia.config_path(module_factory({"config_file": config_file})) == expected
+
+
+@pytest.mark.parametrize("config_file", ["/etc/kopia/repository.config", None])
+def test_command_explains_password_prompt(monkeypatch, module_factory, config_file):
+    # kopia asks for a password neither given nor persisted, and fails at once on a pipe
+    monkeypatch.setenv("XDG_CONFIG_HOME", "/xdg")
+    monkeypatch.delenv("KOPIA_CONFIG_PATH", raising=False)
+    module = module_factory({"config_file": config_file})
+    module.get_bin_path.return_value = "/usr/bin/kopia"
+    error = "kopia: error: open repository: get password: password prompt error: inappropriate ioctl for device\n"
+    module.run_command = Mock(return_value=(1, "Enter password to open repository: ", error))
+    config = config_file or "/xdg/kopia/repository.config"
+    missing = f"kopia needs the repository password, which is not given and not persisted next to {config}"
+    assert kopia.kopia_command(module, ["policy", "list"]) == (
+        1,
+        "Enter password to open repository: ",
+        (f"{missing}: {error.strip()}"),
+    )
+
+
+@pytest.mark.parametrize("value", ["a\x00b", {"a": ["b\x00"]}, {"a\x00": "b"}])
+@pytest.mark.parametrize("errors", ["strict", "surrogateescape"])
+def test_check_utf8_rejects_nul(module_factory, invoke, value, errors):
+    result = invoke(kopia.check_utf8, module_factory(), [("name", value)], errors, {"key": {}})
+    assert result["failed"] and result["key"] == {}
+    assert result["msg"].startswith("invalid name") and result["msg"].endswith(": it must not contain a NUL character")
+
+
+@pytest.mark.parametrize(
+    "key,fields,expected",
+    [
+        ("keepLatest", {"keepLatest": None}, None),
+        ("keeplatest", {"keepLatest": None}, "keepLatest"),
+        ("KEEPLATEST", {"keepLatest": None}, "keepLatest"),
+        # Go folds a key with unicode.ToUpper, so the long s matches "s"
+        ("keepLateſt", {"keepLatest": None}, "keepLatest"),
+        ("keepForever", {"keepLatest": None}, None),
+        ("hour", None, None),
+    ],
+)
+def test_policy_field_mismatch(key, fields, expected):
+    assert kopia.policy_field_mismatch(key, fields) == expected
 
 
 @pytest.mark.parametrize(

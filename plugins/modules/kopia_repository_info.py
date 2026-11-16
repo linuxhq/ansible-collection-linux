@@ -13,6 +13,14 @@ description:
   - Gather the repository connection status from C(kopia repository status).
   - A host that is not connected to a repository returns RV(connected=false)
     with an empty RV(repository), it is not an error.
+notes:
+  - kopia reads the repository password persisted next to the configuration
+    file, in a file named after it with C(.kopia-password) added. When there
+    is none, such as for a connection made with C(persist_credentials) set to
+    V(false), the module fails rather than kopia waiting for the password on
+    its standard input.
+  - While another client upgrades the repository format, kopia fails rather
+    than waiting for the upgrade to end.
 options:
   config_file:
     description:
@@ -20,6 +28,18 @@ options:
       - Defaults to kopia's own configuration path when unset.
       - Ansible expands a leading V(~) and environment variables in it, as for
         any C(path) option, before it is passed to kopia.
+      - kopia looks up a bare file name, without a directory, in its
+        configuration directory, C($XDG_CONFIG_HOME/kopia) or
+        C(~/.config/kopia), not in the working directory, so write V(./name)
+        for a file in the working directory.
+      - The module fails before kopia runs, also in check mode, when the file,
+        or kopia's default one when this is unset, exists and is not a regular
+        file, such as a directory or a FIFO, which kopia fails or waits
+        reading.
+      - A path with a NUL character, or a lone surrogate code point other than
+        U+DC80 to U+DCFF, cannot be passed to kopia, so it is rejected before
+        kopia runs, also in check mode. U+DC80 to U+DCFF, which Ansible uses
+        for bytes that are not valid UTF-8, are passed as those bytes.
     type: path
 requirements:
   - kopia
@@ -49,16 +69,18 @@ connected:
   description:
     - Whether the host is connected to a kopia repository.
     - Not returned when the module fails, as the connection state is then
-      unknown.
-  returned: success
+      unknown, nor when kopia is unavailable in check mode.
+  returned: success, unless kopia is unavailable in check mode
   type: bool
   sample: true
 repository:
   description:
     - Repository status reported by C(kopia repository status).
-    - Empty when the module fails. Not returned when the kopia command is not
-      found.
-  returned: always
+    - Empty when the module fails, and when kopia is unavailable in check mode.
+      Not returned when Ansible rejects the arguments, such as a missing
+      required option, a value of the wrong type or an invalid choice, or when
+      the kopia command is not found.
+  returned: unless Ansible rejects the arguments or the kopia command is not found
   type: dict
   sample:
     config_file: /root/.config/kopia/repository.config
@@ -83,14 +105,18 @@ from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.common.dict_transformations import camel_dict_to_snake_dict
 
 from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
+    check_connection,
     kopia_available,
     repository_status,
 )
 
 
 def info(module):
+    check_connection(module, failed_result={"repository": {}})
+
+    # whether the host is connected is unknown without kopia, so it is left out
     if module.check_mode and not kopia_available(module):
-        module.exit_json(changed=False, connected=False, repository={})
+        module.exit_json(changed=False, repository={})
 
     status = repository_status(module, failed_result={"repository": {}})
 

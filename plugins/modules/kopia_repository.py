@@ -44,14 +44,17 @@ description:
     until that blob is removed from the storage. A later run that finds such
     data without a repository fails saying so.
   - For V(filesystem) storage, C(kopia repository create) creates the
-    C(path) directory before it writes the repository. When it then fails,
-    such as for lack of space, and the directory did not exist before, the
-    module fails reporting a change.
+    C(path) directory, and any missing parent directory, before it writes the
+    repository. When it then fails, such as for lack of space, after creating
+    any of them, the module fails reporting a change.
   - When C(kopia repository connect) fails after kopia saved the connection,
     such as when persisting the password fails, the module fails reporting a
     change, and a later run finds the host connected. When the connection
     status cannot be read after C(kopia repository connect) fails, the module
     fails reporting a change, as kopia may have saved the connection.
+notes:
+  - While another client upgrades the repository format, kopia fails rather
+    than waiting for the upgrade to end.
 options:
   config_file:
     description:
@@ -59,6 +62,18 @@ options:
       - Defaults to kopia's own configuration path when unset.
       - Ansible expands a leading V(~) and environment variables in it, as for
         any C(path) option, before it is passed to kopia.
+      - kopia looks up a bare file name, without a directory, in its
+        configuration directory, C($XDG_CONFIG_HOME/kopia) or
+        C(~/.config/kopia), not in the working directory, so write V(./name)
+        for a file in the working directory.
+      - The module fails before kopia runs, also in check mode, when the file,
+        or kopia's default one when this is unset, exists and is not a regular
+        file, such as a directory or a FIFO, which kopia fails or waits
+        reading.
+      - A path with a NUL character, or a lone surrogate code point other than
+        U+DC80 to U+DCFF, cannot be passed to kopia, so it is rejected before
+        kopia runs, also in check mode. U+DC80 to U+DCFF, which Ansible uses
+        for bytes that are not valid UTF-8, are passed as those bytes.
     type: path
   options:
     description:
@@ -93,6 +108,15 @@ options:
         that are not valid UTF-8, are passed to kopia as those bytes. Another
         lone surrogate code point, from U+D800 to U+DC7F, cannot be passed to
         kopia, so it is rejected before kopia runs, also in check mode.
+      - Keys and values must not contain a NUL character, which cannot be
+        passed to kopia, or the module fails before kopia runs, also in check
+        mode.
+      - With O(storage=sftp) and C(external) set, kopia runs C(ssh), which asks
+        for a password, a key passphrase or the confirmation of an unknown host
+        key on the terminal rather than on its standard input, so the module
+        can still wait for an answer. Give C(ssh) everything it needs, such as
+        a key without a passphrase and a known host key, in its arguments or
+        configuration.
       - Put credential-carrying flags in O(secrets) instead so they stay out of
         logs.
       - Values are passed to kopia as given, so the module does not expand V(~)
@@ -110,6 +134,10 @@ options:
         line.
       - Also used to read the connection status, so a connection made with
         V(persist_credentials) set to V(false) in O(options) is recognized.
+      - An empty password, which kopia reads as no password, or one with a NUL
+        character or a lone surrogate code point other than U+DC80 to U+DCFF,
+        which cannot be passed to kopia, is rejected before kopia runs, also in
+        check mode.
     type: str
     required: true
   secrets:
@@ -192,9 +220,11 @@ repository:
     - Repository status reported by C(kopia repository status).
     - Empty in check mode when a connection would be made, and when kopia is
       unavailable in check mode.
-    - Empty when the module fails, also for an invalid option before kopia
-      runs. Not returned when the kopia command is not found.
-  returned: always
+    - Empty when the module fails, also for an option value the module rejects
+      before kopia runs. Not returned when Ansible rejects the arguments, such
+      as a missing required option, a value of the wrong type or an invalid
+      choice, or when the kopia command is not found.
+  returned: unless Ansible rejects the arguments or the kopia command is not found
   type: dict
   sample:
     config_file: /root/.config/kopia/repository.config
@@ -221,6 +251,7 @@ from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.common.dict_transformations import camel_dict_to_snake_dict
 
 from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
+    check_connection,
     check_utf8,
     clean_path,
     kopia_available,
@@ -329,17 +360,12 @@ def check_option_values(module):
                 )
 
             # kopia takes these as text flags, which kopia_flags cannot send for a Boolean or a list
+            invalid = f"invalid {param} value for {option}: it identifies the repository"
             if option in STORAGE_KEYS and isinstance(value, bool):
-                module.fail_json(
-                    msg=f"invalid {param} value for {option}: it identifies the repository, so it takes a text value, not a Boolean; quote it",
-                    repository={},
-                )
+                module.fail_json(msg=f"{invalid}, so it takes a text value, not a Boolean; quote it", repository={})
 
             if option in STORAGE_KEYS and isinstance(value, (list, tuple)):
-                module.fail_json(
-                    msg=f"invalid {param} value for {option}: it identifies the repository, so it takes one value, not a list",
-                    repository={},
-                )
+                module.fail_json(msg=f"{invalid}, so it takes one value, not a list", repository={})
 
 
 def storage_options(module):
@@ -419,19 +445,39 @@ def not_initialized(storage, stderr):
     return storage == "filesystem" and "cannot access storage path" in stderr and "no such file or directory" in stderr
 
 
-def created_directory(module):
-    """Return the path kopia repository create makes for filesystem storage when it does not exist yet, or None."""
+def mkdir_all_paths(path):
+    """Return path and each parent Go's os.MkdirAll creates when missing, cut textually as it does."""
+    paths = []
+
+    while path:
+        paths.append(path)
+        # the parent ends before the last "/" that precedes the final name, or is empty
+        parent = path.rfind("/", 0, len(path.rstrip("/")))
+        path = path[: max(parent, 0)]
+
+    return paths
+
+
+def missing_directories(module):
+    """Return the directories kopia repository create would make for filesystem storage that do not exist yet."""
     path = storage_options(module).get("path")
 
     if module.params["storage"] != "filesystem" or path is None:
-        return None
+        return []
 
-    path = storage_value("filesystem", "path", str(path))
+    # kopia makes the path it is given, with only a leading "~" resolved, so the kernel resolves any ".." after the
+    # directories it creates and the symbolic links on the way
+    path = str(path)
+    home = os.environ.get("HOME", "")
 
-    return None if os.path.lexists(path) else path
+    if path.startswith("~") and home:
+        path = home + path[1:]
+
+    return [directory for directory in mkdir_all_paths(path) if not os.path.lexists(directory)]
 
 
 def ensure_present(module):
+    check_connection(module, failed_result={"repository": {}})
     check_option_values(module)
 
     if module.check_mode and not kopia_available(module):
@@ -461,7 +507,7 @@ def ensure_present(module):
     if rc != 0 and not_initialized(module.params["storage"], stderr):
         uninitialized = CONNECT_NOT_INITIALIZED_ERROR in stderr
         # kopia creates the directory of filesystem storage before it writes the repository, which can still fail
-        directory = created_directory(module)
+        missing = missing_directories(module)
 
         rc, _dummy, stderr = kopia_command(module, ["repository", "create"] + target, password=password)
 
@@ -475,9 +521,9 @@ def ensure_present(module):
             module.fail_json(changed=True, msg=msg, repository={})
 
         if rc != 0 and CREATE_PARTIAL_ERROR in stderr:
-            partial = "the storage holds a partial repository, and creating it fails until that blob is removed from the storage"
-            msg = f"kopia failed to create the repository in {description} after writing {BLOBCFG}, so {partial}: {stderr.strip()}"
-            module.fail_json(changed=True, msg=msg, repository={})
+            failed = f"kopia failed to create the repository in {description} after writing {BLOBCFG}"
+            partial = "the storage holds a partial repository, and creating it fails until that blob is removed from it"
+            module.fail_json(changed=True, msg=f"{failed}, so {partial}: {stderr.strip()}", repository={})
 
         if rc != 0 and uninitialized and CREATE_NOT_EMPTY_ERROR in stderr:
             hint = f"the storage holds data but no kopia repository, such as {BLOBCFG} left by a failed create"
@@ -485,8 +531,9 @@ def ensure_present(module):
                 msg=f"unable to create the kopia repository in {description}: {hint}: {stderr.strip()}", repository={}
             )
 
-        if rc != 0 and directory is not None and os.path.lexists(directory):
-            msg = f"kopia created the storage directory but failed to create the repository in {description}: {stderr.strip()}"
+        if rc != 0 and any(os.path.lexists(directory) for directory in missing):
+            created = "kopia created the storage directory or a parent of it"
+            msg = f"{created} but failed to create the repository in {description}: {stderr.strip()}"
             module.fail_json(changed=True, msg=msg, repository={})
 
         if rc != 0:
@@ -498,16 +545,18 @@ def ensure_present(module):
             rc, _dummy, stderr = kopia_command(module, ["repository", "validate-provider"], password=password)
 
             if rc != 0:
-                msg = f"created the kopia repository in {description}, but validating the provider failed and is not retried on a later run: {stderr.strip()}"
+                failed = "validating the provider failed and is not retried on a later run"
+                msg = f"created the kopia repository in {description}, but {failed}: {stderr.strip()}"
                 module.fail_json(changed=True, msg=msg, repository={})
 
     if rc != 0:
         # kopia saves the connection before it persists the password, which can still fail
+        unable = f"unable to connect to the kopia repository in {description}"
         status = repository_status(
             module,
             password=password,
             failed_result={"changed": True, "repository": {}},
-            context=f"unable to connect to the kopia repository in {description}, and kopia may have saved the connection: {stderr.strip()}",
+            context=f"{unable}, and kopia may have saved the connection: {stderr.strip()}",
         )
 
         if status is not None:

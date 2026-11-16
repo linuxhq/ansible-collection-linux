@@ -1,4 +1,6 @@
 import json
+import os
+import sys
 from unittest.mock import Mock
 
 import pytest
@@ -26,7 +28,8 @@ FAKE_KOPIA = """#!/bin/sh
 for arg in "$@"; do printf '%s\\n' "$arg" >> "$KOPIA_FAKE_DIR/argv"; done
 case "$2" in
   export)
-    if [ -f "$KOPIA_FAKE_DIR/policy.json" ]; then cat "$KOPIA_FAKE_DIR/policy.json"; else echo "policy not found" >&2; exit 1; fi
+    if [ ! -f "$KOPIA_FAKE_DIR/policy.json" ]; then echo "policy not found" >&2; exit 1; fi
+    cat "$KOPIA_FAKE_DIR/policy.json"
     ;;
   import) cp "$4" "$KOPIA_FAKE_DIR/policy.json" ;;
   delete) rm "$KOPIA_FAKE_DIR/policy.json" ;;
@@ -410,7 +413,8 @@ def test_snapshot_info(monkeypatch, run_module, path):
 @pytest.mark.parametrize(
     "path,source",
     [
-        # kopia reads a bare path with "@" before any ":" as user@host or user@host:path, listing nothing or another source
+        # kopia reads a bare path with "@" before any ":" as user@host or user@host:path, listing nothing or another
+        # source
         ("/home/alice@example.com", "root@host:/home/alice@example.com"),
         ("/x@h:/y", "root@host:/x@h:/y"),
         # qualified as kopia records the source, absolute and cleaned
@@ -1183,20 +1187,26 @@ def must_not_run_kopia(monkeypatch, plugin):
 
 @pytest.mark.parametrize("check_mode", [False, True])
 @pytest.mark.parametrize(
-    "policy,key",
+    "policy,key,spelling",
     [
-        ({"Retention": {"keep_latest": 2}}, "policy.Retention: kopia reads it as Retention,"),
-        ({"retention": {"KEEP_LATEST": 2}}, "policy.retention.KEEP_LATEST: kopia reads it as KEEPLatest,"),
-        ({"retention": {"keepLatesT": 2}}, "policy.retention.keepLatesT:"),
-        ({"scheduling": {"time_of_day": [{"Hour": 1}]}}, "policy.scheduling.time_of_day[0].Hour:"),
+        ({"Retention": {"keep_latest": 2}}, "policy.Retention: kopia reads it as Retention,", "write retention"),
+        (
+            {"retention": {"KEEP_LATEST": 2}},
+            "policy.retention.KEEP_LATEST: kopia reads it as KEEPLatest,",
+            "write keep_latest or keepLatest",
+        ),
+        ({"retention": {"keepLatesT": 2}}, "policy.retention.keepLatesT:", "write keep_latest or keepLatest"),
+        ({"scheduling": {"time_of_day": [{"Hour": 1}]}}, "policy.scheduling.time_of_day[0].Hour:", "write hour"),
+        # a key kopia's fields do not hold yet is rejected by the capitalization a later field would have
+        ({"Unknown": 1}, "policy.Unknown: kopia reads it as Unknown,", "or in kopia's camelCase, such as keepLatest"),
     ],
 )
-def test_policy_rejects_keys_kopia_reports_differently(monkeypatch, run_module, policy, key, check_mode):
+def test_policy_rejects_keys_kopia_reports_differently(monkeypatch, run_module, policy, key, spelling, check_mode):
     # kopia matches field names ignoring case, stores the policy, then exports camelCase keys that never match
     must_not_run_kopia(monkeypatch, kopia_policy)
     result = run_module(kopia_policy, {"target": "/data", "policy": policy}, check_mode)
     assert result["failed"] and result["msg"].startswith(f"invalid policy key {key}")
-    assert "keep_latest" in result["msg"] and "keepLatest" in result["msg"]
+    assert result["msg"].endswith(spelling) and result["policy"] == {}
 
 
 @pytest.mark.parametrize("check_mode", [False, True])
@@ -1421,10 +1431,10 @@ def test_policy_manifest_id_target_fails_before_kopia_runs(
     """kopia policy export, show and delete would look the target up as a manifest ID, such as a snapshot's."""
     fake_kopia(monkeypatch, tmp_path, {MANIFEST_ID: {"retention": {"keepLatest": 10}}})
     result = run_module(plugin, params, check_mode)
+    lookup = "kopia policy export, show and delete read it as a manifest ID, such as that of a policy or a snapshot"
+    spelling = f"write a relative directory with such a name as ./{MANIFEST_ID}"
     assert result["failed"] and result["msg"] == (
-        f"invalid target {MANIFEST_ID}: kopia policy export, show and delete read a target of 32 lowercase "
-        "hexadecimal digits as a manifest ID, such as that of a policy or a snapshot, while kopia policy import "
-        f"reads it as a path; write a relative directory with such a name as ./{MANIFEST_ID}"
+        f"invalid target {MANIFEST_ID}: {lookup}, while kopia policy import reads it as a path; {spelling}"
     )
     assert not (tmp_path / "argv").exists()
     assert (tmp_path / "policy.json").exists()
@@ -1512,9 +1522,9 @@ def test_repository_create_failure_after_initialize_reports_change(monkeypatch, 
     monkeypatch.setattr(kopia_repository, "repository_status", REPOSITORY_STATUS)
     result = run_module(kopia_repository, repository_params(validate_provider=True))
     assert result["failed"] and result["changed"] is True and result["repository"] == {}
+    unset = "so its default global policy and maintenance owner may not be set, and a later run does not retry them"
     assert result["msg"] == (
-        "created the kopia repository in filesystem path=/backup, but kopia failed afterwards, so its default global "
-        f"policy and maintenance owner may not be set, and a later run does not retry them: {stderr}"
+        f"created the kopia repository in filesystem path=/backup, but kopia failed afterwards, {unset}: {stderr}"
     )
     assert command.call_count == 3
 
@@ -1537,21 +1547,17 @@ def test_repository_connect_failure_after_saving_connection_reports_change(monke
 
 def test_repository_create_failure_after_blobcfg_reports_change(monkeypatch, run_module):
     # repo.Initialize writes kopia.blobcfg, then the format blob; kopia create then refuses the non-empty storage
-    stderr = (
-        "kopia: error: cannot initialize repository: unable to write format blob: "
-        'unable to write format blob "kopia.repository": no space left on device'
-    )
+    error = 'unable to write format blob "kopia.repository": no space left on device'
+    stderr = f"kopia: error: cannot initialize repository: unable to write format blob: {error}"
     command = Mock(side_effect=[NOT_CONNECTED, NOT_INITIALIZED, (1, "", stderr)])
     monkeypatch.setattr(kopia_repository, "kopia_command", command)
     monkeypatch.setattr(kopia_utils, "kopia_command", command)
     monkeypatch.setattr(kopia_repository, "repository_status", REPOSITORY_STATUS)
     result = run_module(kopia_repository, repository_params(validate_provider=True))
     assert result["failed"] and result["changed"] is True and result["repository"] == {}
-    assert result["msg"] == (
-        "kopia failed to create the repository in filesystem path=/backup after writing the kopia.blobcfg blob (the "
-        "file kopia.blobcfg.f with filesystem, rclone, sftp or webdav storage), so the storage holds a partial "
-        f"repository, and creating it fails until that blob is removed from the storage: {stderr}"
-    )
+    failed = f"kopia failed to create the repository in filesystem path=/backup after writing {BLOBCFG}"
+    partial = "the storage holds a partial repository, and creating it fails until that blob is removed from it"
+    assert result["msg"] == f"{failed}, so {partial}: {stderr}"
     assert command.call_count == 3
 
 
@@ -1571,9 +1577,9 @@ def test_repository_connect_failure_with_unknown_status_reports_change(monkeypat
     monkeypatch.setattr(kopia_repository, "repository_status", REPOSITORY_STATUS)
     result = run_module(kopia_repository, repository_params())
     assert result["failed"] and result["changed"] is True and result["repository"] == {}
+    unable = "unable to connect to the kopia repository in filesystem path=/backup"
     assert result["msg"].startswith(
-        "unable to connect to the kopia repository in filesystem path=/backup, and kopia may have saved the "
-        f"connection: {stderr}; {error} kopia repository status"
+        f"{unable}, and kopia may have saved the connection: {stderr}; {error} kopia repository status"
     )
     assert command.call_count == 3
 
@@ -1768,10 +1774,8 @@ def test_repository_create_failure_on_storage_left_partial_says_so(monkeypatch, 
     monkeypatch.setattr(kopia_repository, "repository_status", REPOSITORY_STATUS)
     result = run_module(kopia_repository, repository_params())
     assert result["failed"] and not result.get("changed") and result["repository"] == {}
-    assert result["msg"] == (
-        "unable to create the kopia repository in filesystem path=/backup: the storage holds data but no kopia "
-        f"repository, such as {BLOBCFG} left by a failed create: {stderr}"
-    )
+    hint = f"the storage holds data but no kopia repository, such as {BLOBCFG} left by a failed create"
+    assert result["msg"] == f"unable to create the kopia repository in filesystem path=/backup: {hint}: {stderr}"
 
 
 @pytest.mark.parametrize("existed,changed", [(False, True), (True, False)])
@@ -1804,9 +1808,8 @@ def test_repository_create_failure_after_creating_directory_reports_change(
     description = f"filesystem path={'~/repo' if home else path}"
     assert result["failed"] and bool(result.get("changed")) is changed and result["repository"] == {}
     if changed:
-        assert result["msg"] == (
-            f"kopia created the storage directory but failed to create the repository in {description}: {stderr}"
-        )
+        created = "kopia created the storage directory or a parent of it"
+        assert result["msg"] == f"{created} but failed to create the repository in {description}: {stderr}"
     else:
         assert result["msg"] == f"unable to create the kopia repository in {description}: {stderr}"
 
@@ -1822,3 +1825,377 @@ def test_repository_create_failure_on_other_storage_reports_no_change(monkeypatc
     params = {"storage": storage, "password": "secret", "options": {"path": str(tmp_path / "missing")}}
     result = run_module(kopia_repository, params)
     assert result["failed"] and not result.get("changed") and result["repository"] == {}
+
+
+# kopia asks for a password it is not given and has not persisted on its standard input, and fails at once when that is
+# not a terminal; this one records what it got there, waiting at most 5 seconds so a test without a pipe fails
+PROMPT_KOPIA = """#!{python}
+import os
+import select
+import stat
+import sys
+
+ready = select.select([0], [], [], 5)[0]
+data = os.read(0, 16) if ready else b"(nothing within 5 seconds)"
+kind = "pipe" if stat.S_ISFIFO(os.fstat(0).st_mode) else "other"
+with open(os.path.join(os.environ["KOPIA_FAKE_DIR"], "stdin"), "w") as handle:
+    handle.write(f"{{data!r}} {{kind}}")
+if not os.isatty(0):
+    error = "password prompt error: inappropriate ioctl for device"
+    sys.stderr.write(f"kopia: error: open repository: get password: {{error}}\\n")
+sys.exit(1)
+"""
+
+PROMPT_ERROR = "kopia: error: open repository: get password: password prompt error: inappropriate ioctl for device"
+
+MODULE_RESULTS = [
+    (
+        kopia_repository,
+        {"storage": "filesystem", "password": "secret", "options": {"path": "/backup"}},
+        {"repository": {}},
+    ),
+    (kopia_repository_info, {}, {"repository": {}}),
+    (kopia_maintenance, {"enable_full": True}, {"maintenance": {}}),
+    (kopia_maintenance_info, {}, {"maintenance": {}}),
+    (kopia_policy, {"target": "/data", "policy": {}}, {"policy": {}}),
+    (kopia_policy, {"target": "/data", "state": "absent"}, {}),
+    (kopia_policy_info, {"target": "/data"}, {"effective_policy": {}, "policy": {}}),
+    (kopia_policy_info, {}, {"policies": []}),
+    (kopia_snapshot, {"path": "/data"}, {"snapshot": {}}),
+    (kopia_snapshot_info, {}, {"snapshots": []}),
+]
+
+# the modules that run kopia without a password, and the result keys they return on failure
+UNPASSWORDED = [entry for entry in MODULE_RESULTS if entry[0] is not kopia_repository]
+
+
+@pytest.mark.parametrize("check_mode", [False, True])
+@pytest.mark.parametrize("plugin,params,keys", UNPASSWORDED)
+def test_password_prompt_fails_instead_of_waiting(monkeypatch, run_module, tmp_path, plugin, params, keys, check_mode):
+    # over SSH without pipelining, kopia's standard input is a terminal, on which it waited for the password forever
+    if plugin is kopia_snapshot and check_mode:
+        pytest.skip("kopia_snapshot does not run kopia in check mode for this path")
+
+    config = tmp_path / "repository.config"
+    config.write_text("{}")
+    kopia = tmp_path / "kopia"
+    kopia.write_text(PROMPT_KOPIA.format(python=sys.executable))
+    kopia.chmod(0o755)
+    monkeypatch.setenv("KOPIA_FAKE_DIR", str(tmp_path))
+    monkeypatch.setattr(basic.AnsibleModule, "run_command", RUN_COMMAND)
+    monkeypatch.setattr(basic.AnsibleModule, "get_bin_path", lambda self, name, required=False: str(kopia))
+    monkeypatch.setattr(kopia_utils, "repository_status", REPOSITORY_STATUS)
+    result = run_module(plugin, dict(params, config_file=str(config)), check_mode)
+    missing = f"kopia needs the repository password, which is not given and not persisted next to {config}"
+    assert result["failed"] and f"{missing}: {PROMPT_ERROR}" in result["msg"]
+    assert {key: result[key] for key in keys} == keys and "changed" not in result
+    assert (tmp_path / "stdin").read_text() == "b'\\n' pipe"
+
+
+@pytest.mark.parametrize("check_mode", [False, True])
+@pytest.mark.parametrize(
+    "plugin,params,keys",
+    [
+        (kopia_repository, {"storage": "filesystem", "options": {"path": "/backup"}}, {"repository": {}}),
+        (kopia_snapshot, {"path": "/data"}, {"snapshot": {}}),
+        (kopia_snapshot_info, {}, {"snapshots": []}),
+    ],
+)
+def test_empty_password_is_rejected(monkeypatch, run_module, plugin, params, keys, check_mode):
+    # kopia reads an empty KOPIA_PASSWORD as no password, so it would use a persisted one or ask for one
+    must_not_run_kopia(monkeypatch, plugin)
+    monkeypatch.setattr(kopia_utils, "repository_status", Mock(side_effect=AssertionError("must not run kopia")))
+    result = run_module(plugin, dict(params, password=""), check_mode)
+    reason = "as kopia reads an empty password as no password"
+    assert result == {"failed": True, "msg": f"invalid password: it must not be empty, {reason}", **keys}
+
+
+@pytest.mark.parametrize("check_mode", [False, True])
+@pytest.mark.parametrize("plugin,params,keys", MODULE_RESULTS)
+@pytest.mark.parametrize("kind", ["directory", "fifo", "symlink"])
+def test_config_file_that_is_not_a_regular_file_is_rejected(
+    monkeypatch, run_module, tmp_path, plugin, params, keys, check_mode, kind
+):
+    # kopia waits reading a FIFO, even with a password, and fails reading a directory
+    config = tmp_path / "repository.config"
+    if kind == "directory":
+        config.mkdir()
+    elif kind == "fifo":
+        os.mkfifo(config)
+    else:
+        (tmp_path / "target").mkdir()
+        config.symlink_to(tmp_path / "target")
+
+    must_not_run_kopia(monkeypatch, plugin)
+    monkeypatch.setattr(kopia_utils, "repository_status", Mock(side_effect=AssertionError("must not run kopia")))
+    result = run_module(plugin, dict(params, config_file=str(config)), check_mode)
+    assert result == {"failed": True, "msg": f"invalid config_file {config}: it is not a regular file", **keys}
+
+
+@pytest.mark.parametrize("config_file", ["repository.config", None])
+def test_config_file_is_looked_up_as_kopia_does(monkeypatch, run_module, tmp_path, config_file):
+    # kopia looks a bare file name up in its configuration directory, as it does its default repository.config
+    config = tmp_path / "xdg" / "kopia" / "repository.config"
+    config.mkdir(parents=True)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
+    monkeypatch.delenv("KOPIA_CONFIG_PATH", raising=False)
+    monkeypatch.chdir(tmp_path)
+    must_not_run_kopia(monkeypatch, kopia_maintenance_info)
+    params = {"config_file": config_file} if config_file else {}
+    result = run_module(kopia_maintenance_info, params)
+    label = "config_file" if config_file else "kopia configuration file"
+    assert result == {"failed": True, "msg": f"invalid {label} {config}: it is not a regular file", "maintenance": {}}
+
+
+@pytest.mark.parametrize("check_mode", [False, True])
+@pytest.mark.parametrize(
+    "plugin,params,name",
+    [
+        (
+            kopia_repository,
+            {"storage": "filesystem", "password": "secret", "options": {"path": "/a\x00b"}},
+            "options.path",
+        ),
+        (
+            kopia_repository,
+            {"storage": "filesystem", "password": "secret", "secrets": {"key\x00": "x"}},
+            "secrets.key\x00",
+        ),
+        (kopia_repository, {"storage": "filesystem", "password": "se\x00cret"}, "password"),
+        (kopia_repository_info, {"config_file": "/etc/kopia\x00.config"}, "config_file"),
+        (kopia_maintenance, {"owner": "root\x00@host"}, "owner"),
+        (kopia_policy, {"target": "/data\x00", "policy": {}}, "target"),
+        (kopia_policy, {"target": "/data", "policy": {"files": {"ignore": ["*\x00"]}}}, "policy.files.ignore[0]"),
+        (kopia_policy, {"target": "/data\x00", "state": "absent"}, "target"),
+        (kopia_policy_info, {"target": "/data\x00"}, "target"),
+        (kopia_snapshot, {"path": "/data\x00"}, "path"),
+        (kopia_snapshot, {"path": "/data", "description": "a\x00"}, "description"),
+        (kopia_snapshot, {"path": "/data", "tags": {"role": "db\x00"}}, "tags.role"),
+        (kopia_snapshot, {"path": "/data", "password": "\x00"}, "password"),
+        (kopia_snapshot_info, {"path": "/data\x00"}, "path"),
+    ],
+)
+def test_nul_is_rejected_before_kopia_runs(monkeypatch, run_module, plugin, params, name, check_mode):
+    # run_command cannot pass a NUL in an argument or an environment variable, and failed with a traceback; Ansible
+    # fails earlier logging a value with a NUL to syslog, but never logs a no_log value, nor any value with no_log
+    must_not_run_kopia(monkeypatch, plugin)
+    monkeypatch.setattr(kopia_utils, "repository_status", Mock(side_effect=AssertionError("must not run kopia")))
+    result = run_module(plugin, dict(params, _ansible_no_log=True), check_mode)
+    assert result["failed"] and result["msg"] == f"invalid {name}: it must not contain a NUL character"
+    assert "se\x00cret" not in result["msg"]
+
+
+@pytest.mark.parametrize("check_mode", [False, True])
+@pytest.mark.parametrize("plugin,params,keys", MODULE_RESULTS)
+@pytest.mark.parametrize("name", ["config_file", "password"])
+def test_surrogate_in_config_file_or_password_is_rejected(
+    monkeypatch, run_module, plugin, params, keys, name, check_mode
+):
+    # U+D800 to U+DC7F cannot be encoded, so run_command failed with a traceback; Ansible logs neither a no_log value,
+    # such as a password, nor any value with no_log, and fails logging other text that is not valid UTF-8
+    if name == "password" and plugin not in (kopia_repository, kopia_snapshot, kopia_snapshot_info):
+        pytest.skip("the module has no password option")
+
+    must_not_run_kopia(monkeypatch, plugin)
+    monkeypatch.setattr(kopia_utils, "repository_status", Mock(side_effect=AssertionError("must not run kopia")))
+    result = run_module(plugin, dict(params, _ansible_no_log=True, **{name: "/etc/kopia\ud800.config"}), check_mode)
+    rule = "it must not contain a lone surrogate code point other than U+DC80 to U+DCFF"
+    escaped = "which stand for bytes that are not valid UTF-8"
+    msg = f"invalid {name}: {rule}, {escaped}, as it cannot be passed to kopia"
+    assert result == {"failed": True, "msg": msg, **keys}
+
+
+def test_config_file_with_escaped_byte_reaches_kopia(monkeypatch, run_module, tmp_path):
+    # Ansible stands for a byte that is not valid UTF-8 with U+DC80 to U+DCFF, which run_command passes as the byte
+    kopia = tmp_path / "kopia"
+    kopia.write_text("#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$KOPIA_FAKE_DIR/argv\"\necho '{}'\n")
+    kopia.chmod(0o755)
+    monkeypatch.setenv("KOPIA_FAKE_DIR", str(tmp_path))
+    monkeypatch.setattr(basic.AnsibleModule, "run_command", RUN_COMMAND)
+    monkeypatch.setattr(basic.AnsibleModule, "get_bin_path", lambda self, name, required=False: str(kopia))
+    params = {"config_file": f"{tmp_path}/r\udce9.config", "_ansible_no_log": True}
+    result = run_module(kopia_maintenance_info, params)
+    assert result == {"changed": False, "maintenance": {}}
+    argv = (tmp_path / "argv").read_bytes().splitlines()
+    assert argv[0] == b"--config-file=" + os.fsencode(str(tmp_path)) + b"/r\xe9.config"
+
+
+@pytest.mark.parametrize(
+    "plugin,params,result",
+    [
+        (kopia_repository_info, {}, {"changed": False, "repository": {}}),
+        (kopia_policy_info, {"target": "/data"}, {"changed": False, "effective_policy": {}, "policy": {}}),
+    ],
+)
+def test_check_mode_without_kopia_leaves_unknown_state_out(monkeypatch, run_module, plugin, params, result):
+    # without kopia, whether the host is connected or a policy is defined is unknown, as when the module fails
+    monkeypatch.setattr(plugin, "kopia_available", lambda module: False)
+    monkeypatch.setattr(plugin, "kopia_command", Mock(side_effect=AssertionError("must not run kopia")), raising=False)
+    assert run_module(plugin, params, check_mode=True) == result
+
+
+@pytest.mark.parametrize("check_mode", [False, True])
+@pytest.mark.parametrize(
+    "plugin,params",
+    [
+        (kopia_policy, {"policy": {}}),
+        (kopia_policy, {"state": "absent"}),
+        (kopia_policy_info, {}),
+    ],
+)
+@pytest.mark.parametrize("target", ["/srv/backup@", "@", "backup@"])
+def test_policy_target_ending_in_its_only_at_sign_is_rejected(
+    monkeypatch, run_module, tmp_path, plugin, params, target, check_mode
+):
+    # kopia reads a target with an "@" and no ":" as user@host, and rejects one with no host as an invalid hostname
+    fake_kopia(monkeypatch, tmp_path)
+    result = run_module(plugin, dict(params, target=target), check_mode)
+    user_host = "kopia reads a target with an '@' and no ':' as user@host"
+    rejected = "rejects one with nothing after the '@'"
+    assert result["failed"] and result["msg"] == (
+        f"invalid target {target}: {user_host}, and {rejected}; write such a directory as user@host:/path"
+    )
+    assert not (tmp_path / "argv").exists()
+
+
+@pytest.mark.parametrize("target", ["/srv/a@b@", "root@host:/srv/backup@", "/srv/a:b@"])
+def test_policy_target_with_a_host_or_colon_is_passed(monkeypatch, run_module, tmp_path, target):
+    fake_kopia(monkeypatch, tmp_path, {target: {"retention": {"keepLatest": 10}}})
+    result = run_module(kopia_policy_info, {"target": target})
+    assert not result.get("failed") and result["defined"]
+
+
+@pytest.mark.parametrize(
+    "plugin,replies",
+    [
+        (kopia_snapshot, [(0, '{"id":"new"}', ""), (0, '[{"id":"new"}]', "")]),
+        (kopia_snapshot_info, [(0, '[{"id":"new"}]', "")]),
+    ],
+)
+def test_snapshot_path_ending_in_its_only_at_sign_is_qualified(monkeypatch, run_module, plugin, replies):
+    # kopia rejects such a bare path as an invalid hostname, so it is listed by its source user@host:/path
+    command = Mock(side_effect=replies)
+    monkeypatch.setattr(plugin, "kopia_command", command)
+    result = run_module(plugin, {"path": "/srv/backup@"})
+    assert not result.get("failed")
+    assert command.call_args.args[1][-2:] == ["--", "root@host:/srv/backup@"]
+
+
+@pytest.mark.parametrize("check_mode", [False, True])
+@pytest.mark.parametrize(
+    "policy,key,field,spelling",
+    [
+        ({"retention": {"keeplatest": 2}}, "policy.retention.keeplatest", "keepLatest", "keep_latest or keepLatest"),
+        ({"Files": {"ignore": []}}, "policy.Files", "files", "files"),
+        (
+            {"files": {"ignorecachedirs": True}},
+            "policy.files.ignorecachedirs",
+            "ignoreCacheDirs",
+            "ignore_cache_dirs or ignoreCacheDirs",
+        ),
+        ({"scheduling": {"time_of_day": [{"MIN": 5}]}}, "policy.scheduling.time_of_day[0].MIN", "min", "min"),
+        ({"actions": {"before_folder": {"SCRIPT": "x"}}}, "policy.actions.before_folder.SCRIPT", "script", "script"),
+        (
+            {"upload": {"maxparallelsnapshots": 1}},
+            "policy.upload.maxparallelsnapshots",
+            "maxParallelSnapshots",
+            "max_parallel_snapshots or maxParallelSnapshots",
+        ),
+    ],
+)
+def test_policy_rejects_keys_kopia_matches_only_ignoring_case(
+    monkeypatch, run_module, policy, key, field, spelling, check_mode
+):
+    # kopia matched keeplatest to keepLatest, applied the value, then exported keepLatest, so the policy never matched
+    must_not_run_kopia(monkeypatch, kopia_policy)
+    result = run_module(kopia_policy, {"target": "/data", "policy": policy}, check_mode)
+    assert result["failed"] and result["policy"] == {}
+    assert result["msg"].startswith(f"invalid policy key {key}: kopia reads it as ")
+    assert f", which it matches to its field {field} ignoring case, so the policy would never match; write " in (
+        result["msg"]
+    )
+    assert result["msg"].endswith(spelling)
+
+
+def test_policy_passes_keys_kopia_does_not_know(monkeypatch, run_module):
+    # kopia refuses a key that matches none of its fields when it imports the policy, before changing it
+    monkeypatch.setattr(kopia_policy, "kopia_available", lambda module: True)
+    monkeypatch.setattr(kopia_policy, "policy_export", lambda *args, **kwargs: None)
+    error = 'kopia: error: unable to decode policy file as valid json: json: unknown field "keepForever"'
+    command = Mock(return_value=(1, "", error))
+    monkeypatch.setattr(kopia_policy, "kopia_command", command)
+    result = run_module(kopia_policy, {"target": "/data", "policy": {"retention": {"keep_forever": 2}}})
+    assert result == {"failed": True, "msg": f"unable to import kopia policy /data: {error}", "policy": {}}
+    assert command.call_args.args[1][:2] == ["policy", "import"]
+
+
+def repository_mkdir_params(path):
+    return {"storage": "filesystem", "password": "secret", "options": {"path": str(path)}}
+
+
+def run_failing_create(monkeypatch, run_module, path, created):
+    """Run kopia_repository with a kopia whose create makes the created directories, then fails."""
+    stderr = "kopia: error: cannot initialize repository: unable to create directory: permission denied"
+    replies = iter([NOT_CONNECTED, NOT_INITIALIZED])
+
+    def kopia(module, args, password=None):
+        if args[:2] != ["repository", "create"]:
+            return next(replies)
+
+        for directory in created:
+            os.mkdir(directory)
+
+        return 1, "", stderr
+
+    monkeypatch.setattr(kopia_repository, "kopia_command", kopia)
+    monkeypatch.setattr(kopia_utils, "kopia_command", kopia)
+    monkeypatch.setattr(kopia_repository, "repository_status", REPOSITORY_STATUS)
+    return run_module(kopia_repository, repository_mkdir_params(path)), stderr
+
+
+def test_repository_create_failure_after_creating_parents_reports_change(monkeypatch, run_module, tmp_path):
+    # kopia creates the missing parents with os.MkdirAll, then fails on the storage directory itself
+    path = tmp_path / "a" / "b" / "repo"
+    result, stderr = run_failing_create(monkeypatch, run_module, path, [tmp_path / "a", tmp_path / "a" / "b"])
+    created = "kopia created the storage directory or a parent of it"
+    msg = f"{created} but failed to create the repository in filesystem path={path}: {stderr}"
+    assert result == {"failed": True, "changed": True, "msg": msg, "repository": {}}
+
+
+def test_repository_create_failure_after_dot_dot_across_missing_directory_reports_change(
+    monkeypatch, run_module, tmp_path
+):
+    # kopia passes the path to os.MkdirAll uncleaned, so it creates "missing" before the kernel resolves ".."
+    path = f"{tmp_path}/missing/../repo"
+    result, _dummy = run_failing_create(monkeypatch, run_module, path, [tmp_path / "missing"])
+    assert result["failed"] and result["changed"] is True and result["repository"] == {}
+
+
+def test_repository_create_failure_after_dot_dot_past_symlink_reports_change(monkeypatch, run_module, tmp_path):
+    # the kernel resolves ".." after the symbolic link, so kopia creates real/repo, not the existing tmp/repo
+    (tmp_path / "real" / "sub").mkdir(parents=True)
+    (tmp_path / "link").symlink_to(tmp_path / "real" / "sub")
+    (tmp_path / "repo").mkdir()
+    path = f"{tmp_path}/link/../repo"
+    result, _dummy = run_failing_create(monkeypatch, run_module, path, [tmp_path / "real" / "repo"])
+    assert result["failed"] and result["changed"] is True and result["repository"] == {}
+
+
+def test_repository_create_failure_without_creating_directories_reports_no_change(monkeypatch, run_module, tmp_path):
+    path = tmp_path / "a" / "repo"
+    result, stderr = run_failing_create(monkeypatch, run_module, path, [])
+    msg = f"unable to create the kopia repository in filesystem path={path}: {stderr}"
+    assert result == {"failed": True, "msg": msg, "repository": {}}
+
+
+@pytest.mark.parametrize(
+    "path,paths",
+    [
+        ("/srv/kopia", ["/srv/kopia", "/srv"]),
+        ("/srv//kopia/", ["/srv//kopia/", "/srv/"]),
+        ("/srv/a/../kopia", ["/srv/a/../kopia", "/srv/a/..", "/srv/a", "/srv"]),
+        ("/", ["/"]),
+    ],
+)
+def test_mkdir_all_paths_cuts_parents_as_go_does(path, paths):
+    assert kopia_repository.mkdir_all_paths(path) == paths
