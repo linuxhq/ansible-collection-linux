@@ -123,7 +123,7 @@ def list_snapshots(module):
 
     if module.params["path"]:
         source = f" of {module.params['path']}"
-        command.append(snapshot_source(module, module.params["path"], "list kopia snapshots"))
+        command.extend(["--", snapshot_source(module, module.params["path"], "list kopia snapshots")])
 
     rc, stdout, stderr = kopia_command(module, command, password=module.params["password"])
 

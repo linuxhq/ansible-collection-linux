@@ -55,7 +55,7 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.rclone import (
 
 def rclone_deobscure(obscured):
     if not HAS_PYCRYPTODOME:
-        raise AnsibleFilterError("rclone_deobscure requires the pycryptodome library")
+        raise AnsibleFilterError("rclone_deobscure requires the pycryptodome or pycryptodomex library")
 
     if isinstance(obscured, AnsibleVaultEncryptedUnicode):
         obscured = to_text(obscured)

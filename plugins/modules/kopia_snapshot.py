@@ -197,7 +197,7 @@ def listed_source(manifest, source):
 
 def list_snapshots(module, source):
     rc, stdout, _dummy = kopia_command(
-        module, ["snapshot", "list", source, "--json"], password=module.params["password"]
+        module, ["snapshot", "list", "--json", "--", source], password=module.params["password"]
     )
 
     if rc != 0:
