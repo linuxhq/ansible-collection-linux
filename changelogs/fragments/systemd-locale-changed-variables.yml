@@ -17,7 +17,8 @@ bugfixes:
     only when it is a regular file and otherwise predicts no fallback.
   - systemd_locale - fail before any setting is written, also in check mode,
     when ``lang`` changes without a set ``language`` and the language
-    fallback map lists a fallback for it that is not valid UTF-8.
+    fallback map lists a fallback for it that is not valid UTF-8 or contains
+    a Unicode noncharacter.
     ``systemd-localed`` writes such a fallback to the locale configuration
     and then fails to report the locale, as seen on systemd 252, and check
     mode returned it as lone surrogates. A real run reads the map for this
@@ -26,7 +27,7 @@ bugfixes:
     ``LANGUAGE`` without validating it, so it can be a list such as
     ``en_AU:en_GB``, which ``locale.language`` cannot set again where
     ``systemd-localed`` refuses a list, from systemd 256 everywhere and from
-    systemd 247 where it checks that each locale is installed, as on EL, and
+    systemd 246 where it checks that each locale is installed, as on EL, and
     that the returned ``language`` then cannot be fed back where it differs
     from the configured one.
   - systemd_locale - document that a set ``language`` is kept unless it equals

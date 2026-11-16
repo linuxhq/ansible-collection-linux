@@ -31,9 +31,10 @@ description:
   - O(path) is made absolute and cleaned, as kopia does, and its snapshots
     are listed by that path, to which kopia adds the client user and host.
     kopia reads a bare path in which an V(@) comes before any V(:) as
-    C(user@host) or C(user@host:path), so when the absolute path is such a
-    path, such as V(/home/alice@example.com), it is listed by the source kopia
-    records, C(user@host:/path), taken from the snapshot kopia printed or, when
+    C(user@host) or C(user@host:path), and rejects one with no V(:) whose only
+    V(@) is its last character, so when the absolute path is such a path, such
+    as V(/home/alice@example.com) or V(/srv/backup@), it is listed by the
+    source kopia records, C(user@host:/path), taken from the snapshot kopia printed or, when
     it printed none, from the client user and host reported by
     C(kopia repository status). A path with a V(:) before its first V(@), such
     as V(/srv/a:b@c), is read as a path.
@@ -43,6 +44,8 @@ description:
     or the host contains V(:). The module then fails before taking the
     snapshot.
 notes:
+  - While another client upgrades the repository format, kopia fails rather
+    than waiting for the upgrade to end.
   - A failure reported by kopia after it saved the snapshot without printing
     it, such as applying the retention policy, cannot be told apart from a
     snapshot that was not saved. The module then fails without reporting a
@@ -54,13 +57,26 @@ options:
       - Defaults to kopia's own configuration path when unset.
       - Ansible expands a leading V(~) and environment variables in it, as for
         any C(path) option, before it is passed to kopia.
+      - kopia looks up a bare file name, without a directory, in its
+        configuration directory, C($XDG_CONFIG_HOME/kopia) or
+        C(~/.config/kopia), not in the working directory, so write V(./name)
+        for a file in the working directory.
+      - The module fails before kopia runs, also in check mode, when the file,
+        or kopia's default one when this is unset, exists and is not a regular
+        file, such as a directory or a FIFO, which kopia fails or waits
+        reading.
+      - A path with a NUL character, or a lone surrogate code point other than
+        U+DC80 to U+DCFF, cannot be passed to kopia, so it is rejected before
+        kopia runs, also in check mode. U+DC80 to U+DCFF, which Ansible uses
+        for bytes that are not valid UTF-8, are passed as those bytes.
     type: path
   description:
     description:
       - Description recorded on the snapshot.
       - A description that is not valid UTF-8, such as one with a lone
         surrogate code point, is rejected before kopia runs, also in check
-        mode, because kopia records it with U+FFFD in its place.
+        mode, because kopia records it with U+FFFD in its place. So is one
+        with a NUL character, which cannot be passed to kopia.
     type: str
   password:
     description:
@@ -68,6 +84,15 @@ options:
       - Only needed when the repository configuration does not already hold the
         key, and exported to the kopia CLI as E(KOPIA_PASSWORD) rather than
         placed on the command line.
+      - When it is not given, kopia reads the password persisted next to the
+        configuration file, in a file named after it with C(.kopia-password)
+        added. When there is none, such as for a connection made with
+        C(persist_credentials) set to V(false), the module fails rather than
+        kopia waiting for the password on its standard input.
+      - An empty password, which kopia reads as no password, or one with a NUL
+        character or a lone surrogate code point other than U+DC80 to U+DCFF,
+        which cannot be passed to kopia, is rejected before kopia runs, also in
+        check mode.
     type: str
   path:
     description:
@@ -77,7 +102,8 @@ options:
       - A path that is not valid UTF-8, such as one with a lone surrogate code
         point, which Ansible uses for a byte that is not valid UTF-8, is
         rejected before kopia runs, also in check mode, because kopia records
-        it with U+FFFD in its place and cannot list its snapshots.
+        it with U+FFFD in its place and cannot list its snapshots. So is one
+        with a NUL character, which cannot be passed to kopia.
     type: path
     required: true
   tags:
@@ -96,7 +122,8 @@ options:
         V("{{ build_number | string }}").
       - A key or value that is not valid UTF-8, such as one with a lone
         surrogate code point, is rejected before kopia runs, also in check
-        mode, because kopia records it with U+FFFD in its place.
+        mode, because kopia records it with U+FFFD in its place. So is one
+        with a NUL character, which cannot be passed to kopia.
     type: dict
 requirements:
   - kopia
@@ -144,9 +171,11 @@ snapshot:
     - Keys under C(tags) are returned as kopia reports them, such as
       C(tag:role).
     - Empty in check mode and when the snapshot manifest cannot be read back.
-    - Empty when the module fails before running kopia, such as for an
-      invalid option. Not returned when the kopia command is not found.
-  returned: always
+    - Empty when the module fails before running kopia, such as for an option
+      value the module rejects. Not returned when Ansible rejects the
+      arguments, such as a missing required option, a value of the wrong type
+      or an invalid choice, or when the kopia command is not found.
+  returned: unless Ansible rejects the arguments or the kopia command is not found
   type: dict
   sample:
     id: k9c8f0b1c2d3e4f5
@@ -164,6 +193,7 @@ from ansible.module_utils.common.dict_transformations import camel_dict_to_snake
 
 from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
     absolute_path,
+    check_connection,
     check_utf8,
     kopia_available,
     kopia_command,
@@ -232,6 +262,7 @@ def latest_snapshot(module, source, snapshot_id=None):
 def ensure_present(module):
     path = module.params["path"]
 
+    check_connection(module, failed_result={"snapshot": {}})
     check_utf8(
         module,
         [(name, module.params[name]) for name in ("path", "description", "tags")],
@@ -243,10 +274,8 @@ def ensure_present(module):
             module.fail_json(msg=f"invalid tag key {key!r}: kopia splits tags at the first ':'", snapshot={})
 
         if not isinstance(value, str):
-            module.fail_json(
-                msg=f"tag {key!r} value is not a string; pass it as a string, for example quoted or with the string filter",
-                snapshot={},
-            )
+            spelling = "pass it as a string, for example quoted or with the string filter"
+            module.fail_json(msg=f"tag {key!r} value is not a string; {spelling}", snapshot={})
 
     if module.check_mode:
         if reads_as_user_host(absolute_path(path)) and kopia_available(module):

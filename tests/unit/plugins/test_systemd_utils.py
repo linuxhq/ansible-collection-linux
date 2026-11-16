@@ -1,3 +1,6 @@
+import io
+import os
+import signal
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -203,3 +206,118 @@ def test_load_env_file_reports_why_systemd_refuses_it(content, error):
 
 def test_load_env_file_keeps_entries_before_an_invalid_one():
     assert systemd.load_env_file(b"KEYMAP=us\nFONT=caf\xe9\nKEYMAP_TOGGLE=de\n", 262)[0] == {"KEYMAP": "us"}
+
+
+def read_all(content, version, reader=None, block=None):
+    """Return the lines reader yields for content, read in blocks of block bytes when given."""
+    reader = reader or systemd.read_lines
+    handle = io.BytesIO(content)
+
+    if block is not None:
+        source = handle
+        handle = SimpleNamespace(read=lambda size=-1: source.read(min(size, block)))
+
+    return list(reader(handle, version))
+
+
+@pytest.mark.parametrize(
+    "content,lines",
+    [
+        (b"", []),
+        (b"a", ["a"]),
+        (b"a\n", ["a"]),
+        (b"a\n\n", ["a", ""]),
+        # read_line_full() reads a line feed, a carriage return and a NUL, each at most once and a NUL last, as one end
+        (b"a\r\nb", ["a", "b"]),
+        (b"a\n\rb", ["a", "b"]),
+        (b"a\r\0b", ["a", "b"]),
+        (b"a\n\r\0b", ["a", "b"]),
+        (b"a\r\n\0b", ["a", "b"]),
+        (b"a\r\rb", ["a", "", "b"]),
+        (b"a\r\n\rb", ["a", "", "b"]),
+        (b"a\0\nb", ["a", "", "b"]),
+        (b"a\0\0", ["a", ""]),
+        (b"a\r\n", ["a"]),
+        (b"caf\xe9\n", ["caf\udce9"]),
+    ],
+)
+@pytest.mark.parametrize("block", [None, 1, 2])
+def test_read_lines_ends_lines_as_read_line_full(content, lines, block):
+    assert read_all(content, 240, block=block) == lines
+
+
+@pytest.mark.parametrize(
+    "content,lines",
+    [
+        (b"a\r\nb", ["a\r", "b"]),
+        (b"a\rb\0c\n", ["a\rb", "c"]),
+        (b"a\n\n", ["a", ""]),
+        (b"a\0\n", ["a", ""]),
+    ],
+)
+@pytest.mark.parametrize("block", [None, 1])
+def test_read_lines_239_ends_lines_at_line_feed_or_nul(content, lines, block):
+    assert read_all(content, 239, block=block) == lines
+
+
+@pytest.mark.parametrize("version", [239, 240])
+def test_read_lines_refuses_long_line(version):
+    long_line = b"x" * systemd.LONG_LINE_MAX
+    assert read_all(b"a\n" + long_line + b"\nb\n", version) == ["a", None]
+    assert read_all(b"a\n" + long_line, version) == ["a", None]
+    assert read_all(b"a\n" + long_line[1:] + b"\nb", version) == ["a", long_line[1:].decode(), "b"]
+
+
+@pytest.mark.parametrize(
+    "content,lines",
+    [
+        (b"a\rb\n", ["a\rb\n"]),
+        (b"a\0b\nc", ["a", "c"]),
+        (b"x" * 2047 + b"y\n", ["x" * 2047, "y\n"]),
+        (b"x" * 2046 + b"\n", ["x" * 2046 + "\n"]),
+        (b"x" * 5000, ["x" * 2047, "x" * 2047, "x" * 906]),
+    ],
+)
+@pytest.mark.parametrize("block", [None, 100])
+def test_read_map_lines_239_reads_as_fgets(content, lines, block):
+    assert read_all(content, 239, systemd.read_map_lines, block) == lines
+
+
+def test_read_map_lines_240_reads_as_read_line():
+    assert read_all(b"a\rb\n", 240, systemd.read_map_lines) == ["a", "b"]
+
+
+def test_open_regular_reads_a_regular_file(tmp_path):
+    path = tmp_path / "file"
+    path.write_bytes(b"data")
+
+    with systemd.open_regular(str(path)) as handle:
+        assert handle.read() == b"data"
+
+
+@pytest.mark.parametrize("kind", ["directory", "fifo", "device"])
+def test_open_regular_skips_other_files_without_blocking(tmp_path, kind):
+    path = tmp_path / "file"
+    if kind == "directory":
+        path.mkdir()
+    elif kind == "fifo":
+        os.mkfifo(path)
+    else:
+        path.symlink_to("/dev/null")
+
+    # opening a FIFO without O_NONBLOCK would wait for a writer, so fail after 5 seconds instead
+    def expire(signum, frame):
+        raise AssertionError("open_regular blocked")
+
+    previous = signal.signal(signal.SIGALRM, expire)
+    signal.alarm(5)
+    try:
+        assert systemd.open_regular(str(path)) is None
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, previous)
+
+
+def test_open_regular_raises_for_a_missing_file(tmp_path):
+    with pytest.raises(FileNotFoundError):
+        systemd.open_regular(str(tmp_path / "missing"))

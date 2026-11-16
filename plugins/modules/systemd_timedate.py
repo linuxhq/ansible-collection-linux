@@ -195,9 +195,8 @@ def wait_for_ntp(module, proxy, ntp):
 
     while systemd_properties(module, proxy, [("ntp", "NTP")])["ntp"] != ntp:
         if monotonic() >= deadline:
-            module.fail_json(
-                msg=f"unable to set ntp to {ntp}: network time synchronization did not change within {NTP_TIMEOUT} seconds"
-            )
+            unchanged = f"network time synchronization did not change within {NTP_TIMEOUT} seconds"
+            module.fail_json(msg=f"unable to set ntp to {ntp}: {unchanged}")
 
         sleep(0.5)
 

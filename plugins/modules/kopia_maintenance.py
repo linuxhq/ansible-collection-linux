@@ -19,6 +19,14 @@ description:
     default log retention before applying the requested log retention
     options, so the ones left unset take the default values. The result and
     check mode predictions follow kopia.
+notes:
+  - kopia reads the repository password persisted next to the configuration
+    file, in a file named after it with C(.kopia-password) added. When there
+    is none, such as for a connection made with C(persist_credentials) set to
+    V(false), the module fails rather than kopia waiting for the password on
+    its standard input.
+  - While another client upgrades the repository format, kopia fails rather
+    than waiting for the upgrade to end.
 options:
   config_file:
     description:
@@ -26,6 +34,18 @@ options:
       - Defaults to kopia's own configuration path when unset.
       - Ansible expands a leading V(~) and environment variables in it, as for
         any C(path) option, before it is passed to kopia.
+      - kopia looks up a bare file name, without a directory, in its
+        configuration directory, C($XDG_CONFIG_HOME/kopia) or
+        C(~/.config/kopia), not in the working directory, so write V(./name)
+        for a file in the working directory.
+      - The module fails before kopia runs, also in check mode, when the file,
+        or kopia's default one when this is unset, exists and is not a regular
+        file, such as a directory or a FIFO, which kopia fails or waits
+        reading.
+      - A path with a NUL character, or a lone surrogate code point other than
+        U+DC80 to U+DCFF, cannot be passed to kopia, so it is rejected before
+        kopia runs, also in check mode. U+DC80 to U+DCFF, which Ansible uses
+        for bytes that are not valid UTF-8, are passed as those bytes.
     type: path
   enable_full:
     description: Enable or disable periodic full maintenance.
@@ -84,7 +104,8 @@ options:
         set time, so V(me) always reports a change, prefer the explicit form.
       - An owner that is not valid UTF-8, such as one with a lone surrogate
         code point, is rejected before kopia runs, also in check mode, because
-        kopia records it with U+FFFD in its place.
+        kopia records it with U+FFFD in its place. So is one with a NUL
+        character, which cannot be passed to kopia.
     type: str
   quick_interval:
     description:
@@ -126,9 +147,11 @@ maintenance:
     - In check mode, when a change would be made, the settings reported by
       kopia with the requested changes applied, as the module predicts them.
     - Empty when kopia is unavailable in check mode.
-    - Empty when the module fails, also for an invalid option before kopia
-      runs. Not returned when the kopia command is not found.
-  returned: always
+    - Empty when the module fails, also for an option value the module rejects
+      before kopia runs. Not returned when Ansible rejects the arguments, such
+      as a missing required option, a value of the wrong type or an invalid
+      choice, or when the kopia command is not found.
+  returned: unless Ansible rejects the arguments or the kopia command is not found
   type: dict
   sample:
     extend_object_locks: false
@@ -155,6 +178,7 @@ from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.common.dict_transformations import camel_dict_to_snake_dict
 
 from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
+    check_connection,
     check_utf8,
     kopia_available,
     kopia_command,
@@ -256,6 +280,8 @@ def log_retention_change(module, current):
 
 
 def validate_settings(module):
+    check_connection(module, failed_result={"maintenance": {}})
+
     for param, _dummy, _dummy, kind in SETTINGS:
         value = module.params[param]
 

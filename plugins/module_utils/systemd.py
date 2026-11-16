@@ -101,6 +101,17 @@ LONG_LINE_MAX = 1024 * 1024
 
 LINE_READ_SIZE = 65536
 
+# the first systemd whose read_line() also ends a line at a carriage return, and reads a pair such as \r\n as one end
+READ_LINE_FULL_VERSION = 240
+
+# systemd 240 and later end a line at a line feed, a carriage return or a NUL, taking in at most one of each, with a
+# NUL last, so \r\n, \n\r, \r\0 and \n\r\0 each end one line; systemd 239 ends a line at a line feed or a NUL only
+LINE_END = re.compile(rb"\0|\n\r?\0?|\r\n?\0?")
+LINE_END_239 = re.compile(rb"[\n\0]")
+
+# systemd 239 reads a map line with fgets() into a LINE_MAX buffer, so at most this many bytes at a time
+FGETS_SIZE = 2048 - 1
+
 ENV_COMMENTS = "#;"
 ENV_NEWLINE = "\n\r"
 ENV_SHELL_NEED_ESCAPE = '"\\`$'
@@ -376,10 +387,10 @@ def read_bytes(module, path):
 def open_regular(path):
     """Open path for reading as bytes, or return None when it is not a regular file, which the module does not read.
 
-    The file is opened without blocking, so a FIFO is detected rather than waited on. Raise OSError when it cannot be
-    opened.
+    The file is opened without blocking, so a FIFO is detected rather than waited on, and without making a terminal
+    the controlling terminal. Raise OSError when it cannot be opened.
     """
-    fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_CLOEXEC)
+    fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_NOCTTY | os.O_CLOEXEC)
 
     try:
         regular = stat.S_ISREG(os.fstat(fd).st_mode)
@@ -394,31 +405,77 @@ def open_regular(path):
     return os.fdopen(fd, "rb")
 
 
-def read_lines(handle):
-    """Yield the lines of a file as systemd's read_line() reads them, ending at a carriage return, a line feed or a NUL.
+def read_lines(handle, version):
+    """Yield the lines of a file as read_line() of the given systemd version reads them, see LINE_END.
 
+    A last line without a line end is yielded once, and a file ending with a line end yields no empty line after it.
     Undecodable bytes are kept as surrogates. Yields None and stops for a line read_line() refuses as too long.
     """
+    line_end = LINE_END if version >= READ_LINE_FULL_VERSION else LINE_END_239
     pending = b""
 
     while True:
         block = handle.read(LINE_READ_SIZE)
-        lines = re.split(b"[\r\n\0]", pending + block)
-        # the last piece can continue in the next block, unless the file has ended
-        pending = lines.pop() if block else b""
+        buffer = pending + block
+        start = 0
 
-        for line in lines + ([pending] if not block else []):
+        # each line end found is the first after the line it ends, so the lines between them hold none
+        for match in line_end.finditer(buffer):
+            line = buffer[start : match.start()]
+
             if len(line) >= LONG_LINE_MAX:
                 yield None
                 return
 
-            yield line.decode("utf-8", errors="surrogateescape")
+            # a line end at the end of a block can take in more of it from the next block, unless it ends with a NUL
+            if block and match.end() == len(buffer) and not match.group().endswith(b"\0"):
+                break
 
-        if not block:
+            yield line.decode("utf-8", errors="surrogateescape")
+            start = match.end()
+
+        pending = buffer[start:]
+        line = pending if line_end.search(pending) is None else b""
+
+        if len(line) >= LONG_LINE_MAX:
+            yield None
             return
 
-        if len(pending) >= LONG_LINE_MAX:
-            yield None
+        if not block:
+            if line:
+                yield line.decode("utf-8", errors="surrogateescape")
+
+            return
+
+
+def read_map_lines(handle, version):
+    """Yield the lines of a map file as systemd-localed's read_next_mapping() of the given version reads them.
+
+    systemd 240 and later read them with read_line(), see read_lines(). systemd 239 reads them with fgets(), so only a
+    line feed ends a line, kept at the end of the line, a longer line is read in pieces of FGETS_SIZE bytes, a NUL ends
+    the text of a piece, and no line is too long.
+    """
+    if version >= READ_LINE_FULL_VERSION:
+        yield from read_lines(handle, version)
+        return
+
+    pending = b""
+
+    while True:
+        block = handle.read(LINE_READ_SIZE)
+        pending += block
+
+        while pending:
+            end = pending.find(b"\n", 0, FGETS_SIZE)
+
+            if end < 0 and len(pending) < FGETS_SIZE and block:
+                break
+
+            size = FGETS_SIZE if end < 0 else end + 1
+            piece, pending = pending[:size], pending[size:]
+            yield piece.split(b"\0", 1)[0].decode("utf-8", errors="surrogateescape")
+
+        if not block:
             return
 
 

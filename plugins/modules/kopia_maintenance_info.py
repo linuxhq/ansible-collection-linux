@@ -12,6 +12,14 @@ short_description: Gather kopia repository maintenance settings
 description:
   - Gather the maintenance settings and schedule of the connected kopia
     repository from C(kopia maintenance info).
+notes:
+  - kopia reads the repository password persisted next to the configuration
+    file, in a file named after it with C(.kopia-password) added. When there
+    is none, such as for a connection made with C(persist_credentials) set to
+    V(false), the module fails rather than kopia waiting for the password on
+    its standard input.
+  - While another client upgrades the repository format, kopia fails rather
+    than waiting for the upgrade to end.
 options:
   config_file:
     description:
@@ -19,6 +27,18 @@ options:
       - Defaults to kopia's own configuration path when unset.
       - Ansible expands a leading V(~) and environment variables in it, as for
         any C(path) option, before it is passed to kopia.
+      - kopia looks up a bare file name, without a directory, in its
+        configuration directory, C($XDG_CONFIG_HOME/kopia) or
+        C(~/.config/kopia), not in the working directory, so write V(./name)
+        for a file in the working directory.
+      - The module fails before kopia runs, also in check mode, when the file,
+        or kopia's default one when this is unset, exists and is not a regular
+        file, such as a directory or a FIFO, which kopia fails or waits
+        reading.
+      - A path with a NUL character, or a lone surrogate code point other than
+        U+DC80 to U+DCFF, cannot be passed to kopia, so it is rejected before
+        kopia runs, also in check mode. U+DC80 to U+DCFF, which Ansible uses
+        for bytes that are not valid UTF-8, are passed as those bytes.
     type: path
 requirements:
   - kopia
@@ -43,9 +63,11 @@ maintenance:
   description:
     - Maintenance settings reported by C(kopia maintenance info).
     - Durations are in nanoseconds and sizes in bytes, as reported by kopia.
-    - Empty when the module fails. Not returned when the kopia command is not
-      found.
-  returned: always
+    - Empty when the module fails, and when kopia is unavailable in check mode.
+      Not returned when Ansible rejects the arguments, such as a missing
+      required option, a value of the wrong type or an invalid choice, or when
+      the kopia command is not found.
+  returned: unless Ansible rejects the arguments or the kopia command is not found
   type: dict
   sample:
     extend_object_locks: false
@@ -70,12 +92,15 @@ from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.common.dict_transformations import camel_dict_to_snake_dict
 
 from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
+    check_connection,
     kopia_available,
     maintenance_info,
 )
 
 
 def info(module):
+    check_connection(module, failed_result={"maintenance": {}})
+
     if module.check_mode and not kopia_available(module):
         module.exit_json(changed=False, maintenance={})
 

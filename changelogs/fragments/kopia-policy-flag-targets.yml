@@ -46,14 +46,19 @@ bugfixes:
     no kopia repository, such as that blob.
   - kopia_repository - report ``changed`` when ``kopia repository create``
     fails after creating the missing ``path`` directory of ``filesystem``
-    storage, such as when writing the ``kopia.blobcfg`` blob fails for lack
-    of space, and say that kopia created the directory.
+    storage, or any missing parent directory, such as when writing the
+    ``kopia.blobcfg`` blob fails for lack of space, and say that kopia created
+    a directory. The path is checked as kopia creates it, with only a leading
+    ``~`` resolved, so a ``..`` after a missing directory or a symbolic link
+    is resolved as the kernel resolves it.
   - kopia_repository, kopia_policy, kopia_maintenance, kopia_snapshot - return
     an empty ``repository``, ``policy``, ``maintenance`` or ``snapshot`` when
     the module fails, also before any change, such as when reading the current
     state fails, the host is connected to a different repository or an option
     is refused before kopia runs, instead of leaving the key out, and document
-    it. The key is still left out when the kopia command is not found.
+    it. The key is still left out when Ansible rejects the arguments, such as
+    a missing required option or an invalid choice, or when the kopia command
+    is not found.
   - kopia_repository_info, kopia_maintenance_info, kopia_policy_info,
     kopia_snapshot_info - return an empty ``repository``, ``maintenance``,
     ``policy`` and ``effective_policy``, ``policies`` or ``snapshots`` when the

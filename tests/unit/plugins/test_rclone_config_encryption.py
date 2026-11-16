@@ -137,9 +137,9 @@ def test_unassigned_password_character_is_rejected(monkeypatch, tmp_path, run_mo
     params = {"path": str(path), "password": "pw" + UNASSIGNED, "state": state, "content": "config"}
     result = run_module(plugin, params, check_mode)
     assert not path.exists()
+    unassigned = f"character U+1CCF0 is unassigned in Unicode {unicodedata.unidata_version}, the version of this Python"
     assert result["failed"] and result["msg"] == (
-        f"invalid password for configuration file {path}: character U+1CCF0 is unassigned in Unicode "
-        f"{unicodedata.unidata_version}, the version of this Python, so its normalization may differ from rclone's"
+        f"invalid password for configuration file {path}: {unassigned}, so its normalization may differ from rclone's"
     )
 
 
@@ -168,9 +168,9 @@ def test_long_combining_run_password_is_rejected(
     params = {"path": str(path), "password": password, "state": state, "content": "config"}
     result = run_module(plugin, params, check_mode)
     assert not path.exists()
+    run = "password has more than 30 consecutive combining characters, marks or Hangul jamo"
     assert result["failed"] and result["msg"] == (
-        f"invalid password for configuration file {path}: password has more than 30 consecutive combining "
-        "characters, marks or Hangul jamo, which rclone normalizes differently"
+        f"invalid password for configuration file {path}: {run}, which rclone normalizes differently"
     )
 
 
@@ -228,9 +228,9 @@ def test_surrogate_content_character_is_rejected(
     params = {"path": str(path), "password": "secret", "state": state, "content": f"[remote]{character}\n"}
     result = run_module(plugin, params, check_mode)
     assert not path.exists()
+    surrogate = f"character U+{ord(character):04X} is a surrogate"
     assert result["failed"] and result["msg"] == (
-        f"invalid content for configuration file {path}: character U+{ord(character):04X} is a surrogate,"
-        " which is not valid UTF-8"
+        f"invalid content for configuration file {path}: {surrogate}, which is not valid UTF-8"
     )
 
 
@@ -361,18 +361,77 @@ def test_damaged_payload_is_replaced_by_content(tmp_path, run_module, payload, s
         assert path.read_text() == "new"
 
 
+PRESENT_UNREADABLE = "is already encrypted with a different password or its encrypted payload is damaged"
+ABSENT_UNREADABLE = "wrong or missing password or damaged encrypted payload"
+
+
 @pytest.mark.parametrize("payload", ["AAAA", "!!!!"])
-@pytest.mark.parametrize(
-    "state, message",
-    [("present", "different password"), ("absent", "wrong or missing password or damaged encrypted payload")],
-)
-def test_damaged_payload_without_content_fails_clearly(tmp_path, run_module, payload, state, message):
+@pytest.mark.parametrize("state", ["present", "absent"])
+def test_damaged_payload_without_content_fails_clearly(tmp_path, run_module, payload, state):
     path = tmp_path / "rclone.conf"
     original = f"{rclone.CONFIG_MARKER}\n{payload}"
     path.write_text(original)
     result = run_module(plugin, {"path": str(path), "password": "secret", "state": state})
-    assert result["failed"] and message in result["msg"] and str(path) in result["msg"]
+    if state == "present":
+        assert result == {"failed": True, "msg": f"configuration file {path} {PRESENT_UNREADABLE}"}
+    else:
+        assert result == {"failed": True, "msg": f"unable to decrypt configuration file {path}, {ABSENT_UNREADABLE}"}
+
     assert path.read_text() == original
+
+
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_absent_without_password_or_content_fails_on_encrypted_file(tmp_path, run_module, check_mode):
+    path = tmp_path / "rclone.conf"
+    original = rclone.encrypt_config(b"[remote]\ntype=local\n", "secret")
+    path.write_text(original)
+    result = run_module(plugin, {"path": str(path), "state": "absent"}, check_mode)
+    assert result == {"failed": True, "msg": f"unable to decrypt configuration file {path}, {ABSENT_UNREADABLE}"}
+    assert path.read_text() == original
+
+
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_absent_without_password_replaces_encrypted_file_with_content(tmp_path, run_module, check_mode):
+    path = tmp_path / "rclone.conf"
+    original = rclone.encrypt_config(b"[remote]\ntype=local\n", "secret")
+    path.write_text(original)
+    content = "[other]\ntype=local\n"
+    result = run_module(plugin, {"path": str(path), "state": "absent", "content": content}, check_mode)
+    assert result == {"changed": True, "encrypted": False, "path": str(path)}
+    assert path.read_text() == (original if check_mode else content)
+
+
+@pytest.mark.parametrize("character", [chr(0xD800), chr(0xDBFF), chr(0xDC00), chr(0xDC7F)])
+@pytest.mark.parametrize("state", ["present", "absent"])
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_path_with_surrogate_is_rejected_before_file_access(
+    monkeypatch, tmp_path, run_module, character, state, check_mode
+):
+    # such a path stands for no bytes, so os.path.realpath failed with a traceback; Ansible logs no value with no_log
+    monkeypatch.setattr(plugin.os.path, "realpath", Mock(side_effect=AssertionError("must not access files")))
+    path = f"{tmp_path}/rclone{character}.conf"
+    params = {"path": path, "password": "secret", "state": state, "content": "config", "_ansible_no_log": True}
+    result = run_module(plugin, params, check_mode)
+    label = path.encode("utf-8", "backslashreplace").decode("utf-8")
+    escaped = "other than U+DC80 to U+DCFF, which stand for bytes that are not valid UTF-8"
+    msg = f"invalid path {label}: it contains U+{ord(character):04X}, a lone surrogate code point {escaped}"
+    assert result == {"failed": True, "msg": msg}
+    assert sorted(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_path_with_nul_is_rejected_before_file_access(monkeypatch, tmp_path, run_module, check_mode):
+    monkeypatch.setattr(plugin.os.path, "realpath", Mock(side_effect=AssertionError("must not access files")))
+    params = {"path": f"{tmp_path}/a\x00b", "password": "secret", "content": "config", "_ansible_no_log": True}
+    result = run_module(plugin, params, check_mode)
+    msg = f"invalid path {tmp_path}/a\x00b: it contains a NUL character, which a file path cannot contain"
+    assert result == {"failed": True, "msg": msg}
+    assert sorted(tmp_path.iterdir()) == []
+
+
+def test_path_with_escaped_bytes_is_accepted(module_factory):
+    # U+DC80 to U+DCFF stand for the bytes that are not valid UTF-8, which a Linux file name can hold
+    plugin.check_path(module_factory(), "/etc/rclone/r\udcff\udc80.conf")
 
 
 @pytest.mark.parametrize("state", ["present", "absent"])

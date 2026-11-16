@@ -1,3 +1,4 @@
+import errno
 import os
 import signal
 from contextlib import contextmanager
@@ -418,7 +419,29 @@ LONG_LINE_MAX = 1024 * 1024
 )
 def test_language_fallback_parses_map_as_systemd(keyboard_files, content, lang, language):
     keyboard_files["language_fallback_map"].write_bytes(content)
-    assert systemd_locale.language_fallback(lang) == language
+    assert systemd_locale.language_fallback(lang, 262) == language
+
+
+@pytest.mark.parametrize(
+    "content,lang,language",
+    [
+        # systemd 239 reads the map with fgets(): a carriage return separates fields, and does not end a line
+        (b"en_AU\ren_AU:en_GB\n", "en_AU", "en_AU:en_GB"),
+        (b"fr_CA fr_CA:fr_FR\ren_AU en_AU:en_GB\n", "en_AU", None),
+        (b"en_AU en_AU:en_GB\r\n", "en_AU", "en_AU:en_GB"),
+        # a NUL ends the text of the line, not the line
+        (b"fr_CA fr_CA:fr_FR\0en_AU en_AU:en_GB\n", "en_AU", None),
+        (b"en_AU en_AU:en_GB\0extra\n", "en_AU", "en_AU:en_GB"),
+        # a long line is read in pieces of 2047 bytes, each read as a line, and none is too long
+        (b"#" + b"x" * 2046 + b"en_AU en_AU:en_GB\n", "en_AU", "en_AU:en_GB"),
+        (b"#" + b"x" * 2045 + b"en_AU en_AU:en_GB\n", "en_AU", None),
+        (b"#" + b"x" * LONG_LINE_MAX + b"\nen_AU en_AU:en_GB\n", "en_AU", "en_AU:en_GB"),
+        (b"en_AU en_AU:en_GB", "en_AU", "en_AU:en_GB"),
+    ],
+)
+def test_language_fallback_parses_map_as_systemd_239(keyboard_files, content, lang, language):
+    keyboard_files["language_fallback_map"].write_bytes(content)
+    assert systemd_locale.language_fallback(lang, 239) == language
 
 
 @pytest.mark.parametrize("kind", ["device", "fifo"])
@@ -430,7 +453,7 @@ def test_language_fallback_reads_only_a_regular_file(keyboard_files, kind):
         os.mkfifo(keyboard_files["language_fallback_map"])
 
     with time_limit():
-        assert systemd_locale.language_fallback("en_AU") is None
+        assert systemd_locale.language_fallback("en_AU", 262) is None
 
 
 @pytest.mark.parametrize("check_mode", [False, True])
@@ -459,6 +482,7 @@ def test_locale_check_mode_with_fifo_language_fallback_map_keeps_language(
         (b"en_AU caf\xe9\n", "en_AU"),
         (b"en_AU \xed\xa0\x80\n", "en_AU"),
         (b"fr_CA fr_CA:fr_FR\nen_AU 'en_AU:\xef\xbf\xbe'\n", "en_AU"),
+        (b"en_AU en_AU:\xef\xb7\x90\n", "en_AU"),
     ],
 )
 def test_locale_fallback_not_valid_utf8_fails_before_any_call(
@@ -473,10 +497,9 @@ def test_locale_fallback_not_valid_utf8_fails_before_any_call(
     monkeypatch.setattr(systemd_locale, "systemd_call", mutate)
     result = run_module(systemd_locale, {"locale": {"lang": lang, "lc_time": "C.UTF-8"}}, check_mode)
     path = keyboard_files["language_fallback_map"]
-    assert result["failed"] and result["msg"] == (
-        f"unable to set locale.lang {lang}: {path} lists a LANGUAGE fallback for it that is not valid UTF-8, which "
-        "systemd-localed would write and then fail to report; set locale.language as well"
-    )
+    listed = f"{path} lists a LANGUAGE fallback for it that is not valid UTF-8 or contains a Unicode noncharacter"
+    reason = "which systemd-localed would write and then fail to report; set locale.language as well"
+    assert result["failed"] and result["msg"] == f"unable to set locale.lang {lang}: {listed}, {reason}"
     mutate.assert_not_called()
 
 
@@ -1075,13 +1098,78 @@ def test_hostname_static_hostname_not_a_regular_file_reads_as_unset(monkeypatch,
     mutate.assert_not_called()
 
 
-def test_hostname_static_hostname_unreadable_fails(monkeypatch, tmp_path, run_module):
-    path = tmp_path / "hostname"
-    path.write_text("web\n")
-    hostname_module(monkeypatch, tmp_path, HOSTNAME)
-    monkeypatch.setattr(systemd_hostname, "open_regular", Mock(side_effect=PermissionError(13, "Permission denied")))
-    result = run_module(systemd_hostname, {"static_hostname": "web"}, True)
-    assert result["failed"] and result["msg"] == f"unable to read {path}: [Errno 13] Permission denied"
+@pytest.mark.parametrize(
+    "error",
+    [
+        PermissionError(errno.EACCES, "Permission denied"),
+        OSError(errno.ELOOP, "Too many levels of symbolic links"),
+        OSError(errno.EIO, "Input/output error"),
+    ],
+)
+def test_hostname_static_hostname_unreadable_reads_as_unset(monkeypatch, tmp_path, run_module, error):
+    # systemd-hostnamed 246 and later log a file they cannot read and ignore it
+    (tmp_path / "hostname").write_text("web\n")
+    mutate = hostname_module(monkeypatch, tmp_path, {**HOSTNAME, "hostname": "localhost", "static_hostname": ""})
+    monkeypatch.setattr(systemd_hostname, "open_regular", Mock(side_effect=error))
+    assert run_module(systemd_hostname, {"static_hostname": ""}, True)["changed"] is False
+    assert run_module(systemd_hostname, {"static_hostname": "web"}, True)["changed"] is True
+    mutate.assert_not_called()
+
+
+def test_hostname_static_hostname_from_device_reads_as_unset(monkeypatch, tmp_path, run_module):
+    # /dev/null is not a regular file, so it is not read; reading it would end at once, unlike /dev/zero
+    (tmp_path / "hostname").symlink_to("/dev/null")
+    mutate = hostname_module(monkeypatch, tmp_path, {**HOSTNAME, "hostname": "localhost", "static_hostname": ""})
+
+    with time_limit():
+        assert run_module(systemd_hostname, {"static_hostname": ""}, True)["changed"] is False
+
+    mutate.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "etc_hostname,stored",
+    [
+        # systemd 239 keeps '_' and every '-', and ends a line only at a line feed or a NUL
+        (b"my_host\n", "my_host"),
+        (b"-web-\n", "-web-"),
+        (b"web.\n", "web"),
+        (b"..web..lab..\n", "web.lab"),
+        (b"\rweb\r\n", "web"),
+        (b"# comment\rweb\n", ""),
+        (b"# comment\0web\n", "web"),
+        (b"w\re\rb\n", "web"),
+        # it shortens the line to 64 bytes before removing the other characters
+        (b"a" * 60 + b"!!!!!bcd\n", "a" * 60),
+        (b"\xc3\xa9" * 40 + b"web\n", ""),
+    ],
+)
+def test_hostname_static_hostname_read_as_systemd_239(
+    monkeypatch, tmp_path, run_module, systemd_version, etc_hostname, stored
+):
+    systemd_version.return_value = 239
+    (tmp_path / "hostname").write_bytes(etc_hostname)
+    status = {**HOSTNAME, "hostname": "web", "static_hostname": stored}
+    mutate = hostname_module(monkeypatch, tmp_path, status)
+    assert run_module(systemd_hostname, {"static_hostname": "web"}, True)["changed"] is (stored != "web")
+    assert run_module(systemd_hostname, {"static_hostname": ""}, True)["changed"] is (stored != "")
+    mutate.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "value,expected",
+    [
+        ("my_host", "my_host"),
+        ("-web-", "-web-"),
+        ("web..", "web"),
+        (".web", "web"),
+        ("web-.lab", "web-.lab"),
+        ("a" * 70, "a" * 64),
+        ("a" * 63 + "!b", "a" * 63),
+    ],
+)
+def test_hostname_cleanup_239(value, expected):
+    assert systemd_hostname.hostname_cleanup(value, 239) == expected
 
 
 def test_hostname_version_read_only_to_compare(monkeypatch, tmp_path, run_module, systemd_version):
