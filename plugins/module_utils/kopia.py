@@ -342,18 +342,19 @@ def reads_as_user_host(path):
     return 0 < at < colon or (at >= 0 and colon < 0)
 
 
-def snapshot_source(module, path, operation, failed_result=None):
+def snapshot_source(module, path, operation, failed_result=None, status=None):
     # the path is passed absolute, so a name such as "--all" or "(global)" stays a path, and kopia adds its own client
     # user and host; kopia reads an absolute path in which an "@" comes before any ":" as user@host or
     # user@host:path, so only such a path is qualified with the client user and host, whose user can start with "-",
-    # so callers pass the source after "--"
+    # so callers pass the source after "--"; a caller that has read the repository status passes it as status
     failed_result = failed_result or {}
     absolute = absolute_path(path)
 
     if not reads_as_user_host(absolute):
         return absolute
 
-    status = repository_status(module, password=module.params["password"], failed_result=failed_result)
+    if status is None:
+        status = repository_status(module, password=module.params["password"], failed_result=failed_result)
 
     if status is None:
         module.fail_json(msg=f"unable to {operation} of {text_label(path)}: {NOT_CONNECTED_ERROR}", **failed_result)

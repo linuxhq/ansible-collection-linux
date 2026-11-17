@@ -191,7 +191,6 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
     kopia_available,
     kopia_command,
     maintenance_info,
-    repository_connected,
     repository_status,
     same_value,
 )
@@ -296,9 +295,10 @@ def log_retention_change(module, current):
     return expected, flags
 
 
-def owner_me(module):
-    """Return the owner kopia sets for "me", the client user and host of the connection."""
-    status = repository_status(module, failed_result={"maintenance": {}})
+def owner_me(module, status):
+    """Return the owner kopia sets for "me", the client user and host of the connection, reading status when None."""
+    if status is None:
+        status = repository_status(module, failed_result={"maintenance": {}})
 
     if status is None:
         module.fail_json(msg="unable to resolve the maintenance owner me: repository is not connected", maintenance={})
@@ -340,11 +340,15 @@ def validate_settings(module):
 def ensure_present(module):
     validate_settings(module)
 
+    status = None
+
     # an earlier task in check mode, such as kopia_repository, may only have predicted the connection
-    if module.check_mode and not (
-        kopia_available(module) and repository_connected(module, failed_result={"maintenance": {}})
-    ):
-        module.exit_json(changed=True, maintenance={})
+    if module.check_mode:
+        if kopia_available(module):
+            status = repository_status(module, failed_result={"maintenance": {}})
+
+        if status is None:
+            module.exit_json(changed=True, maintenance={})
 
     current = maintenance_info(module, failed_result={"maintenance": {}})
     predicted = deepcopy(current)
@@ -357,7 +361,7 @@ def ensure_present(module):
 
         # kopia sets "me" as the client user and host of the connection, which never equal "me"
         if param == "owner" and value == "me":
-            value = owner_me(module)
+            value = owner_me(module, status)
 
         # kopia before 0.14 reports no extendObjectLocks and before 0.18 no listParallelism, as it has no such setting
         node = predicted

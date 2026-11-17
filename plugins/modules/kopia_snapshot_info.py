@@ -70,11 +70,11 @@ options:
         V(alice@corp.example.com), or the host contains V(:).
       - Ansible expands a leading V(~) and environment variables in it, as for
         any C(path) option, before it is passed to kopia.
-      - A path with a lone surrogate code point from U+D800 to U+DC7F, which
-        cannot be passed to kopia, is rejected before kopia runs, also in check
-        mode. U+DC80 to U+DCFF, which Ansible uses for bytes that are not valid
-        UTF-8, are passed as those bytes, but kopia records a path with U+FFFD
-        in their place, so no snapshots are listed for such a path.
+      - A path that is not valid UTF-8, with a lone surrogate code point,
+        including U+DC80 to U+DCFF, which Ansible uses for bytes that are not
+        valid UTF-8, is rejected before kopia runs, also in check mode. Ansible
+        cannot run a task with such a path, as it fails while logging the
+        arguments, or with C(no_log) rejects the module result.
     type: path
 requirements:
   - kopia
@@ -139,7 +139,7 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
     check_utf8,
     kopia_available,
     kopia_command,
-    repository_connected,
+    repository_status,
     snapshot_source,
     text_label,
 )
@@ -149,22 +149,27 @@ def list_snapshots(module):
     failed_result = {"snapshots": []}
 
     check_connection(module, failed_result=failed_result)
-    # run_command cannot pass U+D800 to U+DC7F to kopia
-    check_utf8(module, [("path", module.params["path"])], errors="surrogateescape", failed_result=failed_result)
+    # Ansible cannot pass a path that is not valid UTF-8 through a task, and kopia lists a source by its path with
+    # U+FFFD in place of those bytes
+    check_utf8(module, [("path", module.params["path"])], failed_result=failed_result)
+
+    status = None
 
     # an earlier task in check mode, such as kopia_repository, may only have predicted the connection
-    if module.check_mode and not (
-        kopia_available(module)
-        and repository_connected(module, password=module.params["password"], failed_result=failed_result)
-    ):
-        module.exit_json(changed=False, snapshots=[])
+    if module.check_mode:
+        if kopia_available(module):
+            status = repository_status(module, password=module.params["password"], failed_result=failed_result)
+
+        if status is None:
+            module.exit_json(changed=False, snapshots=[])
 
     command = ["snapshot", "list", "--json"]
     source = ""
 
     if module.params["path"]:
         source = f" of {text_label(module.params['path'])}"
-        command.extend(["--", snapshot_source(module, module.params["path"], "list kopia snapshots", failed_result)])
+        target = snapshot_source(module, module.params["path"], "list kopia snapshots", failed_result, status)
+        command.extend(["--", target])
 
     rc, stdout, stderr = kopia_command(module, command, password=module.params["password"])
 

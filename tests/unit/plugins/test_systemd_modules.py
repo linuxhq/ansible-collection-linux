@@ -1212,6 +1212,14 @@ def test_ntp_units_are_read_as_systemd_timedated_reads_them(monkeypatch, tmp_pat
     assert NTP_UNITS(module_factory()) == {"chronyd.service", "systemd-timesyncd.service"}
 
 
+def test_ntp_units_skip_names_systemd_timedated_ignores(monkeypatch, tmp_path, module_factory):
+    # systemd-timedated ignores a line that is not a valid plain unit name, which PID 1 would refuse to load
+    lines = ["chronyd", "foo@.service", "foo@bar.service", "chronyd.unknown", ".service", "x" * 248 + ".service"]
+    (tmp_path / "50-other.list").write_bytes("\n".join(lines + ["chronyd.service"]).encode() + b"\n\xff.service\n")
+    monkeypatch.setattr(systemd_timedate, "NTP_UNIT_DIRS", (str(tmp_path),))
+    assert NTP_UNITS(module_factory()) == {"chronyd.service"}
+
+
 def hostname_module(monkeypatch, tmp_path, current, machine_info=None, etc_hostname=None):
     if machine_info is not None:
         (tmp_path / "machine-info").write_text(machine_info, newline="")

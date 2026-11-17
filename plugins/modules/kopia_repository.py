@@ -14,9 +14,8 @@ description:
     storage location has not been initialized yet.
   - The module runs C(kopia repository create) first, and runs
     C(kopia repository connect) when kopia reports that the storage already
-    holds data, so it never connects to storage without a repository, which
-    can write to it, such as the C(.shards) file of V(filesystem) storage with
-    legacy parameters. With O(storage=from-config), it only connects.
+    holds data, which may be a repository. With O(storage=from-config), it
+    only connects.
   - For V(filesystem) storage, a C(path) that does not exist yet is created
     along with the repository.
   - The module is idempotent on the connection state reported by
@@ -65,6 +64,14 @@ description:
     fails without reporting a change, although the remote C(path) or the
     C(.shards) file may have been created. kopia ignores them when it creates
     the repository on a later run.
+  - C(kopia repository connect) writes the C(.shards) file, with legacy
+    parameters, to storage that has none when it first reads a blob, even
+    when the storage holds data but no repository, such as a stray file
+    ending in C(.f) in the C(path) of V(filesystem) storage. When
+    C(kopia repository connect) then fails after writing the C(.shards) file
+    of V(filesystem) storage, the module fails reporting a change. With
+    V(sftp), V(webdav) or V(rclone) storage, it fails without reporting a
+    change, as the module cannot inspect remote storage.
   - When C(kopia repository connect) fails after kopia saved the connection,
     such as when persisting the password fails, the module fails reporting a
     change, and a later run finds the host connected. When the connection
@@ -588,14 +595,23 @@ def create(module, target, description):
 
 def connect(module, target, description):
     password = module.params["password"]
+    # kopia's sharded storage writes the .shards file of filesystem storage on the first blob it reads, also when the
+    # storage holds no repository
+    missing = missing_storage_files(module)
+
     rc, _dummy, stderr = kopia_command(module, ["repository", "connect"] + target, password=password)
 
     if rc == 0:
         return
 
+    written = any(os.path.lexists(path) for path in missing)
+    shards = ", and kopia wrote its .shards file" if written else ""
+
     if CONNECT_NOT_INITIALIZED_ERROR in stderr and module.params["storage"] != "from-config":
+        reason = f"the storage holds data, such as kopia.blobcfg, but no repository{shards}"
         module.fail_json(
-            msg=f"unable to create the kopia repository in {description}: the storage holds data, such as kopia.blobcfg, but no repository: {stderr.strip()}",
+            changed=written,
+            msg=f"unable to create the kopia repository in {description}: {reason}: {stderr.strip()}",
             repository={},
         )
 
@@ -614,7 +630,11 @@ def connect(module, target, description):
             repository={},
         )
 
-    module.fail_json(msg=f"unable to connect to the kopia repository in {description}: {stderr.strip()}", repository={})
+    module.fail_json(
+        changed=written,
+        msg=f"unable to connect to the kopia repository in {description}{shards}: {stderr.strip()}",
+        repository={},
+    )
 
 
 def ensure_present(module):
@@ -652,8 +672,7 @@ def ensure_present(module):
     target = [module.params["storage"]] + kopia_flags(storage_options(module))
     description = storage_description(module)
 
-    # creating first leaves storage that holds data untouched, while kopia repository connect to storage without a
-    # repository can write to it, such as the .shards file of filesystem storage with legacy parameters
+    # kopia repository create refuses storage that holds data, which may be a repository to connect to
     if module.params["storage"] == "from-config" or not create(module, target, description):
         connect(module, target, description)
 

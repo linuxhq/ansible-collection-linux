@@ -1,0 +1,12 @@
+---
+bugfixes:
+  - kopia_snapshot, kopia_snapshot_info - refuse a ``path`` that is not
+    valid UTF-8, including U+DC80 to U+DCFF, which Ansible uses for bytes that
+    are not valid UTF-8, before kopia runs, also in check mode. This reverses
+    the change in
+    https://github.com/linuxhq/ansible-collection-linux/pull/103, which
+    passed those code points to kopia as raw bytes. Ansible cannot run a task
+    with such a path. Without ``no_log``, the module fails while Ansible logs
+    its arguments. With ``no_log``, kopia saves the snapshot, and the
+    controller then rejects the module result, which echoes the path, so the
+    task fails without reporting the change.

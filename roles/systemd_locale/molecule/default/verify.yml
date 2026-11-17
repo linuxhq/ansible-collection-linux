@@ -15,6 +15,7 @@
           - _systemd_locale_info_dict.locale.lc_time == 'C'
           - _systemd_locale_info_dict.x11_layout == 'us'
           - _systemd_locale_info_dict.x11_model == 'pc105'
+          - _systemd_locale_info_dict.x11_options == ''
 
     - name: Ensure systemd console keyboard settings are verified
       tags:

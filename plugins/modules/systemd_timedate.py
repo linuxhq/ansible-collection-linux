@@ -189,6 +189,14 @@ NTP_UNIT_DIRS = (
     "/lib/systemd/ntp-units.d",
 )
 
+# systemd-timedated uses only the names that are valid plain unit names, and PID 1 refuses to load any other
+UNIT_NAME = re.compile(
+    r"[A-Za-z0-9:_.\\-]+\.(?:automount|device|mount|path|scope|service|slice|socket|swap|target|timer)"
+)
+
+# UNIT_NAME_MAX, including the terminating NUL
+UNIT_NAME_MAX = 256
+
 SECONDS = re.compile(r"^[ \t]*UNIX seconds: @([0-9]+)(?:\.([0-9]{6}))?[ \t]*$", re.MULTILINE)
 
 SETTINGS = ["local_rtc", "ntp", "time", "timezone"]
@@ -223,6 +231,7 @@ def ntp_units(module):
     """Return the network time services systemd-timedated starts and stops, named in its ntp-units.d/*.list files.
 
     A file overrides any file of the same name in a later directory, and one linked to /dev/null names nothing.
+    Like systemd-timedated, it skips any line that is not a valid plain unit name, such as a comment.
     """
     files = {}
 
@@ -234,12 +243,14 @@ def ntp_units(module):
 
     for _name, path in sorted(files.items()):
         try:
-            with open(path) as handle:
+            # a line that is not valid UTF-8 is no valid unit name either
+            with open(path, encoding="utf-8", errors="surrogateescape") as handle:
                 lines = handle.read().splitlines()
-        except (OSError, UnicodeDecodeError) as error:
+        except OSError as error:
             module.fail_json(msg=f"unable to read the network time services in {path}: {error}")
 
-        units.update(line.strip() for line in lines if line.strip() and not line.strip().startswith(("#", ";")))
+        names = (line.strip() for line in lines)
+        units.update(name for name in names if len(name) < UNIT_NAME_MAX and UNIT_NAME.fullmatch(name))
 
     return units
 

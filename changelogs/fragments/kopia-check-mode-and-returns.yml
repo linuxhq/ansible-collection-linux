@@ -27,9 +27,6 @@ bugfixes:
   - kopia_repository_info role - omit ``config_file`` when
     ``kopia_repository_info_config_file`` is ``null``, the default, instead of
     passing an empty string on ansible-core 2.18.
-  - kopia role - document the ``kopia_policies`` item schema, which targets
-    are snapshotted, and that ``kopia_snapshot`` takes a new snapshot on every
-    run.
 breaking_changes:
   - kopia_policy_info role - name the published facts after the module's
     return values. Publish ``_kopia_policy_info_defined``,

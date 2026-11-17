@@ -38,9 +38,7 @@ notes:
     line feed, a carriage return or a NUL and cannot read a line of 1 MiB or
     more, while systemd 239 ends a line only at a line feed, reads a long
     line in pieces of up to 2047 bytes and ignores the rest of a piece after
-    a NUL. A different map set by E(SYSTEMD_LANGUAGE_FALLBACK_MAP) in the
-    environment of C(systemd-localed) is not read, so the C(language) field
-    check mode reports can then differ from the one a real run produces.
+    a NUL.
   - C(systemd-localed) writes that fallback without the validation it applies
     to the requested values, so C(LANGUAGE) can become a list such as
     V(en_AU:en_GB), which O(locale.language) cannot set again where
@@ -90,9 +88,6 @@ notes:
     it clears the toggle keymap only when the converted console keymap differs
     from the current one. On systemd 253 and later, as on EL 10 and Debian 13,
     it clears the toggle keymap even when the console keymap stays the same.
-  - Check mode cannot predict the converted values, so the reported counterpart
-    fields, including a toggle keymap cleared by that conversion, can differ
-    from the ones a real run produces.
   - A locale or keyboard value that is not valid UTF-8, such as one with a
     lone surrogate code point, or that contains a NUL character, is rejected
     before any setting is written, also in check mode. So is a keyboard value
@@ -235,8 +230,18 @@ requirements:
 attributes:
   check_mode:
     description: Predicts changes without modifying the target.
-    support: full
-    details: When dasbus is unavailable, predicts changes from the supplied options without querying current state.
+    support: partial
+    details:
+      - When dasbus is unavailable, predicts changes from the supplied options
+        without querying current state.
+      - Check mode cannot predict the keyboard settings converted between the
+        console keymap and the X11 keyboard settings, so the reported
+        counterpart fields, including a toggle keymap cleared by that
+        conversion, can differ from the ones a real run produces.
+      - A different language fallback map set by
+        E(SYSTEMD_LANGUAGE_FALLBACK_MAP) in the environment of
+        C(systemd-localed) is not read, so the C(language) field check mode
+        reports can then differ from the one a real run produces.
   diff_mode:
     description: Diff mode is not supported.
     support: none
