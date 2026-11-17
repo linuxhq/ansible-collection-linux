@@ -1,5 +1,3 @@
-# .gitignore
-
 .ansible/
 .claude/
 .DS_Store
