@@ -50,6 +50,10 @@ provisioner:
           lang: C.UTF-8
           lc_numeric: C.UTF-8
           lc_time: C
+        systemd_locale_vconsole_keymap: us
+        systemd_locale_vconsole_keymap_toggle: de
+        systemd_locale_x11_layout: us
+        systemd_locale_x11_model: pc105
 
 scenario:
   test_sequence:

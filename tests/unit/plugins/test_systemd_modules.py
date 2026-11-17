@@ -1080,8 +1080,11 @@ def test_ntp_change_is_reported_before_time_is_set(monkeypatch, run_module, anal
     calls = Mock()
     calls.systemd_properties.side_effect = [
         {**TIMEDATE, "ntp": not ntp},
+        {"jobs": 0},
         {"ntp": not ntp},
+        {"jobs": 0},
         {"ntp": not ntp},
+        {"jobs": 0},
         {"ntp": ntp},
         {**TIMEDATE, "ntp": ntp},
     ]
@@ -1097,26 +1100,64 @@ def test_ntp_change_is_reported_before_time_is_set(monkeypatch, run_module, anal
         "systemd_properties",
         "systemd_call",
         "systemd_properties",
-        "sleep",
         "systemd_properties",
         "sleep",
+        "systemd_properties",
+        "systemd_properties",
+        "sleep",
+        "systemd_properties",
         "systemd_properties",
     ] + (["systemd_call"] if not ntp else []) + ["systemd_properties"]
     if not ntp:
         assert calls.systemd_call.call_args.args[2:] == ("SetTime", 1784083200000000, False, False)
 
 
-def test_ntp_change_wait_times_out(monkeypatch, run_module, analyze):
+def ntp_wait_module(monkeypatch, current, ntp, jobs):
+    """Report current, then answer NTP with the given values in turn, the last one again, and NJobs likewise.
+
+    The clock advances 10 seconds on each reading.
+    """
     clock = iter(range(0, 1000, 10))
+    replies = {"NTP": list(ntp), "NJobs": list(jobs)}
+
+    def properties(module, proxy, names):
+        name, prop = names[0]
+        if len(names) > 1:
+            return {**TIMEDATE, "ntp": current}
+
+        values = replies[prop]
+        return {name: values.pop(0) if len(values) > 1 else values[0]}
+
     monkeypatch.setattr(systemd_timedate, "monotonic", lambda: next(clock))
     monkeypatch.setattr(systemd_timedate, "sleep", Mock())
     monkeypatch.setattr(systemd_timedate, "systemd_proxy", Mock())
-    monkeypatch.setattr(systemd_timedate, "systemd_properties", Mock(return_value={**TIMEDATE, "ntp": True}))
+    monkeypatch.setattr(systemd_timedate, "systemd_properties", properties)
     mutate = Mock()
     monkeypatch.setattr(systemd_timedate, "systemd_call", mutate)
+    return mutate
+
+
+def test_ntp_change_wait_times_out(monkeypatch, run_module, analyze):
+    mutate = ntp_wait_module(monkeypatch, True, [True], [0])
     result = run_module(systemd_timedate, {"ntp": False, "time": "@1784083200"})
     assert result["failed"] and "ntp" in result["msg"] and "30 seconds" in result["msg"]
     assert [entry.args[2] for entry in mutate.call_args_list] == ["SetNTP"]
+
+
+def test_ntp_enabled_while_the_service_fails_to_start_fails(monkeypatch, run_module):
+    # systemd-timedated reports NTP enabled while the start job runs, then disabled once the service failed to start
+    mutate = ntp_wait_module(monkeypatch, False, [True, False], [1, 0])
+    result = run_module(systemd_timedate, {"ntp": True})
+    assert result["failed"] and result["msg"] == (
+        "unable to set ntp to True: network time synchronization did not change within 30 seconds"
+    )
+    assert [entry.args[2] for entry in mutate.call_args_list] == ["SetNTP"]
+
+
+def test_ntp_enabled_while_other_jobs_run_is_taken_at_the_deadline(monkeypatch, run_module):
+    ntp_wait_module(monkeypatch, False, [True], [1])
+    result = run_module(systemd_timedate, {"ntp": True})
+    assert result["changed"] and not result.get("failed")
 
 
 def hostname_module(monkeypatch, tmp_path, current, machine_info=None, etc_hostname=None):
@@ -1704,7 +1745,7 @@ def test_time_alone_with_ntp_enabled_is_left_to_systemd(monkeypatch, run_module,
 def test_time_set_before_the_hardware_clock_mode(monkeypatch, run_module, analyze, current, params, methods):
     monkeypatch.setattr(systemd_timedate, "sleep", Mock())
     monkeypatch.setattr(systemd_timedate, "systemd_proxy", Mock())
-    reads = [dict(current), {"ntp": False}, dict(current)]
+    reads = [dict(current), {"jobs": 0}, {"ntp": False}, dict(current)]
     monkeypatch.setattr(systemd_timedate, "systemd_properties", Mock(side_effect=reads))
     mutate = Mock()
     monkeypatch.setattr(systemd_timedate, "systemd_call", mutate)
@@ -1805,7 +1846,7 @@ def test_time_parsed_again_right_before_it_is_set(monkeypatch, run_module, analy
     monkeypatch.setattr(
         systemd_timedate,
         "systemd_properties",
-        Mock(side_effect=[{**TIMEDATE, "ntp": True}, {"ntp": False}, {**TIMEDATE, "ntp": False}]),
+        Mock(side_effect=[{**TIMEDATE, "ntp": True}, {"jobs": 0}, {"ntp": False}, {**TIMEDATE, "ntp": False}]),
     )
     calls = []
     analyze.side_effect = lambda *args, **kwargs: (
@@ -1851,7 +1892,11 @@ def test_time_requires_systemd_analyze_before_any_write(monkeypatch, run_module,
     mutate.assert_not_called()
 
 
-@pytest.mark.parametrize("seconds", ["@0"])
+# the kernel refuses to set the clock at or after TIME_SETTOD_SEC_MAX, KTIME_SEC_MAX less 30 years of uptime
+SETTOD_SEC_MAX = 9223372036 - 30 * 365 * 24 * 3600
+
+
+@pytest.mark.parametrize("seconds", ["@0", f"@{SETTOD_SEC_MAX}", f"@{SETTOD_SEC_MAX}.000001", "@9999999999"])
 @pytest.mark.parametrize("check_mode", [False, True])
 def test_time_rejects_out_of_range_time_before_any_write(monkeypatch, run_module, analyze, seconds, check_mode):
     mutate = timedate_module(monkeypatch)
@@ -1859,6 +1904,14 @@ def test_time_rejects_out_of_range_time_before_any_write(monkeypatch, run_module
     result = run_module(systemd_timedate, {"timezone": "Europe/Berlin", "time": seconds}, check_mode)
     assert result["failed"] and result["msg"] == f"unable to set time: invalid time {seconds}"
     mutate.assert_not_called()
+
+
+def test_time_before_the_kernel_limit_is_set(monkeypatch, run_module, analyze):
+    mutate = timedate_module(monkeypatch)
+    seconds = f"@{SETTOD_SEC_MAX - 1}.999999"
+    analyze.return_value = (0, analyze_output(seconds, seconds), "")
+    assert run_module(systemd_timedate, {"time": seconds})["changed"]
+    assert mutate.call_args.args[2:] == ("SetTime", SETTOD_SEC_MAX * 1000000 - 1, False, False)
 
 
 def test_hostname_check_mode_predicts_default_after_clearing_static(monkeypatch, tmp_path, run_module):

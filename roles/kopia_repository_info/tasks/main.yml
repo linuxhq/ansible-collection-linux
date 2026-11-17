@@ -4,7 +4,7 @@
     - kopia_repository_info
   become: true
   linuxhq.linux.kopia_repository_info:
-    config_file: "{{ kopia_repository_info_config_file | d(omit) }}"
+    config_file: "{{ kopia_repository_info_config_file if kopia_repository_info_config_file is not none else omit }}"
   register: __kopia_repository_info_query
 
 - name: Ensure kopia repository facts are generated

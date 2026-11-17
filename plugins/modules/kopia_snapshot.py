@@ -128,7 +128,7 @@ attributes:
       - Reports changed without creating a snapshot.
       - When the absolute O(path) is one in which an V(@) comes before any
         V(:), fails as a real run would when the snapshots of the path cannot
-        be listed and kopia is installed.
+        be listed, kopia is installed and a repository is connected.
       - Check mode cannot tell whether kopia would skip an identical snapshot,
         so it reports changed even when C(retention.ignore_identical_snapshots)
         would leave the repository unchanged.
@@ -159,7 +159,10 @@ snapshot:
     - This is the snapshot just created, identified by the ID kopia prints when
       it saves it, or the existing newest snapshot when kopia skipped an
       identical snapshot. When the printed ID cannot be read or is not listed,
-      the newest snapshot is returned.
+      the newest snapshot of the path is returned, never one of a parent
+      directory, which C(kopia snapshot list) also reports, or empty when the
+      path has none, such as when another client deleted the new snapshot
+      before the module listed it.
     - Also returned when the module fails because kopia printed the snapshot
       it saved, then exited with an error, and kopia lists that snapshot.
       Otherwise empty when the module fails after running kopia.
@@ -184,6 +187,7 @@ snapshot:
 """
 
 import json
+import re
 
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.common.dict_transformations import camel_dict_to_snake_dict
@@ -192,9 +196,11 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
     absolute_path,
     check_connection,
     check_utf8,
+    client_source,
     kopia_available,
     kopia_command,
     reads_as_user_host,
+    repository_status,
     snapshot_source,
     text_label,
 )
@@ -239,11 +245,28 @@ def snapshot_result(snapshot):
     return camel_dict_to_snake_dict(snapshot, ignore_list=["tags"]) if snapshot else {}
 
 
-def latest_snapshot(module, source, snapshot_id=None):
+def recorded_path(manifest, path):
+    """Return the path of the source kopia recorded, as it printed it or, when it printed none, as it records path."""
+    recorded = manifest.get("source")
+
+    if recorded:
+        return recorded["path"]
+
+    # kopia records each byte that is not valid UTF-8, which Ansible passes as U+DC80 to U+DCFF, as U+FFFD
+    return re.sub("[\udc80-\udcff]", "\ufffd", absolute_path(path))
+
+
+def latest_snapshot(module, source, path, snapshot_id=None):
     snapshots = list_snapshots(module, source) or []
 
     # another snapshot of the path, such as a scheduled one, can be newer than the one just created
-    snapshot = find_snapshot(snapshots, snapshot_id) or (snapshots[-1] if snapshots else None)
+    snapshot = find_snapshot(snapshots, snapshot_id)
+
+    # another client can delete the new snapshot before it is listed, and kopia also lists the snapshots of every
+    # parent directory of the source, for the same user and host
+    if snapshot is None:
+        own = [entry for entry in snapshots if entry["source"]["path"] == path]
+        snapshot = own[-1] if own else None
 
     return snapshot_result(snapshot)
 
@@ -261,8 +284,14 @@ def ensure_present(module):
     )
 
     if module.check_mode:
-        if reads_as_user_host(absolute_path(path)) and kopia_available(module):
-            snapshot_source(module, path, OPERATION, failed_result={"snapshot": {}})
+        absolute = absolute_path(path)
+
+        # an earlier task in check mode, such as kopia_repository, may only have predicted the connection
+        if reads_as_user_host(absolute) and kopia_available(module):
+            status = repository_status(module, password=module.params["password"], failed_result={"snapshot": {}})
+
+            if status is not None:
+                client_source(module, absolute, status, OPERATION, failed_result={"snapshot": {}})
 
         module.exit_json(changed=True, snapshot={})
 
@@ -309,9 +338,12 @@ def ensure_present(module):
     # kopia prints the new manifest only when it saves a snapshot; nothing is
     # printed when ignore_identical_snapshots skips an unchanged source.
     if not stdout.strip():
-        module.exit_json(changed=False, snapshot=latest_snapshot(module, source))
+        module.exit_json(changed=False, snapshot=latest_snapshot(module, source, recorded_path(manifest, path)))
 
-    module.exit_json(changed=True, snapshot=latest_snapshot(module, listed_source(manifest, source), snapshot_id))
+    module.exit_json(
+        changed=True,
+        snapshot=latest_snapshot(module, listed_source(manifest, source), recorded_path(manifest, path), snapshot_id),
+    )
 
 
 def main():

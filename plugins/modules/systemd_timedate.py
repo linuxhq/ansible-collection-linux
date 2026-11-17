@@ -53,6 +53,11 @@ options:
       - C(systemd-timedated) starts or stops the service in the background, so
         after changing it the module waits up to 30 seconds for the change to
         be reported before applying O(time), and fails when it is not.
+      - C(systemd-timedated) reports network time synchronization enabled
+        while it starts the service, even when the service then fails to
+        start, so the module waits until systemd has no job left before it
+        takes the change as reported. When other jobs keep systemd busy for
+        the 30 seconds, it takes the change as reported then.
     type: bool
   time:
     description:
@@ -86,8 +91,10 @@ options:
         another setting is written before the clock, the module fails before
         writing any setting when network time synchronization would still be
         enabled.
-      - A value C(systemd-analyze) cannot parse, or a time at or before the
-        epoch, is rejected before any setting is written.
+      - A value C(systemd-analyze) cannot parse, a time at or before the
+        epoch, or a time the kernel refuses to set, at or after
+        V(@8277292036), 2232-04-18 23:47:16 UTC, is rejected before any
+        setting is written.
       - systemd 258 and later also refuse a time before the date systemd was
         built. Only C(systemd-timedated) knows that date, so the refusal is
         reported after the settings written before the clock are applied.
@@ -99,7 +106,7 @@ options:
     type: str
 requirements:
   - dasbus
-  - systemd-analyze, when O(time) is set
+  - systemd-analyze from systemd >= 243, when O(time) is set
 attributes:
   check_mode:
     description: Predicts changes without modifying the target.
@@ -163,6 +170,9 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.systemd import (
 
 MICROSECONDS = 1000000
 
+# the kernel refuses to set the clock at or after TIME_SETTOD_SEC_MAX, KTIME_SEC_MAX less 30 years of uptime, in 2232
+SETTOD_SEC_MAX = (2**63 - 1) // 1000000000 - 30 * 365 * 24 * 3600
+
 NTP_TIMEOUT = 30
 
 SECONDS = re.compile(r"^[ \t]*UNIX seconds: @([0-9]+)(?:\.([0-9]{6}))?[ \t]*$", re.MULTILINE)
@@ -189,7 +199,7 @@ def parse_time(module, analyze, value, zone):
     seconds, fraction = SECONDS.findall(stdout)[-1]
     usec = int(seconds) * MICROSECONDS + int(fraction or 0)
 
-    if usec <= 0:
+    if usec <= 0 or usec // MICROSECONDS >= SETTOD_SEC_MAX:
         module.fail_json(msg=f"unable to set time: invalid time {value}")
 
     return usec
@@ -198,9 +208,18 @@ def parse_time(module, analyze, value, zone):
 def wait_for_ntp(module, proxy, ntp):
     # SetNTP returns once the time service job is queued, and systemd-timedated
     # refuses other requests until that job finishes and NTP reports the change.
+    # While the job runs, it reports NTP enabled, whatever the job's result, so
+    # NTP is read again once systemd has no job left, or at the deadline.
     deadline = monotonic() + NTP_TIMEOUT
+    manager = systemd_proxy(module, "systemd1")
 
-    while systemd_properties(module, proxy, [("ntp", "NTP")])["ntp"] != ntp:
+    while True:
+        idle = systemd_properties(module, manager, [("jobs", "NJobs")])["jobs"] == 0
+        reported = systemd_properties(module, proxy, [("ntp", "NTP")])["ntp"]
+
+        if reported == ntp and (idle or monotonic() >= deadline):
+            return
+
         if monotonic() >= deadline:
             module.fail_json(
                 msg=f"unable to set ntp to {ntp}: network time synchronization did not change within {NTP_TIMEOUT} seconds"

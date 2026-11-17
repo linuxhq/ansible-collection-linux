@@ -55,8 +55,16 @@ description:
     data without a repository fails saying so.
   - For V(filesystem) storage, C(kopia repository create) creates the
     C(path) directory, and any missing parent directory, before it writes the
-    repository. When it then fails, such as for lack of space, after creating
+    repository, and the C(.shards) file in it when it first reads or writes
+    a blob. When it then fails, such as for lack of space, after creating
     any of them, the module fails reporting a change.
+  - With V(sftp) storage, C(kopia repository create) also creates the remote
+    C(path), and with V(sftp), V(webdav) or V(rclone) storage, it writes the
+    C(.shards) file to the storage before the repository. The module cannot
+    inspect remote storage, so when C(kopia repository create) then fails, it
+    fails without reporting a change, although the remote C(path) or the
+    C(.shards) file may have been created. kopia ignores them when it creates
+    the repository on a later run.
   - When C(kopia repository connect) fails after kopia saved the connection,
     such as when persisting the password fails, the module fails reporting a
     change, and a later run finds the host connected. When the connection
@@ -487,29 +495,54 @@ def mkdir_all_paths(path):
     return paths
 
 
-def missing_directories(module):
-    """Return the directories kopia repository create would make for filesystem storage that do not exist yet."""
+def filesystem_path(module):
+    """Return the path kopia uses for filesystem storage, with only a leading "~" resolved, or None."""
     path = storage_options(module).get("path")
 
     if module.params["storage"] != "filesystem" or path is None:
-        return []
+        return None
 
-    # kopia makes the path it is given, with only a leading "~" resolved, so the kernel resolves any ".." after the
-    # directories it creates and the symbolic links on the way
     path = str(path)
     home = os.environ.get("HOME", "")
 
     if path.startswith("~") and home:
         path = home + path[1:]
 
+    return path
+
+
+def missing_directories(module):
+    """Return the directories kopia repository create would make for filesystem storage that do not exist yet."""
+    path = filesystem_path(module)
+
+    if path is None:
+        return []
+
+    # kopia makes the path it is given, so the kernel resolves any ".." after the directories it creates and the
+    # symbolic links on the way
     return [directory for directory in mkdir_all_paths(path) if not os.path.lexists(directory)]
+
+
+def missing_storage_files(module):
+    """Return the directories and the .shards file kopia repository create would make for filesystem storage."""
+    path = filesystem_path(module)
+
+    if path is None:
+        return []
+
+    # kopia's sharded storage writes its .shards parameters on the first blob it reads or writes, before the
+    # repository, and keeps going when it cannot
+    shards = os.path.join(path, ".shards")
+
+    return missing_directories(module) + ([] if os.path.lexists(shards) else [shards])
 
 
 def create(module, target, description):
     """Create the repository, returning False when the storage already holds data, which may be a repository."""
     password = module.params["password"]
-    # kopia creates the directory of filesystem storage before it writes the repository, which can still fail
-    missing = missing_directories(module)
+    # kopia creates the directory of filesystem storage and its .shards file before it writes the repository, which
+    # can still fail
+    missing = missing_storage_files(module)
 
     rc, _dummy, stderr = kopia_command(module, ["repository", "create"] + target, password=password)
 
@@ -533,7 +566,7 @@ def create(module, target, description):
     if rc != 0 and any(os.path.lexists(directory) for directory in missing):
         module.fail_json(
             changed=True,
-            msg=f"kopia created the storage directory or a parent of it but failed to create the repository in {description}: {stderr.strip()}",
+            msg=f"kopia created the storage directory, a parent or its .shards file, but failed to create the repository in {description}: {stderr.strip()}",
             repository={},
         )
 

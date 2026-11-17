@@ -9,5 +9,35 @@
       tags:
         - molecule-idempotence-notest
 
+    - role: kopia
+      kopia_policies:
+        - target: /srv/molecule-absent
+          policy:
+            retention:
+              keep_latest: 1
+      tags:
+        - molecule-idempotence-notest
+
+  post_tasks:
+    - name: Ensure kopia policy to remove information is gathered
+      tags:
+        - molecule-idempotence-notest
+      become: true
+      linuxhq.linux.kopia_policy_info:
+        target: /srv/molecule-absent
+      register: __kopia_absent_policy_query
+
+    - name: Ensure kopia policy to remove is verified
+      tags:
+        - molecule-idempotence-notest
+      ansible.builtin.assert:
+        that:
+          - __kopia_absent_policy_query.defined
+      when:
+        - not ansible_check_mode
+
+- name: Converge
+  hosts: all
+  roles:
     - kopia
 ...

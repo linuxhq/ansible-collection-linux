@@ -12,8 +12,12 @@
   tags:
     - kopia_policy_info
   ansible.builtin.set_fact:
+    _kopia_policy_info_defined:
+      "{{ __kopia_policy_info_query.defined | d(false) }}"
+    _kopia_policy_info_effective_policy:
+      "{{ __kopia_policy_info_query.effective_policy | d({}) }}"
     _kopia_policy_info_list:
       "{{ __kopia_policy_info_query.policies | d([]) }}"
-    _kopia_policy_info_dict:
-      "{{ __kopia_policy_info_query.effective_policy | d({}) }}"
+    _kopia_policy_info_policy:
+      "{{ __kopia_policy_info_query.policy | d({}) }}"
 ...

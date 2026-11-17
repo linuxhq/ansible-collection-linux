@@ -50,7 +50,9 @@ options:
     description: Enable or disable periodic quick maintenance.
     type: bool
   extend_object_locks:
-    description: Extend the retention period of locked objects as needed.
+    description:
+      - Extend the retention period of locked objects as needed.
+      - Requires kopia 0.14.0 or later.
     type: bool
   full_interval:
     description:
@@ -121,7 +123,7 @@ attributes:
   check_mode:
     description: Predicts changes without modifying the target.
     support: full
-    details: Reports a potential change without querying current state when Kopia is unavailable.
+    details: Reports a potential change without querying current state when kopia is unavailable or no repository is connected.
   diff_mode:
     description: Diff mode is not supported.
     support: none
@@ -149,7 +151,8 @@ maintenance:
     - Maintenance settings reported by C(kopia maintenance info).
     - In check mode, when a change would be made, the settings reported by
       kopia with the requested changes applied, as the module predicts them.
-    - Empty when kopia is unavailable in check mode.
+    - Empty when kopia is unavailable or no repository is connected in check
+      mode.
     - Empty when the module fails, also for an option value the module rejects
       before kopia runs. Not returned when Ansible rejects the arguments, such
       as a missing required option, a value of the wrong type or an invalid
@@ -188,6 +191,7 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
     kopia_available,
     kopia_command,
     maintenance_info,
+    repository_connected,
     repository_status,
     same_value,
 )
@@ -336,7 +340,10 @@ def validate_settings(module):
 def ensure_present(module):
     validate_settings(module)
 
-    if module.check_mode and not kopia_available(module):
+    # an earlier task in check mode, such as kopia_repository, may only have predicted the connection
+    if module.check_mode and not (
+        kopia_available(module) and repository_connected(module, failed_result={"maintenance": {}})
+    ):
         module.exit_json(changed=True, maintenance={})
 
     current = maintenance_info(module, failed_result={"maintenance": {}})

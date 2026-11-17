@@ -66,6 +66,23 @@
           - __kopia_policy.retention.keep_weekly == 4
           - __kopia_policy.scheduling.interval_seconds == 3600
 
+    - name: Ensure kopia removed policy information is gathered
+      tags:
+        - kopia
+      become: true
+      linuxhq.linux.kopia_policy_info:
+        target: "{{ kopia_policies[1].target }}"
+      register: __kopia_absent_policy_query
+
+    - name: Ensure kopia removed policy is verified
+      tags:
+        - kopia
+      ansible.builtin.assert:
+        that:
+          - kopia_policies[1].state == 'absent'
+          - not __kopia_absent_policy_query.defined
+          - __kopia_absent_policy_query.policy == {}
+
     - name: Ensure kopia snapshot is created
       tags:
         - kopia

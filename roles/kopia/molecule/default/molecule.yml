@@ -60,6 +60,9 @@ provisioner:
               scheduling:
                 interval_seconds: 3600
 
+          - target: /srv/molecule-absent
+            state: absent
+
 scenario:
   test_sequence:
     - dependency

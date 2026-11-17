@@ -43,6 +43,11 @@ pytestmark = pytest.mark.usefixtures("keep_stdin")
 
 CLIENT_STATUS = {"clientOptions": {"hostname": "host", "username": "root"}}
 
+# a source as kopia records it and lists it, and as the module returns it
+DATA = {"host": "host", "userName": "root", "path": "/data"}
+DATA_RESULT = {"host": "host", "user_name": "root", "path": "/data"}
+ROOT = {"host": "host", "userName": "root", "path": "/"}
+
 NOT_CONNECTED = (1, "", "repository is not connected")
 NOT_INITIALIZED = (1, "", "repository not initialized")
 
@@ -52,6 +57,8 @@ def kopia_client(monkeypatch):
     """Report the client user and host that kopia_snapshot and kopia_snapshot_info qualify a path with."""
     status = Mock(return_value=CLIENT_STATUS)
     monkeypatch.setattr(kopia_utils, "repository_status", status)
+    # kopia_snapshot reads the status itself in check mode
+    monkeypatch.setattr(kopia_snapshot, "repository_status", status)
     return status
 
 
@@ -78,6 +85,49 @@ def test_check_mode_without_kopia(monkeypatch, run_module, plugin, params, key):
     assert key in result
     assert not result.get("failed")
     assert result["changed"] is (plugin in (kopia_repository, kopia_maintenance, kopia_policy))
+
+
+@pytest.mark.parametrize(
+    "plugin,params,expected",
+    [
+        # a real run after kopia_repository connects would define the policy, or find it absent
+        (kopia_policy, {"target": "global", "policy": {}}, {"changed": True, "policy": {}}),
+        (kopia_policy, {"target": "global", "state": "absent"}, {"changed": False}),
+        (kopia_policy_info, {"target": "global"}, {"changed": False, "effective_policy": {}, "policy": {}}),
+        (kopia_policy_info, {}, {"changed": False, "policies": []}),
+        (kopia_maintenance, {"enable_full": False}, {"changed": True, "maintenance": {}}),
+        (kopia_maintenance_info, {}, {"changed": False, "maintenance": {}}),
+        (kopia_snapshot, {"path": "/home/a@b"}, {"changed": True, "snapshot": {}}),
+        (kopia_snapshot_info, {}, {"changed": False, "snapshots": []}),
+        (kopia_snapshot_info, {"path": "/home/a@b"}, {"changed": False, "snapshots": []}),
+    ],
+)
+def test_check_mode_without_connected_repository(monkeypatch, run_module, kopia_client, plugin, params, expected):
+    # kopia is installed, but kopia_repository has only predicted the connection in check mode
+    kopia_client.return_value = None
+    monkeypatch.setattr(plugin, "kopia_available", lambda module: True)
+    command = Mock(side_effect=AssertionError("must not run kopia"))
+    monkeypatch.setattr(kopia_utils, "kopia_command", command)
+    if hasattr(plugin, "kopia_command"):
+        monkeypatch.setattr(plugin, "kopia_command", command)
+
+    assert run_module(plugin, params, check_mode=True) == expected
+    assert kopia_client.call_count == 1
+
+
+def test_policy_info_returns_policies_as_kopia_reports_them(monkeypatch, run_module):
+    # kopia exports and lists the sections of a policy it always writes, also when they are empty
+    defined = {"retention": {"keepLatest": 2}, "files": {}, "osSnapshots": {"volumeShadowCopy": {}}}
+    monkeypatch.setattr(kopia_policy_info, "policy_export", lambda *args, **kwargs: defined)
+    monkeypatch.setattr(kopia_policy_info, "kopia_command", Mock(return_value=(0, json.dumps(defined), "")))
+    result = run_module(kopia_policy_info, {"target": "global"})
+    expected = {"retention": {"keep_latest": 2}, "files": {}, "os_snapshots": {"volume_shadow_copy": {}}}
+    assert result == {"changed": False, "defined": True, "policy": expected, "effective_policy": expected}
+
+    listing = [{"id": "x", "target": {"host": "", "path": "", "userName": ""}, **defined}]
+    monkeypatch.setattr(kopia_policy_info, "kopia_command", Mock(return_value=(0, json.dumps(listing), "")))
+    target = {"host": "", "path": "", "user_name": ""}
+    assert run_module(kopia_policy_info) == {"changed": False, "policies": [{"id": "x", "target": target, **expected}]}
 
 
 @pytest.mark.parametrize("check_mode", [False, True])
@@ -248,6 +298,22 @@ def test_maintenance_no_change_and_info(monkeypatch, run_module):
         assert result == {"changed": False, "maintenance": maintenance}
 
 
+# the sections of a policy kopia exports even when they are empty
+EXPORT_SECTIONS = {
+    "actions": {},
+    "compression": {},
+    "error_handling": {},
+    "files": {},
+    "logging": {"directories": {}, "entries": {}},
+    "metadata_compression": {},
+    "os_snapshots": {"volume_shadow_copy": {}},
+    "retention": {},
+    "scheduling": {},
+    "splitter": {},
+    "upload": {},
+}
+
+
 @pytest.mark.parametrize("current,check_mode,changed", [(None, True, True), ({"keepLatest": 2}, False, False)])
 def test_policy_present_prediction_and_idempotence(monkeypatch, run_module, current, check_mode, changed):
     monkeypatch.setattr(kopia_policy, "kopia_available", lambda module: True)
@@ -255,7 +321,9 @@ def test_policy_present_prediction_and_idempotence(monkeypatch, run_module, curr
     command = Mock(side_effect=AssertionError("must not mutate"))
     monkeypatch.setattr(kopia_policy, "kopia_command", command)
     result = run_module(kopia_policy, {"target": "global", "policy": {"keep_latest": 2}}, check_mode)
-    assert result == {"changed": changed, "policy": {"keep_latest": 2}}
+    # check mode predicts the sections kopia writes even when empty, and kopia's own export is returned as it is
+    expected = {**EXPORT_SECTIONS, "keep_latest": 2} if check_mode else {"keep_latest": 2}
+    assert result == {"changed": changed, "policy": expected}
     command.assert_not_called()
 
 
@@ -355,10 +423,11 @@ def test_snapshot_records_quoted_tag_values_as_given(monkeypatch, run_module):
 
 def test_snapshot_creates_with_tags_and_returns_latest(monkeypatch, run_module):
     created = '{"id":"new","startTime":"new"}\n'
-    command = Mock(side_effect=[(0, created, ""), (0, '[{"startTime":"old"},{"startTime":"new"}]', "")])
+    listing = json.dumps([{"startTime": "old", "source": DATA}, {"startTime": "new", "source": DATA}])
+    command = Mock(side_effect=[(0, created, ""), (0, listing, "")])
     monkeypatch.setattr(kopia_snapshot, "kopia_command", command)
     result = run_module(kopia_snapshot, {"path": "/data", "description": "backup", "tags": {"z": "last", "a": "first"}})
-    assert result == {"changed": True, "snapshot": {"start_time": "new"}}
+    assert result == {"changed": True, "snapshot": {"start_time": "new", "source": DATA_RESULT}}
     assert command.call_args_list[0].args[1] == [
         "snapshot",
         "create",
@@ -374,27 +443,44 @@ def test_snapshot_creates_with_tags_and_returns_latest(monkeypatch, run_module):
     "created,expected",
     [
         # a newer snapshot of the path, such as a scheduled one, is not returned as the one just created
-        ('{"id":"new","startTime":"new"}\n', {"id": "new", "start_time": "new"}),
-        # the newest listed snapshot is returned when the created one cannot be identified or found
-        ('{"id":"gone"}\n', {"id": "other", "start_time": "later"}),
+        ('{"id":"new","startTime":"new"}\n', {"id": "new", "start_time": "new", "source": DATA_RESULT}),
+        # the newest listed snapshot of the path is returned when the created one cannot be identified or found
+        ('{"id":"gone"}\n', {"id": "other", "start_time": "later", "source": DATA_RESULT}),
         # kopia prints nothing when it skips an identical snapshot, which is handled apart from this
-        ("not json\n", {"id": "other", "start_time": "later"}),
+        ("not json\n", {"id": "other", "start_time": "later", "source": DATA_RESULT}),
     ],
 )
 def test_snapshot_returns_the_created_snapshot(monkeypatch, run_module, created, expected):
-    listing = '[{"id":"old","startTime":"old"},{"id":"new","startTime":"new"},{"id":"other","startTime":"later"}]'
+    # kopia sorts the sources it lists by name, so the snapshots of each parent directory come first
+    listing = json.dumps(
+        [
+            {"id": "parent", "startTime": "latest", "source": ROOT},
+            {"id": "old", "startTime": "old", "source": DATA},
+            {"id": "new", "startTime": "new", "source": DATA},
+            {"id": "other", "startTime": "later", "source": DATA},
+        ]
+    )
     command = Mock(side_effect=[(0, created, ""), (0, listing, "")])
     monkeypatch.setattr(kopia_snapshot, "kopia_command", command)
     result = run_module(kopia_snapshot, {"path": "/data"})
     assert result == {"changed": True, "snapshot": expected}
 
 
+def test_snapshot_deleted_before_it_is_listed_returns_no_parent_snapshot(monkeypatch, run_module):
+    # another client deleted the only snapshot of the path before the module listed it, leaving those of a parent
+    listing = json.dumps([{"id": "parent", "startTime": "latest", "source": ROOT}])
+    command = Mock(side_effect=[(0, '{"id":"new"}\n', ""), (0, listing, "")])
+    monkeypatch.setattr(kopia_snapshot, "kopia_command", command)
+    assert run_module(kopia_snapshot, {"path": "/data"}) == {"changed": True, "snapshot": {}}
+
+
 def test_snapshot_skipped_as_identical_is_unchanged(monkeypatch, run_module):
     skipped = (0, "", "Not saving snapshot because no files have been changed since previous snapshot")
-    command = Mock(side_effect=[skipped, (0, '[{"id":"old"}]', "")])
+    listing = json.dumps([{"id": "parent", "source": ROOT}, {"id": "old", "source": DATA}])
+    command = Mock(side_effect=[skipped, (0, listing, "")])
     monkeypatch.setattr(kopia_snapshot, "kopia_command", command)
     result = run_module(kopia_snapshot, {"path": "/data"})
-    assert result == {"changed": False, "snapshot": {"id": "old"}}
+    assert result == {"changed": False, "snapshot": {"id": "old", "source": DATA_RESULT}}
     assert command.call_args_list[0].args[1] == ["snapshot", "create", "/data", "--json"]
 
 
@@ -525,10 +611,14 @@ def test_snapshot_of_path_with_at_sign_is_listed(monkeypatch, run_module, create
 
 
 def test_snapshot_skipped_as_identical_lists_qualified_path(monkeypatch, run_module, kopia_client):
-    command = Mock(side_effect=[(0, "", ""), (0, '[{"id":"old"}]', "")])
+    listing = json.dumps([{"id": "old", "source": {"host": "host", "userName": "root", "path": "/home/a@b"}}])
+    command = Mock(side_effect=[(0, "", ""), (0, listing, "")])
     monkeypatch.setattr(kopia_snapshot, "kopia_command", command)
     result = run_module(kopia_snapshot, {"path": "/home/a@b/./"})
-    assert result == {"changed": False, "snapshot": {"id": "old"}}
+    assert result == {
+        "changed": False,
+        "snapshot": {"id": "old", "source": {"host": "host", "user_name": "root", "path": "/home/a@b"}},
+    }
     assert command.call_args_list[1].args[1] == ["snapshot", "list", "--json", "--", "root@host:/home/a@b"]
     kopia_client.assert_called_once()
 
@@ -555,10 +645,18 @@ def test_snapshot_printed_with_errors_and_listing_failed_may_be_changed(monkeypa
     assert "may have been created" in result["msg"] and "new" in result["msg"] and "disk full" in result["msg"]
 
 
-@pytest.mark.parametrize("response", [(1, "", "denied"), (0, "[]", "")])
+@pytest.mark.parametrize(
+    "response",
+    [
+        (1, "", "denied"),
+        (0, "[]", ""),
+        # the snapshots kopia lists for a parent directory are never those of the path
+        (0, json.dumps([{"id": "parent", "source": ROOT}]), ""),
+    ],
+)
 def test_latest_snapshot_unavailable(monkeypatch, module_factory, response):
     monkeypatch.setattr(kopia_snapshot, "kopia_command", Mock(return_value=response))
-    assert kopia_snapshot.latest_snapshot(module_factory({"password": None}), "/data") == {}
+    assert kopia_snapshot.latest_snapshot(module_factory({"password": None}), "/data", "/data") == {}
 
 
 @pytest.mark.parametrize("check_mode", [False, True])
@@ -589,9 +687,10 @@ def test_policy_zero_values_kopia_omits_are_idempotent(monkeypatch, run_module):
         "actions": {"before_folder": {"script": "", "timeout": 0}},
     }
     result = run_module(kopia_policy, {"target": "global", "policy": policy})
+    # the policy is returned as kopia exports it, with its empty sections
     assert result == {
         "changed": False,
-        "policy": {"retention": {"keep_latest": 0}, "scheduling": {"interval_seconds": 3600}},
+        "policy": {"retention": {"keep_latest": 0}, "scheduling": {"interval_seconds": 3600}, "files": {}},
     }
 
 
@@ -1011,13 +1110,14 @@ def test_policy_commands_use_identical_target(monkeypatch, run_module, tmp_path,
 
 
 def test_snapshot_tags_keep_their_keys(monkeypatch, run_module):
-    listing = '[{"startTime":"now","tags":{"tag:Env":"prod","tag:role_name":"db"}}]'
+    listing = json.dumps([{"startTime": "now", "source": DATA, "tags": {"tag:Env": "prod", "tag:role_name": "db"}}])
+    expected = {"start_time": "now", "source": DATA_RESULT, "tags": {"tag:Env": "prod", "tag:role_name": "db"}}
     monkeypatch.setattr(kopia_snapshot, "kopia_command", Mock(side_effect=[(0, "", ""), (0, listing, "")]))
     result = run_module(kopia_snapshot, {"path": "/data", "tags": {"Env": "prod", "role_name": "db"}})
-    assert result["snapshot"] == {"start_time": "now", "tags": {"tag:Env": "prod", "tag:role_name": "db"}}
+    assert result["snapshot"] == expected
     monkeypatch.setattr(kopia_snapshot_info, "kopia_command", Mock(return_value=(0, listing, "")))
     result = run_module(kopia_snapshot_info)
-    assert result["snapshots"] == [{"start_time": "now", "tags": {"tag:Env": "prod", "tag:role_name": "db"}}]
+    assert result["snapshots"] == [expected]
 
 
 @pytest.mark.parametrize("check_mode", [False, True])
@@ -1096,10 +1196,15 @@ def test_snapshot_without_at_sign_lists_bare_path(monkeypatch, run_module, kopia
     # kopia splits user@host:/path at the first "@", so a client user such as alice@corp.example.com cannot be
     # qualified; a bare path is resolved by kopia with its own client user and host
     kopia_client.return_value = FQDN_CLIENT
-    command = Mock(side_effect=[created, (0, '[{"id":"new"},{"id":"old"}]', "")])
+    source = {"host": "host", "userName": "alice@corp.example.com", "path": "/srv/data"}
+    listing = json.dumps([{"id": "new", "source": source}, {"id": "old", "source": source}])
+    command = Mock(side_effect=[created, (0, listing, "")])
     monkeypatch.setattr(kopia_snapshot, "kopia_command", command)
     result = run_module(kopia_snapshot, {"path": "/srv/data"})
-    assert result["snapshot"] == {"id": listed}
+    assert result["snapshot"] == {
+        "id": listed,
+        "source": {"host": "host", "user_name": "alice@corp.example.com", "path": "/srv/data"},
+    }
     assert result["changed"] is (listed == "new")
     assert command.call_args_list[1].args[1] == ["snapshot", "list", "--json", "--", "/srv/data"]
     kopia_client.assert_not_called()
@@ -1322,7 +1427,7 @@ def test_policy_passes_unknown_key_shapes_to_kopia(monkeypatch, run_module, chec
     )
     if check_mode:
         # the returned policy is valid UTF-8, with the key kopia would refuse escaped
-        assert result == {"changed": True, "policy": {"unknown": 1, "a\\udc80": 2}}
+        assert result == {"changed": True, "policy": {**EXPORT_SECTIONS, "unknown": 1, "a\\udc80": 2}}
         command.assert_not_called()
     else:
         assert result == {"failed": True, "msg": f"unable to import kopia policy /data: {error}", "policy": {}}
@@ -1881,14 +1986,14 @@ def test_info_failure_after_kopia_runs_returns_empty_result(monkeypatch, run_mod
     assert command.call_count == len(replies) + 1
 
 
-@pytest.mark.parametrize("check_mode", [False, True])
 @pytest.mark.parametrize("plugin", [kopia_snapshot, kopia_snapshot_info])
 @pytest.mark.parametrize(
-    "status,message",
+    "status,message,check_mode",
     [
-        # repository_status reports the repository as not connected
-        (None, "repository is not connected"),
-        ({"clientOptions": {"hostname": "host", "username": "a@b"}}, "kopia cannot list it for 'a@b' at 'host'"),
+        # repository_status reports the repository as not connected, which check mode predicts a connection for
+        (None, "repository is not connected", False),
+        ({"clientOptions": {"hostname": "host", "username": "a@b"}}, "kopia cannot list it for 'a@b' at 'host'", False),
+        ({"clientOptions": {"hostname": "host", "username": "a@b"}}, "kopia cannot list it for 'a@b' at 'host'", True),
     ],
 )
 def test_snapshot_source_failure_returns_empty_result(
@@ -1945,15 +2050,45 @@ def test_repository_create_failure_after_creating_directory_reports_change(
     description = f"filesystem path={'~/repo' if home else path}"
     assert result["failed"] and bool(result.get("changed")) is changed and result["repository"] == {}
     if changed:
-        created = "kopia created the storage directory or a parent of it"
+        created = "kopia created the storage directory, a parent or its .shards file,"
         assert result["msg"] == f"{created} but failed to create the repository in {description}: {stderr}"
     else:
         assert result["msg"] == f"unable to create the kopia repository in {description}: {stderr}"
 
 
+@pytest.mark.parametrize("existed,changed", [(False, True), (True, False)])
+def test_repository_create_failure_after_writing_shards_reports_change(
+    monkeypatch, run_module, tmp_path, existed, changed
+):
+    # kopia's sharded storage writes .shards in the existing directory on the first blob it reads, before the
+    # repository, which can then fail
+    shards = tmp_path / ".shards"
+    if existed:
+        shards.write_text("{}")
+
+    stderr = "kopia: error: cannot initialize repository: unable to write blobcfg blob: no space left on device"
+    replies = iter([NOT_CONNECTED])
+
+    def kopia(module, args, password=None):
+        if args[:2] != ["repository", "create"]:
+            return next(replies)
+
+        shards.write_text("{}")
+        return 1, "", stderr
+
+    monkeypatch.setattr(kopia_repository, "kopia_command", kopia)
+    monkeypatch.setattr(kopia_utils, "kopia_command", kopia)
+    monkeypatch.setattr(kopia_repository, "repository_status", REPOSITORY_STATUS)
+    result = run_module(kopia_repository, repository_mkdir_params(tmp_path))
+    assert result["failed"] and bool(result.get("changed")) is changed and result["repository"] == {}
+    if changed:
+        created = "kopia created the storage directory, a parent or its .shards file,"
+        assert result["msg"] == f"{created} but failed to create the repository in filesystem path={tmp_path}: {stderr}"
+
+
 @pytest.mark.parametrize("storage", ["sftp", "webdav"])
 def test_repository_create_failure_on_other_storage_reports_no_change(monkeypatch, run_module, tmp_path, storage):
-    # only filesystem storage creates a local directory
+    # the module cannot inspect remote storage, where kopia can leave the path or .shards, as documented
     stderr = "kopia: error: cannot initialize repository: unable to write blobcfg blob: permission denied"
     command = Mock(side_effect=[NOT_CONNECTED, (1, "", stderr)])
     monkeypatch.setattr(kopia_repository, "kopia_command", command)
@@ -2325,7 +2460,7 @@ def test_repository_create_failure_after_creating_parents_reports_change(monkeyp
     # kopia creates the missing parents with os.MkdirAll, then fails on the storage directory itself
     path = tmp_path / "a" / "b" / "repo"
     result, stderr = run_failing_create(monkeypatch, run_module, path, [tmp_path / "a", tmp_path / "a" / "b"])
-    created = "kopia created the storage directory or a parent of it"
+    created = "kopia created the storage directory, a parent or its .shards file,"
     msg = f"{created} but failed to create the repository in filesystem path={path}: {stderr}"
     assert result == {"failed": True, "changed": True, "msg": msg, "repository": {}}
 

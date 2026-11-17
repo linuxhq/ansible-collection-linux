@@ -1,15 +1,61 @@
 ---
 - name: Verify
   hosts: all
-  roles:
-    - kopia_policy_info
+  tasks:
+    - name: Ensure kopia policy information is gathered for a target
+      tags:
+        - kopia_policy_info
+      ansible.builtin.include_role:
+        name: kopia_policy_info
 
-  post_tasks:
-    - name: Ensure kopia information is verified
+    - name: Ensure kopia policy information for a target is verified
       tags:
         - kopia_policy_info
       ansible.builtin.assert:
         that:
-          - _kopia_policy_info_dict | length > 0
-          - _kopia_policy_info_dict.retention.keep_latest == 2
+          - _kopia_policy_info_defined
+          - _kopia_policy_info_policy.retention.keep_latest == 2
+          - _kopia_policy_info_effective_policy.retention.keep_latest == 2
+          - _kopia_policy_info_list == []
+
+    - name: Ensure kopia policy information is gathered for a target without a policy
+      tags:
+        - kopia_policy_info
+      ansible.builtin.include_role:
+        name: kopia_policy_info
+      vars:
+        kopia_policy_info_target: /srv
+
+    - name: Ensure kopia policy information for a target without a policy is verified
+      tags:
+        - kopia_policy_info
+      ansible.builtin.assert:
+        that:
+          - not _kopia_policy_info_defined
+          - _kopia_policy_info_policy == {}
+          - _kopia_policy_info_effective_policy.retention.keep_latest is number
+
+    - name: Ensure kopia policy information is gathered for every policy
+      tags:
+        - kopia_policy_info
+      ansible.builtin.include_role:
+        name: kopia_policy_info
+      vars:
+        kopia_policy_info_target: null
+
+    - name: Ensure kopia policy information for every policy is verified
+      tags:
+        - kopia_policy_info
+      vars:
+        __kopia_policy_info_target: >-
+          {{ _kopia_policy_info_list
+             | selectattr('target.path', 'equalto', kopia_policy_info_target)
+             | first }}
+      ansible.builtin.assert:
+        that:
+          - not _kopia_policy_info_defined
+          - _kopia_policy_info_policy == {}
+          - _kopia_policy_info_effective_policy == {}
+          - _kopia_policy_info_list | length > 1
+          - __kopia_policy_info_target.retention.keep_latest == 2
 ...

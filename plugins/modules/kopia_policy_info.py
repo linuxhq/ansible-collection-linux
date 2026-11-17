@@ -87,7 +87,7 @@ attributes:
   check_mode:
     description: This module only retrieves information and does not modify state.
     support: full
-    details: Returns empty result data when Kopia is unavailable.
+    details: Returns empty result data when kopia is unavailable or no repository is connected.
   diff_mode:
     description: Diff mode is not supported.
     support: none
@@ -109,17 +109,18 @@ defined:
   description:
     - Whether a policy is defined for O(target).
     - Not returned when the module fails, as it is then unknown, nor when
-      kopia is unavailable in check mode.
+      kopia is unavailable or no repository is connected in check mode.
   returned: >-
     when O(target) is set and the module succeeds, unless kopia is unavailable
-    in check mode
+    or no repository is connected in check mode
   type: bool
   sample: true
 effective_policy:
   description:
     - Effective policy for O(target) reported by C(kopia policy show), with
       inherited values resolved.
-    - Empty when the module fails, and when kopia is unavailable in check mode.
+    - Empty when the module fails, and when kopia is unavailable or no
+      repository is connected in check mode.
       Not returned when Ansible rejects the arguments, such as a missing
       required option, a value of the wrong type or an invalid choice, or fails
       to log them, such as for a lone surrogate code point in an option that is
@@ -135,8 +136,11 @@ effective_policy:
       keep_latest: 2
 policies:
   description:
-    - Policies defined in the repository from C(kopia policy list).
-    - Empty when the module fails, and when kopia is unavailable in check mode.
+    - Policies defined in the repository from C(kopia policy list), as kopia
+      reports them, each with its C(id), its C(target) and the sections of the
+      policy, including the empty ones kopia always writes.
+    - Empty when the module fails, and when kopia is unavailable or no
+      repository is connected in check mode.
       Not returned when Ansible rejects the arguments, such as a missing
       required option, a value of the wrong type or an invalid choice, or fails
       to log them, such as for a lone surrogate code point in an option that is
@@ -151,13 +155,28 @@ policies:
         host: ''
         path: ''
         user_name: ''
+      actions: {}
+      compression: {}
+      error_handling: {}
+      files: {}
+      logging:
+        directories: {}
+        entries: {}
+      metadata_compression: {}
+      os_snapshots:
+        volume_shadow_copy: {}
       retention:
         keep_latest: 10
+      scheduling: {}
+      splitter: {}
+      upload: {}
 policy:
   description:
-    - Defined policy for O(target) reported by C(kopia policy export).
+    - Defined policy for O(target) reported by C(kopia policy export), as
+      kopia reports it, including the empty sections it always writes.
     - Empty when no policy is defined for the target.
-    - Empty when the module fails, and when kopia is unavailable in check mode.
+    - Empty when the module fails, and when kopia is unavailable or no
+      repository is connected in check mode.
       Not returned when Ansible rejects the arguments, such as a missing
       required option, a value of the wrong type or an invalid choice, or fails
       to log them, such as for a lone surrogate code point in an option that is
@@ -166,8 +185,21 @@ policy:
   returned: when O(target) is set
   type: dict
   sample:
+    actions: {}
+    compression: {}
+    error_handling: {}
+    files: {}
+    logging:
+      directories: {}
+      entries: {}
+    metadata_compression: {}
+    os_snapshots:
+      volume_shadow_copy: {}
     retention:
       keep_latest: 2
+    scheduling: {}
+    splitter: {}
+    upload: {}
 """
 
 import json
@@ -182,7 +214,7 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
     kopia_available,
     kopia_command,
     policy_export,
-    prune_empty,
+    repository_connected,
     text_label,
 )
 
@@ -196,7 +228,10 @@ def info(module):
     check_utf8(module, [("target", module.params["target"])], errors="surrogateescape", failed_result=failed_result)
     check_policy_target(module, module.params["target"], failed_result=failed_result)
 
-    if module.check_mode and not kopia_available(module):
+    # an earlier task in check mode, such as kopia_repository, may only have predicted the connection
+    if module.check_mode and not (
+        kopia_available(module) and repository_connected(module, failed_result=failed_result)
+    ):
         module.exit_json(changed=False, **failed_result)
 
     target = module.params["target"]
@@ -211,14 +246,16 @@ def info(module):
         changed=False,
         defined=defined is not None,
         effective_policy=camel_dict_to_snake_dict(json.loads(stdout)),
-        policy=camel_dict_to_snake_dict(prune_empty(defined or {})),
+        policy=camel_dict_to_snake_dict(defined or {}),
     )
 
 
 def list_policies(module):
     check_connection(module, failed_result={"policies": []})
 
-    if module.check_mode and not kopia_available(module):
+    if module.check_mode and not (
+        kopia_available(module) and repository_connected(module, failed_result={"policies": []})
+    ):
         module.exit_json(changed=False, policies=[])
 
     rc, stdout, stderr = kopia_command(module, ["policy", "list", "--json"])

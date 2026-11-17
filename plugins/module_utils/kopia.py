@@ -42,11 +42,29 @@ POLICY_OMITEMPTY = {
     "splitter": {"algorithm": ""},
 }
 
+# kopia writes these sections of a policy it exports even when they are empty, as they are not pointers
+POLICY_EXPORT_SECTIONS = {
+    "actions": {},
+    "compression": {},
+    "errorHandling": {},
+    "files": {},
+    "logging": {"directories": {}, "entries": {}},
+    "metadataCompression": {},
+    "osSnapshots": {"volumeShadowCopy": {}},
+    "retention": {},
+    "scheduling": {},
+    "splitter": {},
+    "upload": {},
+}
+
 # kopia stores both fields of each scheduling.timeOfDay entry, even when zero
 TIME_OF_DAY = {"hour": 0, "min": 0}
 
 # kopia names each manifest, such as a policy or a snapshot, with 16 random bytes in lowercase hexadecimal
 MANIFEST_ID = re.compile(r"[0-9a-f]{32}")
+
+# kopia fails with this error when no repository is connected
+NOT_CONNECTED_ERROR = "repository is not connected"
 
 # kopia fails with this error when it asks for the password on a standard input that is not a terminal
 PASSWORD_PROMPT_ERROR = "password prompt error"
@@ -336,10 +354,16 @@ def snapshot_source(module, path, operation, failed_result=None):
         return absolute
 
     status = repository_status(module, password=module.params["password"], failed_result=failed_result)
-    label = text_label(path)
 
     if status is None:
-        module.fail_json(msg=f"unable to {operation} of {label}: repository is not connected", **failed_result)
+        module.fail_json(msg=f"unable to {operation} of {text_label(path)}: {NOT_CONNECTED_ERROR}", **failed_result)
+
+    return client_source(module, absolute, status, operation, failed_result)
+
+
+def client_source(module, absolute, status, operation, failed_result=None):
+    """Return the absolute path qualified with the client user and host of the connection kopia reports in status."""
+    failed_result = failed_result or {}
 
     # kopia fills in the client user and host of every connection
     username = status["clientOptions"]["username"]
@@ -370,10 +394,18 @@ def repository_status(module, password=None, failed_result=None, context=None):
     if rc == 0:
         return json.loads(stdout)
 
-    if "repository is not connected" in stderr:
+    if NOT_CONNECTED_ERROR in stderr:
         return None
 
     module.fail_json(msg=f"{prefix}unable to query kopia repository status: {stderr.strip()}", **failed_result)
+
+
+def repository_connected(module, password=None, failed_result=None):
+    """Return whether kopia reports a connected repository, which check mode needs to read the current state.
+
+    In check mode, an earlier task, such as kopia_repository, may only have predicted the connection.
+    """
+    return repository_status(module, password=password, failed_result=failed_result) is not None
 
 
 def maintenance_info(module, failed_result=None):

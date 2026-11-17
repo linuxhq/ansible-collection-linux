@@ -174,6 +174,9 @@ options:
       - An empty string resets it to the default hostname. While a static
         hostname is in effect there is nothing observable to reset, so it is
         reported as no change.
+      - An empty string requires the C(HostnameSource) property of
+        C(systemd-hostnamed), added in systemd 248. On older systemd it
+        always fails before any setting is written, also in check mode.
     type: str
 requirements:
   - dasbus

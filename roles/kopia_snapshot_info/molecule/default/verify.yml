@@ -1,10 +1,13 @@
 ---
 - name: Verify
   hosts: all
-  roles:
-    - kopia_snapshot_info
+  tasks:
+    - name: Ensure kopia snapshot information is gathered
+      tags:
+        - kopia_snapshot_info
+      ansible.builtin.include_role:
+        name: kopia_snapshot_info
 
-  post_tasks:
     - name: Ensure kopia information is verified
       tags:
         - kopia_snapshot_info
@@ -12,4 +15,35 @@
         that:
           - _kopia_snapshot_info_list | length > 0
           - _kopia_snapshot_info_list | map(attribute='source.path') | unique == ['/home/vagrant']
+
+    - name: Ensure kopia snapshot information is gathered for a path
+      tags:
+        - kopia_snapshot_info
+      ansible.builtin.include_role:
+        name: kopia_snapshot_info
+      vars:
+        kopia_snapshot_info_path: /home/vagrant
+
+    - name: Ensure kopia snapshot information for a path is verified
+      tags:
+        - kopia_snapshot_info
+      ansible.builtin.assert:
+        that:
+          - _kopia_snapshot_info_list | length > 0
+          - _kopia_snapshot_info_list | map(attribute='source.path') | unique == ['/home/vagrant']
+
+    - name: Ensure kopia snapshot information is gathered for a path without snapshots
+      tags:
+        - kopia_snapshot_info
+      ansible.builtin.include_role:
+        name: kopia_snapshot_info
+      vars:
+        kopia_snapshot_info_path: /srv
+
+    - name: Ensure kopia snapshot information for a path without snapshots is verified
+      tags:
+        - kopia_snapshot_info
+      ansible.builtin.assert:
+        that:
+          - _kopia_snapshot_info_list == []
 ...

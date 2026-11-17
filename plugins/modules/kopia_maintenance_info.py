@@ -42,7 +42,7 @@ attributes:
   check_mode:
     description: This module only retrieves information and does not modify state.
     support: full
-    details: Returns empty result data when Kopia is unavailable.
+    details: Returns empty result data when kopia is unavailable or no repository is connected.
   diff_mode:
     description: Diff mode is not supported.
     support: none
@@ -59,7 +59,8 @@ maintenance:
   description:
     - Maintenance settings reported by C(kopia maintenance info).
     - Durations are in nanoseconds and sizes in bytes, as reported by kopia.
-    - Empty when the module fails, and when kopia is unavailable in check mode.
+    - Empty when the module fails, and when kopia is unavailable or no
+      repository is connected in check mode.
       Not returned when Ansible rejects the arguments, such as a missing
       required option, a value of the wrong type or an invalid choice, or fails
       to log them, such as for a lone surrogate code point in an option that is
@@ -93,13 +94,17 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
     check_connection,
     kopia_available,
     maintenance_info,
+    repository_connected,
 )
 
 
 def info(module):
     check_connection(module, failed_result={"maintenance": {}})
 
-    if module.check_mode and not kopia_available(module):
+    # an earlier task in check mode, such as kopia_repository, may only have predicted the connection
+    if module.check_mode and not (
+        kopia_available(module) and repository_connected(module, failed_result={"maintenance": {}})
+    ):
         module.exit_json(changed=False, maintenance={})
 
     maintenance = maintenance_info(module, failed_result={"maintenance": {}})
