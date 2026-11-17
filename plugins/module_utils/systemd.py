@@ -409,8 +409,13 @@ def parse_env_file(text, version):
 
 
 def read_bytes(module, path):
+    """Return the content of path, or None when it is missing or not a regular file, which could block or never end."""
     try:
-        with open(path, "rb") as handle:
+        handle = open_regular(path)
+        if handle is None:
+            return None
+
+        with handle:
             return handle.read()
     except FileNotFoundError:
         return None

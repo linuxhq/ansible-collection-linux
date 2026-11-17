@@ -397,3 +397,40 @@ def test_check_utf8_noncharacters_can_be_left_to_systemd(module_factory):
 def test_open_regular_raises_for_a_missing_file(tmp_path):
     with pytest.raises(FileNotFoundError):
         systemd.open_regular(str(tmp_path / "missing"))
+
+
+@pytest.mark.parametrize("kind", ["fifo", "device", "missing"])
+def test_read_bytes_reads_no_content_from_other_files(module_factory, tmp_path, kind):
+    path = tmp_path / "file"
+    if kind == "fifo":
+        os.mkfifo(path)
+    elif kind == "device":
+        # a device such as /dev/zero would never end, so /dev/null stands for any device, which reads as empty
+        path.symlink_to("/dev/null")
+
+    # reading a FIFO would wait for a writer, so fail after 5 seconds instead
+    def expire(signum, frame):
+        raise AssertionError("read_bytes blocked")
+
+    previous = signal.signal(signal.SIGALRM, expire)
+    signal.alarm(5)
+    try:
+        assert systemd.read_bytes(module_factory(), str(path)) is None
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, previous)
+
+
+def test_read_bytes_reads_a_regular_file(module_factory, tmp_path):
+    path = tmp_path / "file"
+    path.write_bytes(b"KEY=value\n")
+    assert systemd.read_bytes(module_factory(), str(path)) == b"KEY=value\n"
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root reads any file")
+def test_read_bytes_fails_when_the_file_cannot_be_read(module_factory, invoke, tmp_path):
+    path = tmp_path / "file"
+    path.write_bytes(b"KEY=value\n")
+    path.chmod(0)
+    result = invoke(systemd.read_bytes, module_factory(), str(path))
+    assert result["failed"] and result["msg"].startswith(f"unable to read {path}: ")

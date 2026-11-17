@@ -99,16 +99,23 @@ notes:
     lone surrogate code point, or that contains a NUL character, is rejected
     before any setting is written, also in check mode. So is a keyboard value
     that contains a Unicode noncharacter, such as U+FFFE, which systemd's
-    D-Bus library refuses. A locale value with a Unicode noncharacter is sent
-    first, so that refusal leaves nothing written.
+    D-Bus library refuses, when another request is sent before its own. The
+    locale is sent first, and a value with a Unicode noncharacter in the first
+    request is left to that refusal, which leaves nothing written.
   - Only C(systemd-localed) can tell whether a console keymap or an X11 layout
     exists, so one it refuses is reported after the earlier settings in the
     same task, such as O(locale), are applied.
   - C(systemd-localed) refuses to rewrite C(/etc/vconsole.conf) when it
     contains a NUL byte or a setting that is not valid UTF-8, and on Debian 12
     likewise C(/etc/default/keyboard), where it keeps the X11 keyboard
-    settings. A keyboard change that would rewrite such a file then fails
-    before any setting is written, also in check mode.
+    settings. A keyboard change whose request would rewrite such a file after
+    another request is sent, or to convert the settings after writing its own
+    file, then fails before any setting is written, also in check mode, as
+    C(systemd-localed) only logs a refused conversion. When the first request
+    sent would rewrite such a file as its own, C(systemd-localed) refuses it
+    before anything is changed. The module
+    reads these files only when they are regular files, and otherwise reads
+    them as missing.
   - The console settings rewrite C(/etc/vconsole.conf), and so do the X11
     keyboard settings when they are converted into the console keymap and, on
     systemd 253 and later, always. On Debian 12 the X11 keyboard settings, and
@@ -481,33 +488,42 @@ def debian_family():
 
 
 def keyboard_rewrites(module, version, keymap, convert_keymap, keyboard):
-    """Return the environment files systemd-localed rewrites for the keyboard changes, with the option causing it."""
+    """Return the environment files systemd-localed rewrites for the keyboard changes.
+
+    Each is returned with the option causing it, the request that rewrites it, once for each such request, and
+    whether the request rewrites it to convert the settings, after its own write, which then stays applied while
+    systemd-localed only logs the refused conversion.
+    """
     rewrites = []
     convert_x11 = all(module.params[name] is None for name in VCONSOLE_SETTINGS)
 
     if keymap is not None:
-        rewrites.append((VCONSOLE_CONF, first_requested(module, VCONSOLE_SETTINGS)))
-    elif keyboard is not None and (convert_x11 or version >= X11_VCONSOLE_VERSION):
+        rewrites.append((VCONSOLE_CONF, first_requested(module, VCONSOLE_SETTINGS), "SetVConsoleKeyboard", False))
+
+    if keyboard is not None and (convert_x11 or version >= X11_VCONSOLE_VERSION):
         # SetX11Keyboard stores the converted console keymap there, and from systemd 253 always the X11 settings too
-        rewrites.append((VCONSOLE_CONF, first_requested(module, X11_SETTINGS)))
+        option = first_requested(module, X11_SETTINGS)
+        rewrites.append((VCONSOLE_CONF, option, "SetX11Keyboard", version < X11_VCONSOLE_VERSION))
 
     if (keyboard is not None or convert_keymap) and version < X11_VCONSOLE_VERSION and debian_family():
         # SetVConsoleKeyboard stores the converted X11 settings there too
-        option = first_requested(module, X11_SETTINGS) if keyboard is not None else "vconsole_keymap"
-        rewrites.append((DEBIAN_KEYBOARD, option))
+        if convert_keymap:
+            rewrites.append((DEBIAN_KEYBOARD, "vconsole_keymap", "SetVConsoleKeyboard", True))
+
+        if keyboard is not None:
+            rewrites.append((DEBIAN_KEYBOARD, first_requested(module, X11_SETTINGS), "SetX11Keyboard", False))
 
     return rewrites
 
 
 def ensure_present(module):
-    # a value that cannot be sent would otherwise fail only after the earlier settings are written; SetLocale is
-    # sent first, so a locale value with a noncharacter, which sd-bus refuses, leaves nothing written
+    # dasbus cannot send a surrogate and GLib cuts a string at a NUL, which would write a shortened value
     check_utf8(
         module,
-        [(f"locale.{name}", value) for name, value in sorted((module.params["locale"] or {}).items())],
+        [(f"locale.{name}", value) for name, value in sorted((module.params["locale"] or {}).items())]
+        + [(name, module.params[name]) for name in VCONSOLE_SETTINGS + X11_SETTINGS],
         noncharacters=False,
     )
-    check_utf8(module, [(name, module.params[name]) for name in VCONSOLE_SETTINGS + X11_SETTINGS])
 
     if module.check_mode and not HAS_DASBUS:
         keyboard = VCONSOLE_SETTINGS + X11_SETTINGS
@@ -538,8 +554,30 @@ def ensure_present(module):
     if locale is not None and version < LOCALE_MERGE_VERSION:
         module.fail_json(msg=f"unable to set locale: systemd >= {LOCALE_MERGE_VERSION} is required, found {version}")
 
-    # localed refuses to rewrite such a file only after the earlier settings are written, so check it first
-    for path, option in keyboard_rewrites(module, version, keymap, convert_keymap, keyboard):
+    requests = [
+        method
+        for method, change in (("SetLocale", locale), ("SetVConsoleKeyboard", keymap), ("SetX11Keyboard", keyboard))
+        if change is not None
+    ]
+
+    # systemd-localed refuses the first request before anything is written, but a later one only after the earlier
+    # requests are applied, so a value sd-bus refuses and a file it refuses to rewrite are checked for those first, and
+    # so is a file any request rewrites to convert the settings after its own write
+    later = requests[1:]
+
+    if "SetVConsoleKeyboard" in later:
+        check_utf8(module, [(name, keymap[name]) for name in VCONSOLE_SETTINGS])
+
+    if "SetX11Keyboard" in later:
+        check_utf8(module, [(name, keyboard[name]) for name in X11_SETTINGS])
+
+    checked = set()
+
+    for path, option, method, converted in keyboard_rewrites(module, version, keymap, convert_keymap, keyboard):
+        if not (converted or method in later) or path in checked:
+            continue
+
+        checked.add(path)
         content = read_bytes(module, path)
         error = None if content is None else load_env_file(content, version)[1]
 
@@ -557,7 +595,7 @@ def ensure_present(module):
             # localed writes a fallback that is not valid UTF-8 or holds a noncharacter, then cannot report the locale
             if language and utf8_text(language) != language:
                 module.fail_json(
-                    msg=f"unable to set locale.lang {request['lang']}: {LANGUAGE_FALLBACK_MAP} lists an invalid UTF-8 fallback, set locale.language as well"
+                    msg=f"unable to set locale.lang {request['lang']}: {LANGUAGE_FALLBACK_MAP} lists invalid UTF-8 or a noncharacter, set locale.language"
                 )
 
             if module.check_mode and language:

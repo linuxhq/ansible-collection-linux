@@ -20,10 +20,12 @@ description:
     stores them in, rather than the properties it reports, because it reports a
     computed fallback for a setting that is not stored, such as a chassis
     detected from the firmware or an icon name derived from the chassis. A
-    missing file means no setting is stored. The file is parsed as the running
-    systemd version parses it, which ignores everything from the first
-    setting that is not valid UTF-8, and a whole file containing a NUL byte,
-    except systemd 239, which parses the file up to the NUL byte.
+    missing file means no setting is stored, and so does a file that is not a
+    regular file, such as a FIFO, which the module does not read. The file is
+    parsed as the running systemd version parses it, which ignores everything
+    from the first setting that is not valid UTF-8, and a whole file
+    containing a NUL byte, except systemd 239, which parses the file up to the
+    NUL byte.
   - C(systemd-hostnamed) refuses to rewrite C(/etc/machine-info) when it
     contains a setting that is not valid UTF-8, or on systemd 240 and later a
     NUL byte, so changing O(chassis), O(deployment), O(icon_name),
@@ -52,11 +54,15 @@ description:
   - The module reads C(/etc/hostname) only when it is a regular file, and
     otherwise reads no static hostname. C(systemd-hostnamed) may block
     reading a file that is not a regular file, such as a FIFO.
-  - Every option except O(static_hostname) is validated before any setting is
+  - Only the settings that differ from their stored values are written, in
+    the order O(static_hostname), O(chassis), O(deployment), O(icon_name),
+    O(location), O(pretty_hostname) and O(transient_hostname). The first of
+    them is validated by C(systemd-hostnamed), so a value the running systemd
+    refuses fails before anything is changed, and in check mode is reported
+    as a change. The module checks each later one before any setting is
     written, so an invalid value fails without leaving earlier settings
-    applied. O(static_hostname) is written first and validated by
-    C(systemd-hostnamed), so a value the running systemd refuses fails before
-    anything is changed. In check mode such a value is reported as a change.
+    applied. A stored value the running systemd would now refuse, such as an
+    icon name stored before an upgrade, is neither written nor checked.
   - With no options set the module reads the current settings and reports no
     change.
 notes:
@@ -151,10 +157,12 @@ options:
       - Transient hostname, as C(hostnamectl hostname --transient) sets.
       - Must be a valid hostname of at most 64 characters, made of labels of
         letters, digits and V(-) separated by V(.), where no label is empty or
-        starts or ends with V(-), which the module checks before any setting
-        is written.
+        starts or ends with V(-). systemd 239 also accepts V(_) and a label
+        starting or ending with V(-).
       - The V(?) wildcard and V($) tokens, which systemd 258 and later accept
-        in some hostnames, are not accepted by this module.
+        in some hostnames, are not accepted by this module, as
+        C(systemd-hostnamed) would replace them, so the hostname it reports
+        would never match.
       - C(/etc/hostname) takes the highest preference in C(systemd-hostnamed), so
         a transient hostname cannot take effect while a static one is configured.
       - Nothing is done when RV(hostname) already matches, whatever the source.
@@ -285,10 +293,14 @@ SETTINGS = [
     ("pretty_hostname", "SetPrettyHostname"),
 ]
 
+STRING_SETTINGS = ["deployment", "icon_name", "location", "pretty_hostname", "static_hostname", "transient_hostname"]
+
 CONTROL_CHARACTERS = re.compile(r"[\x00-\x1f\x7f]")
 DEPLOYMENT = re.compile(r"[A-Za-z0-9.:-]+\Z")
 HOSTNAME_LABEL = r"[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?"
 HOSTNAME = re.compile(rf"{HOSTNAME_LABEL}(?:\.{HOSTNAME_LABEL})*\Z")
+# systemd 239 also accepts '_' and a label starting or ending with '-'
+HOSTNAME_239 = re.compile(r"[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*\Z")
 HOSTNAME_CHARACTERS = frozenset(string.ascii_letters + string.digits)
 HOSTNAME_CHARACTERS_239 = HOSTNAME_CHARACTERS | frozenset("-_")
 # the first systemd that keeps only letters, digits and hyphens between dots in a hostname it reads
@@ -303,25 +315,16 @@ ICON_NAME_SAFE_VERSION = 262
 ICON_NAME_UNSAFE = re.compile(r"[\x00-\x1f\x7f\\'\"*?\[]")
 
 
-def hostname_valid(value):
-    return len(value) <= HOSTNAME_MAX and HOSTNAME.match(value) is not None
+def hostname_valid(value, version):
+    """Return whether systemd-hostnamed of the given version accepts value as a hostname, without wildcards."""
+    pattern = HOSTNAME if version >= HOSTNAME_LDH_VERSION else HOSTNAME_239
+    return len(value) <= HOSTNAME_MAX and pattern.match(value) is not None
 
 
-def check_icon_name(module, version):
-    """Fail when systemd-hostnamed of the given version refuses icon_name.
-
-    Only what every version refuses is checked when the version is not known.
-    """
-    value = module.params["icon_name"]
-
-    if not value:
-        return
-
+def check_icon_name(module, value, version):
+    """Fail when systemd-hostnamed of the given version refuses value as icon_name."""
     if value in (".", "..") or "/" in value:
         module.fail_json(msg=f"invalid icon_name {value!r}: it must be a valid file name")
-
-    if version is None:
-        return
 
     if len(value.encode("utf-8")) > (NAME_MAX if version >= ICON_NAME_MAX_VERSION else FILENAME_MAX):
         module.fail_json(msg=f"invalid icon_name {value!r}: it is longer than systemd {version} allows for a file name")
@@ -332,26 +335,29 @@ def check_icon_name(module, version):
         )
 
 
-def validate_settings(module):
-    params = module.params
+def check_setting(module, param, value, version):
+    """Fail when systemd-hostnamed of the given version or sd-bus refuses value for param.
 
-    for param in ("location", "pretty_hostname"):
-        if params[param] and CONTROL_CHARACTERS.search(params[param]):
-            module.fail_json(msg=f"invalid {param}: control characters are not allowed")
+    Such a refusal leaves nothing written when its request is the first one sent, so this is checked only for a
+    request sent after another, whose refusal would otherwise leave the earlier settings written.
+    """
+    if not value:
+        return
 
-    # the static hostname is written first, so a noncharacter, which sd-bus refuses, leaves nothing written
-    check_utf8(module, [("static_hostname", params["static_hostname"])], noncharacters=False)
-    check_utf8(module, [(param, params[param]) for param in ("icon_name", "location", "pretty_hostname")])
+    if param in ("location", "pretty_hostname") and CONTROL_CHARACTERS.search(value):
+        module.fail_json(msg=f"invalid {param}: control characters are not allowed")
 
-    if params["deployment"] and not DEPLOYMENT.match(params["deployment"]):
-        module.fail_json(
-            msg=f"invalid deployment {params['deployment']!r}: only letters, digits, '-', '.' and ':' are allowed"
-        )
+    if param == "deployment" and not DEPLOYMENT.match(value):
+        module.fail_json(msg=f"invalid deployment {value!r}: only letters, digits, '-', '.' and ':' are allowed")
 
-    check_icon_name(module, None)
+    if param == "icon_name":
+        check_icon_name(module, value, version)
 
-    if params["transient_hostname"] and not hostname_valid(params["transient_hostname"]):
-        module.fail_json(msg=f"invalid transient_hostname {params['transient_hostname']!r}: it is not a valid hostname")
+    if param in ("icon_name", "location", "pretty_hostname"):
+        check_utf8(module, [(param, value)])
+
+    if param == "transient_hostname" and not hostname_valid(value, version):
+        module.fail_json(msg=f"invalid transient_hostname {value!r}: it is not a valid hostname")
 
 
 def read_machine_info(module, version):
@@ -449,7 +455,7 @@ def read_static_hostname(module, version):
                         return hostname
 
                     # newer systemd accepts '?' wildcards and '$' tokens in a stored hostname, unlike this module
-                    return hostname if hostname_valid(hostname.replace("?", "0").replace("$", "0")) else ""
+                    return hostname if hostname_valid(hostname.replace("?", "0").replace("$", "0"), version) else ""
     except PermissionError as error:
         # systemd-hostnamed runs as root, so it reads a file the module may not
         module.fail_json(msg=f"unable to read {HOSTNAME_FILE}: {error}")
@@ -461,7 +467,16 @@ def read_static_hostname(module, version):
 
 
 def ensure_present(module):
-    validate_settings(module)
+    # dasbus cannot send a surrogate and GLib cuts a string at a NUL, which would write a shortened value
+    check_utf8(module, [(param, module.params[param]) for param in STRING_SETTINGS], noncharacters=False)
+
+    # systemd-hostnamed 258 and later replace each '?' and 262 and later each '$' token in a transient hostname, so the
+    # hostname it then reports would never match the option
+    transient = module.params["transient_hostname"]
+    if transient and ("?" in transient or "$" in transient):
+        module.fail_json(
+            msg=f"invalid transient_hostname {transient!r}: '?' wildcards and '$' tokens are not supported"
+        )
 
     if module.check_mode and not HAS_DASBUS:
         module.exit_json(
@@ -485,7 +500,6 @@ def ensure_present(module):
         version = systemd_version(module)
 
     if compare_machine_info:
-        check_icon_name(module, version)
         stored, machine_info_error = read_machine_info(module, version)
 
     if compare_static_hostname:
@@ -513,9 +527,7 @@ def ensure_present(module):
             predicted["hostname_source"] = "static" if value else "default"
 
         predicted[param] = value
-        pending.append((method, (value, False)))
-
-    transient = module.params["transient_hostname"]
+        pending.append((param, method, (value, False)))
 
     if transient and predicted["hostname"] != transient:
         if predicted["static_hostname"]:
@@ -525,7 +537,7 @@ def ensure_present(module):
 
         predicted["hostname"] = transient
         predicted["hostname_source"] = "transient"
-        pending.append(("SetHostname", (transient, False)))
+        pending.append(("transient_hostname", "SetHostname", (transient, False)))
 
     if transient == "":
         if current["hostname_source"] is None:
@@ -538,7 +550,12 @@ def ensure_present(module):
         if current["hostname_source"] == "transient" or cleared:
             predicted["hostname"] = predicted["static_hostname"] or default or current["hostname"]
             predicted["hostname_source"] = "static" if predicted["static_hostname"] else "default"
-            pending.append(("SetHostname", ("", False)))
+            pending.append(("transient_hostname", "SetHostname", ("", False)))
+
+    # the first request is validated by systemd-hostnamed before anything is written, a later one only after the
+    # earlier requests are applied; a later request follows a setting compared against its file, so version is known
+    for param, _method, args in pending[1:]:
+        check_setting(module, param, args[0], version)
 
     if not pending:
         module.exit_json(changed=False, hostname=current)
@@ -546,7 +563,7 @@ def ensure_present(module):
     if module.check_mode:
         module.exit_json(changed=True, hostname=predicted)
 
-    for method, args in pending:
+    for _param, method, args in pending:
         systemd_call(module, proxy, method, *args)
 
     current = systemd_properties(module, proxy, HOSTNAME_PROPERTIES)

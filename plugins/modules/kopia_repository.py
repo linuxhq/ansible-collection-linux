@@ -25,12 +25,16 @@ description:
   - A host connected to a different repository fails rather than being
     reconnected. The connection is different when its storage type differs
     from O(storage), or when one of the options C(bucket), C(container),
-    C(endpoint), C(folder_id), C(host), C(path), C(prefix), C(remote_path),
-    C(storage_account) or C(url), given in O(options) or O(secrets), differs
-    from the connected storage configuration. A number in these options is
-    compared as the text passed to kopia, so V(20261115) matches a stored
-    V("20261115"), and that text is the number as Python formats it, as
-    described in O(options). A leading V(~)
+    C(endpoint), C(folder_id), C(host), C(path), C(port), C(prefix),
+    C(remote_path), C(storage_account), C(storage_domain) or C(url), or with
+    O(storage=sftp) C(username), given in O(options) or O(secrets), differs
+    from the connected storage configuration. A C(storage_domain) that is not
+    stored is compared as C(blob.core.windows.net), the domain kopia uses
+    then. C(port) is compared as the number kopia reads from it, which it
+    reads as a decimal number and truncates, so V("+22") matches a stored
+    V(22). Another number in these options is compared as the text passed to
+    kopia, so V(20261115) matches a stored V("20261115"), and that text is the
+    number as Python formats it, as described in O(options). A leading V(~)
     in the C(path) of V(filesystem) storage is resolved to the home directory
     first, as kopia does, and that C(path) is compared as a normalized path,
     so V(/srv/kopia/) and V(//srv/kopia) match V(/srv/kopia). Disconnect it
@@ -93,9 +97,10 @@ options:
         C(--bucket) and V(storage_account) becomes C(--storage-account).
       - Booleans toggle the flag, V(true) emits C(--flag) and V(false) emits
         C(--no-flag), and a list repeats the flag once per element.
-      - A dictionary value is rejected before kopia runs, and so is a list for
-        one of the options that identify the repository, listed in the
-        description, such as C(bucket) or C(path), which kopia takes once.
+      - A dictionary value is rejected before kopia runs, as kopia would store
+        its Python text rather than the value, and so is a list for one of the
+        options that identify the repository, listed in the description, such
+        as C(bucket) or C(path), which kopia takes once.
         kopia rejects a Boolean for these options, which take a text value, so
         quote a value such as V(no) that YAML reads as a Boolean.
       - Values must be valid UTF-8, without a lone surrogate code point, or the
@@ -108,6 +113,10 @@ options:
         O(storage=from-config), C(root_ca_pem_path) with O(storage=s3), whose
         file contents kopia saves instead, and C(embed_rclone_config) with
         O(storage=rclone), whose contents kopia embeds instead.
+      - kopia reads a Boolean flag given a value, such as
+        C(--embed-credentials=true) for a string V("true"), as the flag
+        followed by an unexpected argument, which it refuses before it changes
+        anything, so give Boolean flags Boolean values.
       - With C(embed_credentials) set to the Boolean V(true) in O(options) or
         O(secrets), kopia saves the file contents in place of the path of
         C(credentials_file) with O(storage=gcs) or O(storage=gdrive), and,
@@ -143,9 +152,12 @@ options:
         line.
       - Also used to read the connection status, so a connection made with
         V(persist_credentials) set to V(false) in O(options) is recognized.
-      - An empty password is rejected before kopia runs, also in check mode.
-        kopia reads it as no password, and C(kopia repository create) creates
-        the C(path) of V(filesystem) storage before it fails to read one.
+      - kopia reads an empty password as no password, and fails to read one
+        before it changes anything, except that it first creates a missing
+        C(path) of V(filesystem) or V(sftp) storage. So an empty password is
+        rejected before kopia runs, also in check mode, when the host is not
+        connected and the storage is V(sftp), whose C(path) the module cannot
+        check, or V(filesystem) with a C(path) that does not exist.
       - kopia removes whitespace around the password, so a password of only
         whitespace becomes an empty password, which C(kopia repository create)
         accepts.
@@ -284,11 +296,22 @@ STORAGE_KEYS = {
     "folder_id": "folderID",
     "host": "host",
     "path": "path",
+    "port": "port",
     "prefix": "prefix",
     "remote_path": "remotePath",
     "storage_account": "storageAccount",
+    "storage_domain": "storageDomain",
     "url": "url",
 }
+
+# webdav also takes a username, which only authenticates there, so it identifies only an sftp repository
+STORAGE_TYPE_KEYS = {"sftp": {"username": "username"}}
+
+# kingpin reads an int flag as a float and truncates it, so "+22" or "22.0" set the port 22
+INT_OPTIONS = ("port",)
+
+# kopia uses this azure storage domain when none is stored
+STORAGE_DEFAULTS = {"storageDomain": "blob.core.windows.net"}
 
 STORAGE_TYPES = {"azure": "azureBlob"}
 
@@ -328,7 +351,7 @@ def unsaved_options(module):
     options = storage_options(module)
     unsaved = set(UNSAVED_OPTIONS.get(storage, ()))
 
-    # kopia_flags sends --embed-credentials only for a Boolean true
+    # kopia_flags sends --embed-credentials only for a Boolean true, and kopia refuses any other value given to the flag
     if options.get("embed_credentials") is not True:
         return unsaved
 
@@ -345,6 +368,22 @@ def unsaved_options(module):
     return unsaved
 
 
+def kingpin_int(value):
+    """Return value as text of the number kopia's flag parser reads from it, a float truncated, or as given."""
+    if isinstance(value, bool):
+        return str(value)
+
+    try:
+        return str(int(float(value)))
+    except (OverflowError, ValueError):
+        return str(value)
+
+
+def identifying_keys(storage):
+    """Return the options that identify a repository of the storage type, with the keys kopia stores them under."""
+    return {**STORAGE_KEYS, **STORAGE_TYPE_KEYS.get(storage, {})}
+
+
 def check_option_values(module):
     # kopia saves the storage options in its configuration with U+FFFD in place of bytes that are not UTF-8 and
     # reopens the storage from that copy, but it only reads these options, which run_command passes as the bytes
@@ -359,9 +398,11 @@ def check_option_values(module):
             failed_result={"repository": {}},
         )
 
+    keys = identifying_keys(module.params["storage"])
+
     for param in ("options", "secrets"):
         for option, value in sorted(module.params[param].items()):
-            # kopia_flags would send a dictionary as Python text
+            # kopia would silently store the Python text of the dictionary that kopia_flags sends, not its value
             if isinstance(value, dict):
                 module.fail_json(
                     msg=f"invalid {param} value for {text_label(option)}: a dictionary cannot be passed to kopia",
@@ -370,7 +411,7 @@ def check_option_values(module):
 
             # kopia_flags sends a list as one flag per element, and kopia takes these flags once, so a list of one
             # value would connect to a repository that never matches the list, and an empty list would send none
-            if option in STORAGE_KEYS and isinstance(value, (list, tuple)):
+            if option in keys and isinstance(value, (list, tuple)):
                 module.fail_json(
                     msg=f"invalid {param} value for {option}: it identifies the repository, so it takes one value, not a list",
                     repository={},
@@ -390,7 +431,7 @@ def storage_description(module):
     # an option overridden by a secret is not the value sent, and the secret stays out of the message
     details = [
         f"{option}={options[option]}"
-        for option in sorted(STORAGE_KEYS)
+        for option in sorted(identifying_keys(module.params["storage"]))
         if options.get(option) is not None and option not in module.params["secrets"]
     ]
 
@@ -418,13 +459,14 @@ def storage_mismatch(module, status):
     connected = status["storage"]
     expected = STORAGE_TYPES.get(storage, storage)
 
-    if connected.get("type") != expected:
-        return f"storage type is {connected.get('type')}, not {expected}"
+    if connected["type"] != expected:
+        return f"storage type is {connected['type']}, not {expected}"
 
-    config = connected.get("config") or {}
+    # kopia reports no configuration for a connection to a kopia server
+    config = connected["config"] or {}
     options = storage_options(module)
 
-    for option, key in sorted(STORAGE_KEYS.items()):
+    for option, key in sorted(identifying_keys(storage).items()):
         value = options.get(option)
 
         # check_option_values refuses a list, kopia rejects a Boolean, which kopia_flags sends as a flag without a
@@ -432,8 +474,9 @@ def storage_mismatch(module, status):
         if value is None:
             continue
 
-        value = str(value)
-        stored = config.get(key, "")
+        # kopia leaves out an empty value, using its default then, and stores the sftp port as a number
+        value = (kingpin_int(value) if option in INT_OPTIONS else str(value)) or STORAGE_DEFAULTS.get(key, "")
+        stored = str(config.get(key) or STORAGE_DEFAULTS.get(key, ""))
         if storage_value(storage, option, stored) != storage_value(storage, option, value):
             if option in module.params["secrets"]:
                 return f"{option} differs from the connected repository"
@@ -555,14 +598,6 @@ def connect(module, target, description):
 
 def ensure_present(module):
     check_connection(module, failed_result={"repository": {}})
-
-    # kopia repository create makes the directory of filesystem storage before it asks for a password, which it then
-    # fails to read, as kopia reads an empty KOPIA_PASSWORD as no password
-    if module.params["password"] == "":
-        module.fail_json(
-            msg="invalid password: it must not be empty, as kopia reads an empty password as no password", repository={}
-        )
-
     check_option_values(module)
 
     if module.check_mode and not kopia_available(module):
@@ -570,6 +605,15 @@ def ensure_present(module):
 
     password = module.params["password"]
     status = repository_status(module, password=password, failed_result={"repository": {}})
+
+    # kopia reads an empty KOPIA_PASSWORD as no password, which it fails to read only after the storage of filesystem
+    # and sftp storage has made a missing path
+    storage = module.params["storage"]
+    if status is None and password == "" and (storage == "sftp" or missing_directories(module)):
+        module.fail_json(
+            msg=f"invalid password: it must not be empty, as kopia reads it as no password after it creates the {storage} path",
+            repository={},
+        )
 
     if status is not None:
         mismatch = storage_mismatch(module, status)

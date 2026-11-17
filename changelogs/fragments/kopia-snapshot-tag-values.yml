@@ -1,8 +1,9 @@
 ---
 breaking_changes:
-  - kopia_snapshot - fail before running kopia when a ``tags`` value is not a
-    string. Null, Boolean, number, list and dictionary values were recorded on
-    the snapshot as Python text, such as ``None``, ``True``, ``1.1`` for an
-    unquoted ``1.10`` or ``750`` for an unquoted ``12:30``. Quote such literal
-    values to record them as text, and convert a templated value that can
-    render as a number with ``| string``.
+  - kopia_snapshot - fail before running kopia when a ``tags`` value is null,
+    a Boolean, a list or a dictionary. Such values were recorded on the
+    snapshot as Python text, such as ``None`` or ``True``, rather than the
+    value written. Quote a Boolean, such as ``"true"``, to record it as text.
+    Numbers are still accepted and recorded as Python writes them, so quote a
+    value that YAML reads as a number whose text differs, such as ``1.10`` or
+    ``12:30``, to record it as written.

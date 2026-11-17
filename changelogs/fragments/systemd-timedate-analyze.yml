@@ -15,9 +15,16 @@ breaking_changes:
     written.
 bugfixes:
   - systemd_timedate - reject digits other than ASCII ``0`` to ``9`` and
-    whitespace other than ASCII in a ``time`` timestamp, such as
-    ``2026-07-2٦ 14:30``, which systemd refuses but the module turned into a
-    change of the clock.
+    whitespace other than ASCII in ``time``, such as ``2026-07-2٦ 14:30`` or
+    ``+٣h``, which systemd refuses but the module turned into a change of the
+    clock.
+  - systemd_timedate - accept the Greek small letter mu (U+03BC) in the
+    microsecond unit of ``time``, such as ``+500μs``, as systemd 254 and later
+    do, in addition to the micro sign (U+00B5), a span after ``@``, such as
+    ``@1h`` or ``@1min 30s``, a span that starts with a decimal point, such
+    as ``+.5s``, and relative times written as ``5min ago`` or ``5min left``,
+    as systemd does, and reject ``@1e9`` or ``@1_000``, which systemd
+    refuses.
   - systemd_timedate - set a ``time`` with a fractional span to the exact
     microsecond, such as ``+1.000001s``, which the module rounded down by one
     microsecond.

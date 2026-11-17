@@ -1,5 +1,7 @@
 import os
+import signal
 import unicodedata
+from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
@@ -9,6 +11,11 @@ from ansible.module_utils.common.parameters import remove_values
 
 from ansible_collections.linuxhq.linux.plugins.module_utils import rclone
 from ansible_collections.linuxhq.linux.plugins.modules import rclone_config_encryption as plugin
+
+
+def decrypt(text, password):
+    """Decrypt a configuration file's text as the module does, from the payload after its header."""
+    return rclone.decrypt_config(rclone.config_body(text), password)
 
 
 @pytest.mark.parametrize("check_mode", [False, True])
@@ -21,7 +28,7 @@ def test_encrypt_plaintext(tmp_path, run_module, check_mode):
     if check_mode:
         assert path.read_bytes() == content
     else:
-        assert rclone.decrypt_config(path.read_text(), "secret") == content
+        assert decrypt(path.read_text(), "secret") == content
 
 
 @pytest.mark.parametrize("state", ["present", "absent"])
@@ -58,10 +65,10 @@ def test_create_from_content_and_replace_encrypted_content(tmp_path, run_module)
     path = tmp_path / "rclone.conf"
     params = {"path": str(path), "password": "secret", "content": "first"}
     assert run_module(plugin, params)["changed"]
-    assert rclone.decrypt_config(path.read_text(), "secret") == b"first"
+    assert decrypt(path.read_text(), "secret") == b"first"
     params["content"] = "second"
     assert run_module(plugin, params)["changed"]
-    assert rclone.decrypt_config(path.read_text(), "secret") == b"second"
+    assert decrypt(path.read_text(), "secret") == b"second"
     assert not run_module(plugin, params)["changed"]
 
 
@@ -106,7 +113,7 @@ def test_missing_crypto(monkeypatch, tmp_path, run_module, check_mode):
     [
         ({"password": "secret"}, "configuration file does not exist"),
         ({"password": " ", "content": "config"}, "invalid password for configuration file"),
-        ({"password": " ", "state": "absent", "content": "config"}, "invalid password for configuration file"),
+        ({"password": "pw\ud800", "state": "absent", "content": "config"}, "invalid password for configuration file"),
     ],
 )
 @pytest.mark.parametrize("check_mode", [False, True])
@@ -128,13 +135,12 @@ UNASSIGNED = "\U0001ccf0"
 
 
 @pytest.mark.skipif(unicodedata.category(UNASSIGNED) != "Cn", reason="assigned in this Python's Unicode tables")
-@pytest.mark.parametrize("state", ["present", "absent"])
 @pytest.mark.parametrize("crypto", [True, False])
 @pytest.mark.parametrize("check_mode", [False, True])
-def test_unassigned_password_character_is_rejected(monkeypatch, tmp_path, run_module, state, crypto, check_mode):
+def test_unassigned_password_character_is_rejected(monkeypatch, tmp_path, run_module, crypto, check_mode):
     monkeypatch.setattr(plugin, "HAS_PYCRYPTODOME", crypto)
     path = tmp_path / "config"
-    params = {"path": str(path), "password": "pw" + UNASSIGNED, "state": state, "content": "config"}
+    params = {"path": str(path), "password": "pw" + UNASSIGNED, "content": "config"}
     result = run_module(plugin, params, check_mode)
     assert not path.exists()
     message = f"character U+1CCF0 is unassigned in this Python's Unicode {unicodedata.unidata_version}, so rclone may normalize it differently"
@@ -155,15 +161,12 @@ def test_unassigned_password_character_is_rejected(monkeypatch, tmp_path, run_mo
         "a" + "\u11a8" * 31,
     ],
 )
-@pytest.mark.parametrize("state", ["present", "absent"])
 @pytest.mark.parametrize("crypto", [True, False])
 @pytest.mark.parametrize("check_mode", [False, True])
-def test_long_combining_run_password_is_rejected(
-    monkeypatch, tmp_path, run_module, password, state, crypto, check_mode
-):
+def test_long_combining_run_password_is_rejected(monkeypatch, tmp_path, run_module, password, crypto, check_mode):
     monkeypatch.setattr(plugin, "HAS_PYCRYPTODOME", crypto)
     path = tmp_path / "config"
-    params = {"path": str(path), "password": password, "state": state, "content": "config"}
+    params = {"path": str(path), "password": password, "content": "config"}
     result = run_module(plugin, params, check_mode)
     assert not path.exists()
     message = "password has more than 30 consecutive combining characters, marks or Hangul jamo, which rclone normalizes differently"
@@ -236,7 +239,7 @@ def test_escaped_content_bytes_are_written(tmp_path, run_module, state):
     result = run_module(plugin, {"path": str(path), "password": "secret", "state": state, "content": "a\udcff\udc80"})
     assert result["changed"]
     written = path.read_bytes()
-    assert (rclone.decrypt_config(written, "secret") if state == "present" else written) == b"a\xff\x80"
+    assert (decrypt(written, "secret") if state == "present" else written) == b"a\xff\x80"
 
 
 def test_backward_combining_letter_is_a_non_starter():
@@ -264,7 +267,7 @@ def test_non_ascii_password_is_accepted(tmp_path, run_module, password):
     path = tmp_path / "rclone.conf"
     result = run_module(plugin, {"path": str(path), "password": password, "content": "config"})
     assert result["changed"] and not result.get("failed")
-    assert rclone.decrypt_config(path.read_text(), password) == b"config"
+    assert decrypt(path.read_text(), password) == b"config"
 
 
 def test_atomic_move_failure_removes_temporary_file(tmp_path, module_factory, invoke):
@@ -351,7 +354,7 @@ def test_damaged_payload_is_replaced_by_content(tmp_path, run_module, payload, s
     result = run_module(plugin, {"path": str(path), "password": "secret", "content": "new", "state": state})
     assert result["changed"] and not result.get("failed")
     if state == "present":
-        assert rclone.decrypt_config(path.read_text(), "secret") == b"new"
+        assert decrypt(path.read_text(), "secret") == b"new"
     else:
         assert path.read_text() == "new"
 
@@ -504,7 +507,7 @@ def test_valid_file_attributes_are_applied(tmp_path, run_module, params):
         result = run_module(plugin, {"path": str(path), "password": "secret", "content": "config", **values})
         assert not result.get("failed"), result
 
-    assert rclone.decrypt_config(path.read_text(), "secret") == b"config"
+    assert decrypt(path.read_text(), "secret") == b"config"
 
 
 @pytest.mark.parametrize("state", ["present", "absent"])
@@ -516,21 +519,106 @@ def test_wrong_password_message_names_path(tmp_path, run_module, state):
 
 
 @pytest.mark.parametrize("state", ["present", "absent"])
-@pytest.mark.parametrize("content", [None, "config"])
 @pytest.mark.parametrize("check_mode", [False, True])
 @pytest.mark.parametrize("header", ["RCLONE_ENCRYPT_V1:\nAAAA", "RCLONE_ENCRYPT_V0:AAAA\n"])
-def test_unsupported_encryption_message_names_path(tmp_path, run_module, state, content, check_mode, header):
+def test_unsupported_encryption_message_names_path(tmp_path, run_module, state, check_mode, header):
     path = tmp_path / "rclone.conf"
     path.write_text(header)
-    params = {"path": str(path), "password": "secret", "state": state}
-    if content is not None:
-        params["content"] = content
-
-    result = run_module(plugin, params, check_mode)
+    result = run_module(plugin, {"path": str(path), "password": "secret", "state": state}, check_mode)
     assert result["failed"] and result["msg"] == (
         f"unable to read configuration file {path}: unsupported or damaged configuration encryption header"
     )
     assert path.read_text() == header
+
+
+@pytest.mark.parametrize("state, password", [("present", "secret"), ("absent", "secret"), ("absent", None)])
+@pytest.mark.parametrize("check_mode", [False, True])
+@pytest.mark.parametrize("header", ["RCLONE_ENCRYPT_V1:\nAAAA", "RCLONE_ENCRYPT_V0:AAAA\n"])
+def test_unsupported_encryption_header_is_replaced_by_content(
+    tmp_path, run_module, state, password, check_mode, header
+):
+    # with content the file is read as encrypted and unreadable, as with another password, and replaced
+    path = tmp_path / "rclone.conf"
+    path.write_text(header)
+    params = {"path": str(path), "password": password, "state": state, "content": "config"}
+    result = run_module(plugin, params, check_mode)
+    assert result["changed"] and not result.get("failed")
+    if check_mode:
+        assert path.read_text() == header
+    elif state == "present":
+        assert decrypt(path.read_text(), password) == b"config"
+    else:
+        assert path.read_text() == "config"
+
+    if not check_mode:
+        assert not run_module(plugin, params)["changed"]
+
+
+@pytest.mark.parametrize(
+    "password",
+    [" ", "\u00a0\u3000", "pw" + UNASSIGNED, "a" + "\u0301" * 31],
+)
+@pytest.mark.parametrize("content", [None, "config"])
+def test_absent_decrypts_with_a_password_rclone_could_not_have_used(tmp_path, run_module, password, content):
+    # the rclone compatibility checks apply only when encrypting, so a file encrypted by an earlier release with
+    # such a password can still be decrypted
+    path = tmp_path / "rclone.conf"
+    path.write_text(rclone.encrypt_config(b"original", password))
+    params = {"path": str(path), "password": password, "state": "absent"}
+    if content is not None:
+        params["content"] = content
+
+    result = run_module(plugin, params)
+    assert result["changed"] and not result.get("failed")
+    assert path.read_text() == (content or "original")
+
+
+@pytest.mark.parametrize("mode", [2**31, "0" + oct(2**31)[2:], -(2**31) - 1])
+@pytest.mark.parametrize("state", ["present", "absent"])
+def test_mode_out_of_range_fails_before_writing(tmp_path, run_module, mode, state):
+    # os.chmod refuses a mode beyond a C int, which Ansible reports only after the file is written
+    path = tmp_path / "rclone.conf"
+    result = run_module(
+        plugin, {"path": str(path), "password": "secret", "state": state, "content": "new", "mode": mode}
+    )
+    assert result == {"failed": True, "msg": f"unable to manage configuration file {path}: mode {mode} is out of range"}
+    assert not path.exists()
+
+
+@pytest.mark.parametrize("kind", ["fifo", "device"])
+@pytest.mark.parametrize("state", ["present", "absent"])
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_path_that_is_not_a_regular_file_fails_before_reading(tmp_path, run_module, kind, state, check_mode):
+    # reading a FIFO would block and a device such as /dev/zero never end, and writing would replace the device;
+    # /dev/null stands for any device, as reading /dev/zero would not end
+    link = tmp_path / "rclone.conf"
+    if kind == "fifo":
+        target = tmp_path / "fifo"
+        os.mkfifo(target)
+    else:
+        target = Path("/dev/null")
+
+    link.symlink_to(target)
+
+    def expire(signum, frame):
+        raise AssertionError("the module blocked")
+
+    previous = signal.signal(signal.SIGALRM, expire)
+    signal.alarm(5)
+    try:
+        result = run_module(
+            plugin, {"path": str(link), "password": "secret", "state": state, "content": "new"}, check_mode
+        )
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, previous)
+
+    resolved = os.path.realpath(link)
+    assert result == {
+        "failed": True,
+        "msg": f"unable to manage configuration file {resolved}: it is not a regular file",
+    }
+    assert link.is_symlink() and os.path.realpath(link) == resolved
 
 
 @pytest.mark.parametrize("header", ["RCLONE_ENCRYPT_V0:", "RCLONE_ENCRYPT_V1:"])
@@ -576,7 +664,7 @@ def test_password_of_separator_characters_is_accepted(tmp_path, run_module, pass
     path = tmp_path / "rclone.conf"
     result = run_module(plugin, {"path": str(path), "password": password, "content": "config"})
     assert result["changed"] and not result.get("failed")
-    assert rclone.decrypt_config(path.read_text(), password) == b"config"
+    assert decrypt(path.read_text(), password) == b"config"
 
 
 @pytest.fixture
@@ -644,7 +732,7 @@ def test_symlink_target_is_written(tmp_path, run_module, state):
     assert result["changed"] and result["path"] == str(link)
     assert link.is_symlink()
     text = target.read_text()
-    assert (rclone.decrypt_config(text, "secret") if state == "present" else text.encode()) == b"new"
+    assert (decrypt(text, "secret") if state == "present" else text.encode()) == b"new"
 
 
 def test_content_is_kept_out_of_logs(monkeypatch, tmp_path, run_module):

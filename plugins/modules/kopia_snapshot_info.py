@@ -51,8 +51,9 @@ options:
         kopia waiting for the password on its standard input.
       - kopia reads an empty password as no password, so it reads the
         persisted one, as when the password is not given.
-      - kopia removes whitespace around the password, so a password of only
-        whitespace is an empty password.
+      - kopia removes whitespace around a given password, so a password of
+        only whitespace is used as an empty password, without falling back to
+        the persisted one.
     type: str
   path:
     description:

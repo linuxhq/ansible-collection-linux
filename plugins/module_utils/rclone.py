@@ -252,15 +252,21 @@ def is_non_starter(character):
     )
 
 
-def check_config_password(password):
-    if not password or not password.strip(GO_WHITESPACE):
-        raise ValueError("no characters in password")
-
+def check_password_utf8(password):
+    """Raise ValueError for a lone surrogate, which cannot be encoded as the UTF-8 the configuration key is made of."""
     for character in password:
-        # rclone refuses a password that is not valid UTF-8, and a lone surrogate cannot be encoded as UTF-8
         if unicodedata.category(character) == "Cs":
             raise ValueError(f"character U+{ord(character):04X} is a surrogate, which is not valid UTF-8")
 
+
+def check_config_password(password):
+    """Raise ValueError for a password rclone could not open a configuration encrypted with, as it reads it."""
+    check_password_utf8(password)
+
+    if not password.strip(GO_WHITESPACE):
+        raise ValueError("no characters in password")
+
+    for character in password:
         # NFKC of a code point unknown to this Python may differ from rclone's newer tables
         if unicodedata.category(character) == "Cn" and not is_noncharacter(character):
             raise ValueError(
@@ -281,8 +287,6 @@ def check_config_password(password):
             raise ValueError(
                 f"password has more than {MAX_NON_STARTERS} consecutive combining characters, marks or Hangul jamo, which rclone normalizes differently"
             )
-
-    return password
 
 
 def config_lines(data):
@@ -332,8 +336,6 @@ def is_encrypted(text):
 
 
 def encrypt_config(plaintext, password, nonce=None):
-    check_config_password(password)
-
     if nonce is None:
         nonce = os.urandom(CONFIG_NONCE_SIZE)
 
@@ -343,14 +345,8 @@ def encrypt_config(plaintext, password, nonce=None):
     return f"{CONFIG_HEADER}\n\n{CONFIG_MARKER}\n{payload}"
 
 
-def decrypt_config(text, password):
-    check_config_password(password)
-
-    body = config_body(text)
-
-    if body is None:
-        raise ValueError("configuration is not encrypted")
-
+def decrypt_config(body, password):
+    """Return the configuration sealed in body, the payload config_body() returns, or None for another password."""
     if not BASE64_STD.fullmatch(body):
         raise ValueError("configuration data is not valid base64")
 

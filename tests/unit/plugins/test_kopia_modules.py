@@ -139,8 +139,14 @@ def test_repository_info(monkeypatch, run_module, status, connected):
 
 @pytest.mark.parametrize("check_mode", [False, True])
 def test_maintenance_false_zero_and_unit_conversion(monkeypatch, run_module, check_mode):
-    initial = {"full": {"enabled": True, "interval": 100}, "logRetention": {"maxTotalSize": 99}}
-    updated = {"full": {"enabled": False, "interval": 2000000000}, "logRetention": {"maxTotalSize": 0}}
+    initial = {
+        "full": {"enabled": True, "interval": 100},
+        "logRetention": {"maxAge": 1, "maxCount": 1, "maxTotalSize": 99},
+    }
+    updated = {
+        "full": {"enabled": False, "interval": 2000000000},
+        "logRetention": {"maxAge": 1, "maxCount": 1, "maxTotalSize": 0},
+    }
     monkeypatch.setattr(kopia_maintenance, "kopia_available", lambda module: True)
     monkeypatch.setattr(kopia_maintenance, "maintenance_info", Mock(side_effect=[initial, updated]))
     command = Mock(return_value=(0, "", ""))
@@ -151,7 +157,7 @@ def test_maintenance_false_zero_and_unit_conversion(monkeypatch, run_module, che
     assert result["changed"]
     assert result["maintenance"] == {
         "full": {"enabled": False, "interval": 2000000000},
-        "log_retention": {"max_total_size": 0},
+        "log_retention": {"max_age": 1, "max_count": 1, "max_total_size": 0},
     }
     assert initial["full"]["enabled"] is True
     if check_mode:
@@ -310,14 +316,27 @@ def test_snapshot_rejects_tag_key_with_colon(monkeypatch, run_module, check_mode
 
 
 @pytest.mark.parametrize("check_mode", [False, True])
-@pytest.mark.parametrize("value", [None, True, False, 42, 1.5, ["a", "b"], {"a": "b"}])
-def test_snapshot_rejects_non_string_tag_values(monkeypatch, run_module, check_mode, value):
-    # str() would record them as Python text, such as "None", "True" or "1.1" for an unquoted 1.10
+@pytest.mark.parametrize(
+    "value,kind", [(None, "NoneType"), (True, "bool"), (False, "bool"), (["a", "b"], "list"), ({"a": "b"}, "dict")]
+)
+def test_snapshot_rejects_tag_values_recorded_as_python_text(monkeypatch, run_module, check_mode, value, kind):
+    # str() would record them as Python text, such as "None" or "True", rather than the value written
     monkeypatch.setattr(kopia_snapshot, "kopia_command", Mock(side_effect=AssertionError("must not run kopia")))
     monkeypatch.setattr(kopia_snapshot, "kopia_available", Mock(side_effect=AssertionError("must not look up kopia")))
     result = run_module(kopia_snapshot, {"path": "/data", "tags": {"env": value, "role": "db"}}, check_mode)
-    assert result["failed"] and "'env'" in result["msg"] and "not a string" in result["msg"]
-    assert "string filter" in result["msg"]
+    assert result["failed"] and result["msg"] == (
+        f"tag 'env' value must be a string or a number, as kopia would record the Python text of {kind}"
+    )
+    assert result["snapshot"] == {}
+
+
+def test_snapshot_records_number_tag_values_as_text(monkeypatch, run_module):
+    # kopia records the text of a number, as Python writes it
+    command = Mock(side_effect=[(0, '{"id":"new"}\n', ""), (0, '[{"id":"new"}]', "")])
+    monkeypatch.setattr(kopia_snapshot, "kopia_command", command)
+    result = run_module(kopia_snapshot, {"path": "/data", "tags": {"build": 42, "ratio": 1.5}})
+    assert result == {"changed": True, "snapshot": {"id": "new"}}
+    assert command.call_args_list[0].args[1][-2:] == ["--tags=build:42", "--tags=ratio:1.5"]
 
 
 def test_snapshot_records_quoted_tag_values_as_given(monkeypatch, run_module):
@@ -660,7 +679,9 @@ def test_maintenance_rejects_log_size_beyond_kopia_limit(monkeypatch, run_module
 @pytest.mark.parametrize("size", [8796093022207, -8796093022208])
 def test_maintenance_accepts_log_size_at_kopia_limit(monkeypatch, run_module, size):
     monkeypatch.setattr(kopia_maintenance, "kopia_available", lambda module: True)
-    monkeypatch.setattr(kopia_maintenance, "maintenance_info", lambda module, **kwargs: {"logRetention": {}})
+    monkeypatch.setattr(
+        kopia_maintenance, "maintenance_info", lambda module, **kwargs: {"logRetention": ZERO_RETENTION}
+    )
     result = run_module(kopia_maintenance, {"max_retained_log_size_mb": size}, True)
     assert result["changed"]
     assert result["maintenance"]["log_retention"]["max_total_size"] == size << 20
@@ -1793,7 +1814,7 @@ def assert_failed_keys(plugin, result, params=None):
         (kopia_policy_info, {"target": "/srv/\ud800"}),
         (kopia_snapshot, {"path": f"/srv/{SURROGATE}"}),
         (kopia_snapshot, {"path": "/srv", "tags": {"a:b": "c"}}),
-        (kopia_snapshot, {"path": "/srv", "tags": {"build": 42}}),
+        (kopia_snapshot, {"path": "/srv", "tags": {"build": True}}),
         (kopia_snapshot_info, {"path": "/srv/\ud800"}),
     ],
 )
@@ -1811,7 +1832,7 @@ def test_invalid_input_fails_with_empty_result_before_kopia_runs(monkeypatch, ru
         (kopia_policy_info, {}, []),
         # export, then show
         (kopia_policy_info, {"target": "/srv"}, []),
-        (kopia_policy_info, {"target": "/srv"}, [(0, "{}", "")]),
+        (kopia_policy_info, {"target": "/srv"}, [(0, '{"/srv": {}}', "")]),
         (kopia_snapshot_info, {}, []),
         (kopia_snapshot_info, {"path": "/srv"}, []),
     ],
@@ -1987,14 +2008,53 @@ def test_password_prompt_fails_instead_of_waiting(monkeypatch, run_module, tmp_p
 
 
 @pytest.mark.parametrize("check_mode", [False, True])
-def test_empty_password_is_rejected_for_repository(monkeypatch, run_module, check_mode):
-    # kopia repository create makes the storage directory before it fails to read a password, which it reads an
+@pytest.mark.parametrize(
+    "storage,options", [("filesystem", {"path": "missing"}), ("sftp", {"path": "/p", "host": "h"})]
+)
+def test_empty_password_is_rejected_where_kopia_makes_the_path(
+    monkeypatch, tmp_path, run_module, storage, options, check_mode
+):
+    # filesystem and sftp storage make a missing path before kopia fails to read a password, which it reads an
     # empty KOPIA_PASSWORD as not giving
-    must_not_run_kopia(monkeypatch, kopia_repository)
-    params = {"storage": "filesystem", "options": {"path": "/backup"}, "password": ""}
-    result = run_module(kopia_repository, params, check_mode)
-    msg = "invalid password: it must not be empty, as kopia reads an empty password as no password"
+    if storage == "filesystem":
+        options = {"path": str(tmp_path / "missing")}
+
+    status = Mock(return_value=None)
+    monkeypatch.setattr(kopia_repository, "repository_status", status)
+    monkeypatch.setattr(kopia_repository, "kopia_available", lambda module: True)
+    monkeypatch.setattr(kopia_repository, "kopia_command", Mock(side_effect=AssertionError("must not run kopia")))
+    result = run_module(kopia_repository, {"storage": storage, "options": options, "password": ""}, check_mode)
+    msg = (
+        f"invalid password: it must not be empty, as kopia reads it as no password after it creates the {storage} path"
+    )
     assert result == {"failed": True, "msg": msg, "repository": {}}
+    assert status.call_args.kwargs["password"] == ""
+
+
+@pytest.mark.parametrize(
+    "storage,options,status",
+    [
+        # nothing is created before kopia fails to read the password
+        ("filesystem", None, None),
+        ("webdav", {"url": "https://dav.example.com/kopia"}, None),
+        # a connected host is left as it is
+        ("sftp", {"path": "/p", "host": "h"}, {"storage": {"type": "sftp", "config": {"path": "/p", "host": "h"}}}),
+    ],
+)
+def test_empty_password_is_left_to_kopia_where_nothing_is_made(
+    monkeypatch, tmp_path, run_module, storage, options, status
+):
+    options = options or {"path": str(tmp_path)}
+    monkeypatch.setattr(kopia_repository, "repository_status", Mock(return_value=status))
+    command = Mock(return_value=(1, "", "password prompt error"))
+    monkeypatch.setattr(kopia_repository, "kopia_command", command)
+    result = run_module(kopia_repository, {"storage": storage, "options": options, "password": ""})
+    if status is None:
+        assert result["failed"] and "password prompt error" in result["msg"]
+        assert command.call_args.args[1][:2] == ["repository", "create"]
+    else:
+        assert result["changed"] is False
+        command.assert_not_called()
 
 
 @pytest.mark.parametrize("plugin,params", [(kopia_snapshot, {"path": "/data"}), (kopia_snapshot_info, {})])
@@ -2318,3 +2378,80 @@ def test_repository_create_failure_without_creating_directories_reports_no_chang
 )
 def test_mkdir_all_paths_cuts_parents_as_go_does(path, paths):
     assert kopia_repository.mkdir_all_paths(path) == paths
+
+
+@pytest.mark.parametrize(
+    "storage,config,options,mismatch",
+    [
+        # the sftp port and username identify the server account, and kopia stores the port as a number
+        ("sftp", {"path": "/p", "host": "h", "port": 22, "username": "u"}, {"port": 2222}, "port is 22, not 2222"),
+        ("sftp", {"path": "/p", "host": "h", "port": 22, "username": "u"}, {"username": "v"}, "username is u, not v"),
+        ("sftp", {"path": "/p", "host": "h", "port": 2222, "username": "u"}, {"port": 2222, "username": "u"}, None),
+        # kingpin reads an int flag as a float and truncates it
+        ("sftp", {"path": "/p", "host": "h", "port": 22, "username": "u"}, {"port": "+22"}, None),
+        ("sftp", {"path": "/p", "host": "h", "port": 22, "username": "u"}, {"port": "22.5"}, None),
+        ("sftp", {"path": "/p", "host": "h", "port": 22, "username": "u"}, {"port": "x"}, "port is 22, not x"),
+        ("azure", {"container": "c", "storageDomain": "blob.core.usgovcloudapi.net"}, {}, None),
+        (
+            "azure",
+            {"container": "c", "storageDomain": "blob.core.usgovcloudapi.net"},
+            {"storage_domain": "blob.core.chinacloudapi.cn"},
+            "storage_domain is blob.core.usgovcloudapi.net, not blob.core.chinacloudapi.cn",
+        ),
+        # kopia uses its default domain when none is stored
+        ("azure", {"container": "c"}, {"storage_domain": "blob.core.windows.net"}, None),
+        ("azure", {"container": "c"}, {"storage_domain": ""}, None),
+        # a webdav username only authenticates, so it does not identify the repository
+        ("webdav", {"url": "https://dav.example.com/kopia", "username": "u"}, {"username": "v"}, None),
+    ],
+)
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_repository_identifying_options_by_storage(
+    monkeypatch, run_module, storage, config, options, mismatch, check_mode
+):
+    base = {key: config[key] for key in ("path", "host", "container", "url") if key in config}
+    if storage == "sftp":
+        base["username"] = "u"
+
+    status = {"storage": {"type": kopia_repository.STORAGE_TYPES.get(storage, storage), "config": config}}
+    monkeypatch.setattr(kopia_repository, "kopia_available", lambda module: True)
+    monkeypatch.setattr(kopia_repository, "repository_status", lambda module, **kwargs: status)
+    monkeypatch.setattr(kopia_repository, "kopia_command", Mock(side_effect=AssertionError("must not reconnect")))
+    params = {"storage": storage, "password": "secret", "options": {**base, **options}}
+    result = run_module(kopia_repository, params, check_mode)
+    if mismatch:
+        assert result["failed"] and result["msg"].endswith(f": {mismatch}")
+    else:
+        assert result["changed"] is False and not result.get("failed")
+
+
+@pytest.mark.parametrize("check_mode", [False, True])
+@pytest.mark.parametrize("stored,changed", [("root@server", False), ("admin@other", True)])
+def test_maintenance_owner_me_is_the_client_user_and_host(monkeypatch, run_module, check_mode, stored, changed):
+    # kopia sets "me" as the client user and host of the connection, which a stored owner never equals literally
+    status = Mock(return_value={"clientOptions": {"username": "root", "hostname": "server"}})
+    monkeypatch.setattr(kopia_maintenance, "repository_status", status)
+    monkeypatch.setattr(kopia_maintenance, "kopia_available", lambda module: True)
+    current = {"owner": stored, "logRetention": ZERO_RETENTION}
+    info = Mock(side_effect=[current, {**current, "owner": "root@server"}])
+    monkeypatch.setattr(kopia_maintenance, "maintenance_info", info)
+    command = Mock(return_value=(0, "", ""))
+    monkeypatch.setattr(kopia_maintenance, "kopia_command", command)
+    result = run_module(kopia_maintenance, {"owner": "me"}, check_mode)
+    assert result["changed"] is changed and result["maintenance"]["owner"] == ("root@server" if changed else stored)
+    if changed and not check_mode:
+        assert command.call_args.args[1] == ["maintenance", "set", "--owner=root@server"]
+    else:
+        command.assert_not_called()
+
+
+def test_maintenance_owner_me_without_connection_fails(monkeypatch, run_module):
+    monkeypatch.setattr(kopia_maintenance, "repository_status", Mock(return_value=None))
+    monkeypatch.setattr(kopia_maintenance, "maintenance_info", Mock(return_value={"owner": "x@y"}))
+    monkeypatch.setattr(kopia_maintenance, "kopia_command", Mock(side_effect=AssertionError("must not run kopia")))
+    result = run_module(kopia_maintenance, {"owner": "me"})
+    assert result == {
+        "failed": True,
+        "msg": "unable to resolve the maintenance owner me: repository is not connected",
+        "maintenance": {},
+    }

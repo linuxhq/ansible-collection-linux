@@ -95,8 +95,9 @@ options:
         kopia waiting for the password on its standard input.
       - kopia reads an empty password as no password, so it reads the
         persisted one, as when the password is not given.
-      - kopia removes whitespace around the password, so a password of only
-        whitespace is an empty password.
+      - kopia removes whitespace around a given password, so a password of
+        only whitespace is used as an empty password, without falling back to
+        the persisted one.
     type: str
   path:
     description:
@@ -116,13 +117,14 @@ options:
         given.
       - kopia splits each flag at its first V(:), so a key containing V(:) is
         rejected before kopia runs. Values may contain V(:).
-      - Values must be strings. Any other value, such as a number, Boolean,
-        null, list or dictionary, is rejected before kopia runs. Quote literal
-        numbers, Booleans and values that YAML reads as numbers, such as
-        V("42"), V("true") or V("12:30"), to record them as text. A templated
-        value can still be a number, because Ansible keeps the type a template
-        renders, so convert it with C(| string), as in
-        V("{{ build_number | string }}").
+      - Values must be strings or numbers. A number is recorded as Python
+        writes it, such as C(42) or C(1.5), so quote a value that YAML reads as
+        a number whose text differs, such as V("1.10"), V("0755") or
+        V("12:30"), to record it as written.
+      - A null, Boolean, list or dictionary value is rejected before kopia
+        runs, because kopia would record its Python text, such as C(None) or
+        C(True), rather than the value written. Quote a Boolean, such as
+        V("true"), to record it as text.
       - A key or value with a lone surrogate code point from U+D800 to
         U+DC7F, which cannot be passed to kopia, is rejected before kopia runs,
         also in check mode. U+DC80 to U+DCFF, which Ansible uses for bytes that
@@ -222,7 +224,7 @@ def listed_source(manifest, source):
     # a source qualified as user@host:/path is listed as kopia recorded it when it printed one
     recorded = manifest.get("source")
 
-    if reads_as_user_host(source) and isinstance(recorded, dict):
+    if reads_as_user_host(source) and recorded:
         return "{userName}@{host}:{path}".format(**recorded)
 
     return source
@@ -260,8 +262,8 @@ def ensure_present(module):
     path = module.params["path"]
 
     check_connection(module, failed_result={"snapshot": {}})
-    # kopia records a path with U+FFFD in place of bytes that are not valid UTF-8, so it cannot list its snapshots by
-    # the path, and run_command cannot pass U+D800 to U+DC7F to kopia
+    # kopia would silently record another path, with U+FFFD in place of bytes that are not valid UTF-8, and then not
+    # list its snapshots by the path, and run_command cannot pass U+D800 to U+DC7F to kopia
     check_utf8(module, [("path", path)], failed_result={"snapshot": {}})
     check_utf8(
         module,
@@ -271,12 +273,14 @@ def ensure_present(module):
     )
 
     for key, value in (module.params["tags"] or {}).items():
+        # kopia would silently record another key and value, split at the first ':'
         if ":" in key:
             module.fail_json(msg=f"invalid tag key {key!r}: kopia splits tags at the first ':'", snapshot={})
 
-        if not isinstance(value, str):
+        # kopia would silently record the Python text of the value, such as None or True, not the value written
+        if value is None or isinstance(value, (bool, dict, list)):
             module.fail_json(
-                msg=f"tag {key!r} value is not a string; pass it as a string, for example quoted or with the string filter",
+                msg=f"tag {key!r} value must be a string or a number, as kopia would record the Python text of {type(value).__name__}",
                 snapshot={},
             )
 

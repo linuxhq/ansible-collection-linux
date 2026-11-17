@@ -20,12 +20,15 @@ description:
 notes:
   - Requires a running C(systemd-timedated) reachable on the system D-Bus, so the
     module does not work in a container or chroot without systemd.
-  - A O(time) or O(timezone) value that is not valid UTF-8, such as one with a
-    lone surrogate code point, or that contains a NUL character, is rejected
-    before any setting is written, also in check mode. A Unicode
-    noncharacter, such as U+FFFE, is refused by C(systemd-analyze) in O(time)
-    and by systemd's D-Bus library in O(timezone), which is sent first, so
-    either refusal leaves nothing written.
+  - A O(timezone) value that is not valid UTF-8, such as one with a lone
+    surrogate code point, or that contains a NUL character, is rejected
+    before any setting is written, also in check mode, and so is a O(time)
+    value with a lone surrogate code point in the range U+D800 to U+DC7F,
+    which cannot be passed to C(systemd-analyze). A Unicode noncharacter,
+    such as U+FFFE, is refused by C(systemd-analyze) in O(time), which runs
+    before any setting is written, and by systemd's D-Bus library in
+    O(timezone), which is sent first, so either refusal leaves nothing
+    written.
 options:
   adjust_system_clock:
     description:
@@ -68,22 +71,26 @@ options:
         C(unable to parse the time specification) before any setting is
         written.
       - V(now) and relative times are resolved right before the module sets
-        the clock, after the other settings in the same task are applied, as
-        C(timedatectl set-time now) does.
+        the clock, as C(timedatectl set-time now) does.
+      - The clock is set after O(timezone) is applied. It is also set after
+        O(local_rtc) and O(ntp) are applied when O(ntp) changes, or when
+        O(local_rtc) changes with O(adjust_system_clock=true), which would
+        otherwise reset the clock from the hardware clock, and before them
+        otherwise.
       - Timestamps without a zone are read in the time zone the host ends up
         with, so one set by O(timezone) in the same task applies to them.
       - Setting the clock can never be idempotent, so this always reports a
         change. Prefer O(ntp) for keeping the clock correct.
       - C(systemd-timedated) refuses it while network time synchronization is
-        enabled, so pair it with O(ntp=false) on a host that has it on. The
-        module fails before writing any setting when network time
-        synchronization would still be enabled.
+        enabled, so pair it with O(ntp=false) on a host that has it on. When
+        another setting is written before the clock, the module fails before
+        writing any setting when network time synchronization would still be
+        enabled.
       - A value C(systemd-analyze) cannot parse, or a time at or before the
-        epoch or beyond the range of a signed 64-bit count of microseconds, is
-        rejected before any setting is written.
+        epoch, is rejected before any setting is written.
       - systemd 258 and later also refuse a time before the date systemd was
         built. Only C(systemd-timedated) knows that date, so the refusal is
-        reported after the other settings in the same task are applied.
+        reported after the settings written before the clock are applied.
     type: str
   timezone:
     description:
@@ -154,8 +161,6 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.systemd import (
     systemd_proxy,
 )
 
-INT64_MAX = 2**63 - 1
-
 MICROSECONDS = 1000000
 
 NTP_TIMEOUT = 30
@@ -181,14 +186,10 @@ def parse_time(module, analyze, value, zone):
         module.fail_json(msg=f"unable to parse the time specification {value}: {stderr.strip()}")
 
     # the last match, as the original form echoed before it is caller input
-    matches = SECONDS.findall(stdout)
-    if not matches:
-        module.fail_json(msg=f"unable to parse the time specification {value}: unexpected output {stdout.strip()}")
-
-    seconds, fraction = matches[-1]
+    seconds, fraction = SECONDS.findall(stdout)[-1]
     usec = int(seconds) * MICROSECONDS + int(fraction or 0)
 
-    if not 0 < usec <= INT64_MAX:
+    if usec <= 0:
         module.fail_json(msg=f"unable to set time: invalid time {value}")
 
     return usec
@@ -208,10 +209,22 @@ def wait_for_ntp(module, proxy, ntp):
         sleep(0.5)
 
 
+def check_request(module, method, current, predicted):
+    """Fail when systemd-timedated would refuse the request, which matters only after an earlier request is applied."""
+    if method == "SetNTP" and predicted["ntp"] and not current["can_ntp"]:
+        module.fail_json(msg="unable to enable network time synchronization: no network time service is installed")
+
+    if method == "SetTime" and predicted["ntp"]:
+        module.fail_json(msg="unable to set time: network time synchronization is enabled, set ntp to false")
+
+
 def ensure_present(module):
-    # SetTimezone is sent first and systemd-analyze parses the time before any write, so a noncharacter, which sd-bus
-    # and systemd-analyze refuse, leaves nothing written
-    check_utf8(module, [(name, module.params[name]) for name in ("timezone", "time")], noncharacters=False)
+    # dasbus cannot send a surrogate and GLib cuts a string at a NUL, which would set another time zone, and
+    # run_command cannot pass a surrogate that does not stand for a byte to systemd-analyze
+    check_utf8(module, [("timezone", module.params["timezone"])], noncharacters=False)
+
+    if any(0xD800 <= ord(char) <= 0xDC7F for char in module.params["time"] or ""):
+        module.fail_json(msg="invalid time: it must be valid UTF-8")
 
     if module.check_mode and not HAS_DASBUS:
         module.exit_json(
@@ -231,31 +244,35 @@ def ensure_present(module):
         pending.append(("SetTimezone", (timezone, False)))
 
     local_rtc = module.params["local_rtc"]
+    adjust_system_clock = module.params["adjust_system_clock"]
     if local_rtc is not None and current["local_rtc"] != local_rtc:
         predicted["local_rtc"] = local_rtc
-        pending.append(
-            (
-                "SetLocalRTC",
-                (local_rtc, module.params["adjust_system_clock"], False),
-            )
-        )
+        pending.append(("SetLocalRTC", (local_rtc, adjust_system_clock, False)))
 
     ntp = module.params["ntp"]
     if ntp is not None and current["ntp"] != ntp:
-        if ntp and not current["can_ntp"]:
-            module.fail_json(msg="unable to enable network time synchronization: no network time service is installed")
-
         predicted["ntp"] = ntp
         pending.append(("SetNTP", (ntp, False)))
 
     value = module.params["time"]
     if value is not None:
-        if predicted["ntp"]:
-            module.fail_json(msg="unable to set time: network time synchronization is enabled, set ntp to false")
-
         analyze = module.get_bin_path("systemd-analyze", required=True)
         predicted["time_usec"] = parse_time(module, analyze, value, predicted["timezone"])
-        pending.append(("SetTime", ()))
+
+        # setting the clock before the hardware clock mode leaves that mode unwritten when systemd-timedated refuses
+        # the time, and gives the same result unless SetLocalRTC adjusts the system clock from the hardware clock,
+        # which would undo it; the time zone stays first, as only systemd-timedated can tell whether it is valid,
+        # and NTP has to be turned off before the clock is set
+        methods = [method for method, _args in pending]
+        if "SetNTP" in methods or ("SetLocalRTC" in methods and adjust_system_clock):
+            pending.append(("SetTime", ()))
+        else:
+            pending.insert(int("SetTimezone" in methods), ("SetTime", ()))
+
+    # systemd-timedated refuses the first request before anything is written, a later one only after the earlier
+    # requests are applied
+    for method, _args in pending[1:]:
+        check_request(module, method, current, predicted)
 
     if not pending:
         module.exit_json(changed=False, timedate=current)

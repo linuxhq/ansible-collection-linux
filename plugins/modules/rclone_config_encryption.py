@@ -24,9 +24,8 @@ description:
   - The module is idempotent. It compares the decrypted configuration against the
     desired one and rewrites nothing when they match, so the ciphertext does not
     churn on repeated runs.
-  - Neither the password nor the decrypted configuration is ever placed on a
-    command line, and the password is never returned. The decrypted
-    configuration is returned only in the diff, when diff mode is enabled.
+  - The password is never returned. The decrypted configuration is returned
+    only in the diff, when diff mode is enabled.
   - A symbolic link at O(path) is followed and its target is written, as rclone
     does.
   - A file the module creates is given mode C(0600), as rclone does, unless
@@ -34,20 +33,23 @@ description:
     other users, even before O(mode) is applied. An existing file keeps its
     mode.
   - An O(owner) or O(group) that cannot be looked up and an O(mode) that is
-    neither octal nor symbolic fail before anything is written. An SELinux
-    context or O(attributes) value the system refuses fails only after the
-    file is written.
+    neither octal nor symbolic, or is an octal number beyond the range of a
+    C int, fail before anything is written. An SELinux context or
+    O(attributes) value the system refuses, and an O(owner) or O(group) the
+    module may not set, such as another user's when it does not run as root,
+    fail only after the file is written.
+  - O(path) must resolve to a regular file or to nothing, so a FIFO or a
+    device, such as C(/dev/null), fails before anything is read or written.
 options:
   content:
     description:
       - Configuration body to write, most often rendered with the
         P(ansible.builtin.template#lookup) lookup.
       - When set, the file is created if it does not exist, and an existing file
-        that cannot be opened with O(password), because the password differs or
-        the encrypted payload is damaged, is replaced rather than failing, which
-        is what makes a password rotation a single run. A file with an
-        unsupported or damaged encryption header line fails instead, as
-        described below.
+        that cannot be opened with O(password), because the password differs,
+        the encrypted payload is damaged or the encryption header line is
+        unsupported or damaged, as described below, is replaced rather than
+        failing, which is what makes a password rotation a single run.
       - Treated as a secret and kept out of logs, like O(password).
       - Content containing a lone surrogate code point, such as U+D800, which a
         JSON value can carry, is rejected before anything is read or written
@@ -56,11 +58,12 @@ options:
       - When omitted, the file must already exist and only its encryption state
         is managed, and a file that cannot be opened with O(password) fails.
       - A file whose first line other than blank and comment lines, trimmed
-        of whitespace, starts with C(RCLONE_ENCRYPT_V) fails before anything is
-        written, even when O(content) is set, unless that line, trimmed of
-        whitespace, is exactly C(RCLONE_ENCRYPT_V0:). Whitespace here is the
-        set of Unicode space characters rclone trims, as for O(password). This
-        covers a version this module does not support, such as
+        of whitespace, starts with C(RCLONE_ENCRYPT_V) is read as encrypted
+        with an unsupported or damaged header, unless that line, trimmed of
+        whitespace, is exactly C(RCLONE_ENCRYPT_V0:). Without O(content) such
+        a file fails before anything is written. Whitespace here is the set of
+        Unicode space characters rclone trims, as for O(password). This covers
+        a version this module does not support, such as
         C(RCLONE_ENCRYPT_V1:), and a damaged C(RCLONE_ENCRYPT_V0:) line with
         the payload on it, which rclone refuses as well. Like rclone, the
         module reads lines in pieces of up to 4096 bytes, so a longer line
@@ -74,26 +77,28 @@ options:
         a file that is currently encrypted. With O(content), an encrypted file is
         replaced by O(content) even without it, and it is only used to read the
         current configuration for the comparison and the diff.
-      - Whitespace is significant and is not stripped, matching rclone. A password
-        that is empty or entirely whitespace is rejected, where whitespace is the
-        set of Unicode space characters rclone trims.
+      - Whitespace is significant and is not stripped, matching rclone. With
+        O(state=present), a password that is empty or entirely whitespace is
+        rejected, because rclone could not open the file, where whitespace is
+        the set of Unicode space characters rclone trims.
       - A password containing a lone surrogate code point, such as U+D800,
         which a JSON value can carry, is rejected because it is not valid UTF-8,
         as rclone requires.
       - The password is NFKC normalized with the Unicode tables of the Python
         on the managed node, which can be older than the ones rclone is built
-        with. A password containing a character that is unassigned in those
-        tables is rejected, because rclone may normalize it differently.
-        Unicode noncharacters, such as U+FFFF, are permanently unassigned and
-        are accepted. A character that this Python normalizes but an older
-        rclone build does not cannot be detected.
-      - A password whose compatibility decomposition has a run of more than 30
-        consecutive combining characters, marks or Hangul jamo is rejected,
-        because rclone inserts U+034F into such a run while normalizing and
-        this Python does not. Every mark, every Hangul jamo and every other
-        character that combines with the one before it, such as U+16D67, is
-        counted, including marks that rclone may not count, so some such
-        passwords that rclone could open are rejected as well.
+        with. With O(state=present), a password containing a character that is
+        unassigned in those tables is rejected, because rclone may normalize
+        it differently and then not open the file. Unicode noncharacters, such
+        as U+FFFF, are permanently unassigned and are accepted. A character
+        that this Python normalizes but an older rclone build does not cannot
+        be detected.
+      - With O(state=present), a password whose compatibility decomposition has
+        a run of more than 30 consecutive combining characters, marks or Hangul
+        jamo is rejected, because rclone inserts U+034F into such a run while
+        normalizing and this Python does not. Every mark, every Hangul jamo and
+        every other character that combines with the one before it, such as
+        U+16D67, is counted, including marks that rclone may not count, so some
+        such passwords that rclone could open are rejected as well.
     type: str
   path:
     description:
@@ -207,12 +212,17 @@ from ansible.module_utils.common.text.converters import to_bytes, to_native, to_
 from ansible_collections.linuxhq.linux.plugins.module_utils.rclone import (
     HAS_PYCRYPTODOME,
     check_config_password,
+    check_password_utf8,
+    config_body,
     decrypt_config,
     encrypt_config,
     is_encrypted,
 )
 
 CONFIG_UMASK = 0o077
+
+# os.chmod takes a mode as a C int and refuses a larger one only after the file is written
+INT_MAX = 2**31 - 1
 
 # a regular file of mode 0600, against which a symbolic mode is checked before the configuration file is written
 SAMPLE_STAT = os.stat_result((stat.S_IFREG | 0o600, 0, 0, 0, 0, 0, 0, 0, 0, 0))
@@ -228,6 +238,10 @@ def read_config(module, path):
         return None
 
     try:
+        # reading a FIFO would block and a device such as /dev/zero never end, and writing would replace the device
+        if not stat.S_ISREG(os.stat(path).st_mode):
+            module.fail_json(msg=f"unable to manage configuration file {label(path)}: it is not a regular file")
+
         with open(path, "rb") as handle:
             raw = handle.read()
     except OSError as error:
@@ -239,12 +253,6 @@ def read_config(module, path):
 def discard_file(path):
     if not os.path.exists(path):
         return
-
-    if hasattr(os, "chflags"):
-        try:
-            os.chflags(path, 0)
-        except OSError:
-            pass
 
     try:
         os.remove(path)
@@ -286,22 +294,27 @@ def write_config(module, path, content):
 
 
 def current_config(module, path, raw):
+    """Return whether the configuration is encrypted, and its plain text, or None when it cannot be read."""
     if raw is None:
         return False, None
 
     try:
-        encrypted = is_encrypted(raw)
+        body = config_body(raw)
     except ValueError as error:
+        # with content the file is replaced, as one encrypted with another password would be
+        if module.params["content"] is not None:
+            return True, None
+
         module.fail_json(msg=f"unable to read configuration file {label(path)}: {to_native(error)}")
 
-    if not encrypted:
+    if body is None:
         return False, raw
 
     if module.params["password"] is None:
         return True, None
 
     try:
-        return True, decrypt_config(raw, module.params["password"])
+        return True, decrypt_config(body, module.params["password"])
     except ValueError:
         return True, None
 
@@ -372,11 +385,11 @@ def check_file_attributes(module, path):
                     msg=f"unable to manage configuration file {label(path)}: failed to look up group {label(group)}"
                 )
 
-    if mode is None or isinstance(mode, int):
+    if mode is None:
         return
 
     try:
-        int(mode, 8)
+        value = mode if isinstance(mode, int) else int(mode, 8)
     except (TypeError, ValueError):
         try:
             module._symbolic_mode_to_octal(SAMPLE_STAT, mode)
@@ -384,6 +397,13 @@ def check_file_attributes(module, path):
             module.fail_json(
                 msg=f"unable to manage configuration file {label(path)}: mode {label(str(mode))} must be in octal or symbolic form"
             )
+
+        return
+
+    if not -INT_MAX - 1 <= value <= INT_MAX:
+        module.fail_json(
+            msg=f"unable to manage configuration file {label(path)}: mode {label(str(mode))} is out of range"
+        )
 
 
 def ensure_present(module, path):
@@ -468,7 +488,12 @@ def main():
 
     if password is not None:
         try:
-            check_config_password(password)
+            # rclone could not open a file encrypted with a password it reads differently, while a password that only
+            # decrypts needs to be UTF-8, as the key is made of it
+            if module.params["state"] == "present":
+                check_config_password(password)
+            else:
+                check_password_utf8(password)
         except ValueError as error:
             module.fail_json(msg=f"invalid password for configuration file {label(path)}: {to_native(error)}")
 

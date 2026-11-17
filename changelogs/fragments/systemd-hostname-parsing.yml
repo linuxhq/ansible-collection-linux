@@ -29,15 +29,20 @@ bugfixes:
   - systemd_hostname - reject an ``icon_name``, ``location`` or
     ``pretty_hostname`` containing a Unicode noncharacter, such as U+FDD0,
     which systemd's D-Bus library (sd-bus) refuses, before writing any
-    setting. The module wrote
+    setting when another setting is written before it. The module wrote
     ``static_hostname`` first, then failed with ``Bad message``.
   - systemd_hostname - reject an ``icon_name`` that the running systemd
-    refuses before writing any setting, which is ``.``, ``..`` or a name
-    containing ``/``, one longer than 255 bytes, or 4096 bytes before systemd
-    248, and on systemd 262 and later one containing a control character,
-    ``\``, a quote, ``*``, ``?`` or ``[``.
-  - systemd_hostname - document that ``?`` wildcards and ``$`` tokens in
-    ``transient_hostname`` are not accepted.
+    refuses before writing any setting when another setting is written before
+    it, which is ``.``, ``..`` or a name containing ``/``, one longer than 255
+    bytes, or 4096 bytes before systemd 248, and on systemd 262 and later one
+    containing a control character, ``\``, a quote, ``*``, ``?`` or ``[``.
+  - systemd_hostname - reject ``?`` wildcards and ``$`` tokens in
+    ``transient_hostname``, which ``systemd-hostnamed`` 258 and later replace,
+    so the reported hostname never matched and the task reported a change on
+    every run.
+  - systemd_hostname - check ``transient_hostname`` as the running systemd
+    does, so systemd 239 accepts ``_`` and a label starting or ending with
+    ``-``.
   - systemd_hostname_info, systemd_locale_info, systemd_timedate_info,
     systemd_hostname, systemd_locale, systemd_timedate - fail with a clear
     message instead of a GLib error when the system bus cannot be reached.

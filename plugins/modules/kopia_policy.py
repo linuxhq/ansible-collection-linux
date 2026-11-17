@@ -60,10 +60,11 @@ options:
         V(KEEP_LATEST), is rejected before kopia runs, also in check mode,
         naming the field.
       - Two keys that convert to the same key, such as V(keep_latest) and
-        V(keepLatest), are rejected before kopia runs, also in check mode.
+        V(keepLatest), are rejected before kopia runs, also in check mode, as
+        one of the values would be dropped without notice.
       - kopia rejects a key that matches none of its policy fields when it
         imports the policy, before it changes the policy. Check mode does not
-        know kopia's fields, so it cannot predict that failure.
+        predict that refusal.
       - A value that is not valid UTF-8, such as one with a lone surrogate code
         point, is rejected before kopia runs, also in check mode, because kopia
         records it with U+FFFD in its place.
@@ -264,7 +265,8 @@ def check_policy_keys(module, value, name, fields=None):
             child = f"{name}.{text_label(key)}"
             camel = camel_key(key)
 
-            # snake_dict_to_camel_dict keeps only the last of two keys that convert to the same key
+            # snake_dict_to_camel_dict keeps only the last of two keys that convert to the same key, so kopia would
+            # silently store one value without the other
             if camel in converted:
                 module.fail_json(
                     msg=f"invalid policy keys {converted[camel]} and {child}: both convert to {text_label(camel)}; give only one",

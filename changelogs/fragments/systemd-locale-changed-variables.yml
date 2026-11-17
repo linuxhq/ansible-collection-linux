@@ -38,4 +38,5 @@ bugfixes:
     document that the returned settings are empty, and ``timezones`` an empty
     list, when dasbus is unavailable in check mode.
   - systemd_hostname - document that ``transient_hostname`` cannot be combined
-    with changing ``static_hostname`` to a value containing the ``?`` wildcard.
+    with changing ``static_hostname`` to a value containing the ``?`` wildcard
+    or a ``$`` token.

@@ -13,7 +13,7 @@ bugfixes:
     ``keepLatest``. One of the values was dropped without notice.
   - kopia_policy - document that kopia refuses a ``policy`` key that matches
     none of its fields when it imports the policy, before it changes it, and
-    that check mode cannot predict that failure. In check mode, such a key
+    that check mode does not predict that refusal. In check mode, such a key
     that is not valid UTF-8 is returned escaped.
   - kopia_policy, kopia_maintenance, kopia_repository, kopia_snapshot - fail
     before running kopia, also in check mode, when a ``policy`` value, the

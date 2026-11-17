@@ -8,6 +8,11 @@ from ansible_collections.linuxhq.linux.plugins.filter import rclone_deobscure, r
 from ansible_collections.linuxhq.linux.plugins.module_utils import rclone
 
 
+def decrypt(text, password):
+    """Decrypt a configuration file's text as the module does, from the payload after its header."""
+    return rclone.decrypt_config(rclone.config_body(text), password)
+
+
 @pytest.mark.parametrize("plaintext", ["", "password", "pāss🔑", b"bytes", b""])
 def test_obscure_round_trip_and_determinism(plaintext):
     encoded = rclone.obscure(plaintext)
@@ -101,12 +106,12 @@ def test_base64_newlines_and_binary():
 @pytest.mark.parametrize("password", ["", " ", "\t\n", "\v\f\r", "\x85\u00a0", "\u1680\u2000\u200a\u202f\u205f\u3000"])
 def test_empty_config_password(password):
     with pytest.raises(ValueError, match="no characters"):
-        rclone.encrypt_config(b"config", password)
+        rclone.check_config_password(password)
 
 
 @pytest.mark.parametrize("password", ["\x1f", "\x1c\x1d\x1e", " \x1f ", "\u180e", "\u200b"])
 def test_config_password_trims_go_whitespace_only(password):
-    assert rclone.decrypt_config(rclone.encrypt_config(b"config", password), password) == b"config"
+    assert decrypt(rclone.encrypt_config(b"config", password), password) == b"config"
 
 
 def test_config_header_trims_go_whitespace_only():
@@ -123,12 +128,12 @@ def test_config_encryption_authenticates_password_and_ciphertext():
     content = b"[remote]\ntype = local\n"
     encrypted = rclone.encrypt_config(content, "secret", nonce=bytes(range(24)))
     assert rclone.is_encrypted(encrypted)
-    assert rclone.decrypt_config(encrypted, "secret") == content
-    assert rclone.decrypt_config(encrypted, "wrong") is None
+    assert decrypt(encrypted, "secret") == content
+    assert decrypt(encrypted, "wrong") is None
     raw = bytearray(base64.b64decode(rclone.config_body(encrypted)))
     raw[-1] ^= 1
     damaged = rclone.CONFIG_MARKER + "\n" + base64.b64encode(raw).decode()
-    assert rclone.decrypt_config(damaged, "secret") is None
+    assert decrypt(damaged, "secret") is None
 
 
 def test_encryption_uses_fresh_nonces():
@@ -138,8 +143,7 @@ def test_encryption_uses_fresh_nonces():
 @pytest.mark.parametrize("text", ["", "# comment\n; comment", "[remote]\ntype=local"])
 def test_plaintext_is_not_encrypted(text):
     assert not rclone.is_encrypted(text)
-    with pytest.raises(ValueError, match="not encrypted"):
-        rclone.decrypt_config(text, "secret")
+    assert rclone.config_body(text) is None
 
 
 def test_config_header_and_wrapped_payload():
@@ -152,7 +156,7 @@ def test_config_header_and_wrapped_payload():
         rclone.config_body("RCLONE_ENCRYPT_V0:AAAA\n")
 
     with pytest.raises(ValueError, match="too short"):
-        rclone.decrypt_config("RCLONE_ENCRYPT_V0:\nAAAA", "secret")
+        decrypt("RCLONE_ENCRYPT_V0:\nAAAA", "secret")
 
 
 RCLONE_OBSCURED = "rBC881X_mHbsCyx3DSUR8DhvJ6EaxsNN68rbOveoFA"
@@ -166,28 +170,28 @@ def test_rclone_obscure_vector():
 
 
 def test_rclone_config_vector():
-    assert rclone.decrypt_config(RCLONE_CONFIG, RCLONE_CONFIG_PASSWORD) == b"[vector]\ntype = local\n\n"
-    assert rclone.decrypt_config(RCLONE_CONFIG, "wrong") is None
+    assert decrypt(RCLONE_CONFIG, RCLONE_CONFIG_PASSWORD) == b"[vector]\ntype = local\n\n"
+    assert decrypt(RCLONE_CONFIG, "wrong") is None
 
 
 def test_config_payload_line_endings_match_rclone():
     header, payload = RCLONE_CONFIG.rsplit("\n", 1)
     wrapped = f"{header}\r\n{payload[:40]}\r\n{payload[40:]}\r\n"
-    assert rclone.decrypt_config(wrapped, RCLONE_CONFIG_PASSWORD) == b"[vector]\ntype = local\n\n"
+    assert decrypt(wrapped, RCLONE_CONFIG_PASSWORD) == b"[vector]\ntype = local\n\n"
 
 
 @pytest.mark.parametrize("separator", [" ", "\t", "\x0b"])
 def test_config_payload_rejects_other_whitespace(separator):
     header, payload = RCLONE_CONFIG.rsplit("\n", 1)
     with pytest.raises(ValueError):
-        rclone.decrypt_config(f"{header}\n{payload[:40]}{separator}{payload[40:]}", RCLONE_CONFIG_PASSWORD)
+        decrypt(f"{header}\n{payload[:40]}{separator}{payload[40:]}", RCLONE_CONFIG_PASSWORD)
 
 
 @pytest.mark.parametrize("suffix", ["=", "==", "=\n="])
 def test_config_payload_rejects_excess_padding(suffix):
     # Go's base64.StdEncoding refuses data after a complete quantum, which Python 3.11 and older accept
     with pytest.raises(ValueError, match="not valid base64"):
-        rclone.decrypt_config(RCLONE_CONFIG + suffix, RCLONE_CONFIG_PASSWORD)
+        decrypt(RCLONE_CONFIG + suffix, RCLONE_CONFIG_PASSWORD)
 
 
 @pytest.mark.parametrize("padding_end", [4096, 4092])
@@ -200,7 +204,7 @@ def test_config_payload_rejects_padding_before_its_end(padding_end):
     text = "#" + "x" * (padding_end - len(first) - len(marker) - 2) + "\n" + marker + first + rest
     assert first.endswith("==") and text.index(first) + len(first) == padding_end
     with pytest.raises(ValueError, match="not valid base64"):
-        rclone.decrypt_config(text, RCLONE_CONFIG_PASSWORD)
+        decrypt(text, RCLONE_CONFIG_PASSWORD)
 
 
 def test_config_payload_accepts_nonzero_trailing_bits():
@@ -211,7 +215,7 @@ def test_config_payload_accepts_nonzero_trailing_bits():
     last = encrypted[-2]
     alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
     changed = alphabet[alphabet.index(last) ^ 1]
-    assert rclone.decrypt_config(encrypted[:-2] + changed + "=", "secret") == content
+    assert decrypt(encrypted[:-2] + changed + "=", "secret") == content
 
 
 def test_config_lines_split_on_newline_only():
@@ -238,7 +242,7 @@ def test_config_header_lines_are_read_in_pieces(header, encrypted):
 def test_config_marker_line_rest_is_payload():
     payload = RCLONE_CONFIG.rsplit("\n", 1)[1]
     marker = "RCLONE_ENCRYPT_V0:" + " " * (4096 - len("RCLONE_ENCRYPT_V0:"))
-    assert rclone.decrypt_config(f"{marker}{payload}", RCLONE_CONFIG_PASSWORD) == b"[vector]\ntype = local\n\n"
+    assert decrypt(f"{marker}{payload}", RCLONE_CONFIG_PASSWORD) == b"[vector]\ntype = local\n\n"
 
 
 @pytest.mark.parametrize(
