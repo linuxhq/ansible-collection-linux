@@ -194,7 +194,9 @@ timedate:
 """
 
 import glob
+import os
 import re
+import stat
 from time import monotonic, sleep
 
 from ansible.module_utils.basic import AnsibleModule
@@ -263,27 +265,42 @@ def parse_time(module, analyze, value, zone):
     return usec
 
 
-def ntp_units(module):
+def ntp_units():
     """Return the network time services systemd-timedated starts and stops, named in its ntp-units.d/*.list files.
 
-    A file overrides any file of the same name in a later directory, and one linked to /dev/null names nothing.
-    Like systemd-timedated, it skips any line that is not a valid plain unit name, such as a comment.
+    A file overrides any file of the same name in a later directory, and an empty one or one linked to a character
+    device such as /dev/null names nothing. Like systemd-timedated, it skips a file it cannot stat, such as a dangling
+    symlink, which then overrides nothing, a file it cannot open or read, such as a directory, and any line that is
+    not a valid plain unit name, such as a comment.
     """
     files = {}
 
     for directory in NTP_UNIT_DIRS:
         for path in glob.glob(f"{directory}/*.list"):
-            files.setdefault(path.rsplit("/", 1)[1], path)
+            name = path.rsplit("/", 1)[1]
+            if name in files:
+                continue
+
+            try:
+                status = os.stat(path)
+            except OSError:
+                continue
+
+            masked = stat.S_ISCHR(status.st_mode) or (stat.S_ISREG(status.st_mode) and status.st_size == 0)
+            files[name] = None if masked else path
 
     units = set()
 
     for _name, path in sorted(files.items()):
+        if path is None:
+            continue
+
         try:
             # a line that is not valid UTF-8 is no valid unit name either
             with open(path, encoding="utf-8", errors="surrogateescape") as handle:
                 lines = handle.read().splitlines()
-        except OSError as error:
-            module.fail_json(msg=f"unable to read the network time services in {path}: {error}")
+        except OSError:
+            continue
 
         names = (line.strip() for line in lines)
         units.update(name for name in names if len(name) < UNIT_NAME_MAX and UNIT_NAME.fullmatch(name))
@@ -306,7 +323,7 @@ def wait_for_ntp(module, proxy, ntp):
     deadline = monotonic() + NTP_TIMEOUT
     manager = systemd_proxy(module, "systemd1")
     # systemd reports a job under the unit's own name, which LoadUnit resolves an alias to
-    units = {systemd_result(module, manager, "LoadUnit", name) for name in ntp_units(module)}
+    units = {systemd_result(module, manager, "LoadUnit", name) for name in ntp_units()}
 
     while True:
         if not ntp_jobs(module, manager, units) and systemd_properties(module, proxy, [("ntp", "NTP")])["ntp"] == ntp:

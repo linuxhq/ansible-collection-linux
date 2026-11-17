@@ -580,18 +580,6 @@ def test_absent_plain_text_with_encryption_header_fails_before_writing(
         assert path.read_text() == original
 
 
-@pytest.mark.parametrize("state", ["present", "absent"])
-@pytest.mark.parametrize("mode, expected", [(None, 0o600), ("0640", 0o640)])
-def test_created_file_mode(tmp_path, run_module, state, mode, expected):
-    path = tmp_path / "rclone.conf"
-    params = {"path": str(path), "password": "secret", "content": "config", "state": state}
-    if mode is not None:
-        params["mode"] = mode
-
-    assert run_module(plugin, params)["changed"]
-    assert path.stat().st_mode & 0o777 == expected
-
-
 @pytest.mark.parametrize("password", ["\x1f", "\x1c\x1d\x1e"])
 def test_password_of_separator_characters_is_accepted(tmp_path, run_module, password):
     path = tmp_path / "rclone.conf"

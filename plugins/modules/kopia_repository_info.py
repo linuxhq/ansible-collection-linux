@@ -144,7 +144,7 @@ repository:
         encryption:
           description:
             - Encryption algorithm.
-          returned: always
+          returned: unless the host reaches the repository through a kopia repository server
           type: str
         epoch_parameters:
           description:
@@ -155,7 +155,7 @@ repository:
         hash:
           description:
             - Hash algorithm.
-          returned: always
+          returned: unless the host reaches the repository through a kopia repository server
           type: str
         index_version:
           description:
@@ -170,7 +170,7 @@ repository:
         version:
           description:
             - Version of the repository format.
-          returned: always
+          returned: unless the host reaches the repository through a kopia repository server
           type: int
     object_format:
       description:
@@ -181,7 +181,7 @@ repository:
         splitter:
           description:
             - Splitter algorithm.
-          returned: always
+          returned: unless the host reaches the repository through a kopia repository server
           type: str
     storage:
       description:
@@ -193,16 +193,22 @@ repository:
           description:
             - Configuration of the storage, whose fields depend on its type and
               are passed through.
+            - V(null) when the host reaches the repository through a kopia
+              repository server.
           returned: always
           type: dict
         type:
           description:
             - Storage type, such as C(filesystem) or C(s3).
+            - Empty when the host reaches the repository through a kopia
+              repository server.
           returned: always
           type: str
     unique_id_hex:
       description:
         - Unique ID of the repository in hexadecimal.
+        - Empty when the host reaches the repository through a kopia
+          repository server.
       returned: always
       type: str
     volume:

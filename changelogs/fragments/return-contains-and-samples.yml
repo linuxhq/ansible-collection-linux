@@ -15,3 +15,10 @@ bugfixes:
     the return samples to match kopia's output, with 32-digit snapshot IDs,
     64-digit repository IDs, UTC timestamps with nanoseconds, the snapshot
     ``source`` and the maintenance ``schedule.runs``.
+  - kopia_repository_info - document that for a repository the host reaches
+    through a kopia repository server, kopia reports an empty
+    ``repository.storage.type`` and ``repository.unique_id_hex``, a null
+    ``repository.storage.config``, and no ``repository.content_format.hash``,
+    ``repository.content_format.encryption``,
+    ``repository.content_format.version`` or
+    ``repository.object_format.splitter``.

@@ -32,13 +32,14 @@ description:
     then. C(port) is compared as the number kopia reads from it, which it
     reads as a decimal or hexadecimal floating-point number, as Go's
     C(strconv.ParseFloat) does, and truncates, so V("+22") and V("0x16p0")
-    match a stored V(22), and V(" 22") does not. Another number in these options is compared as the text passed to
-    kopia, so V(20261115) matches a stored V("20261115"), and that text is the
-    number as Python formats it, as described in O(options). A leading V(~)
-    in the C(path) of V(filesystem) storage is resolved to the home directory
-    first, as kopia does, and that C(path) is compared as a normalized path,
-    so V(/srv/kopia/) and V(//srv/kopia) match V(/srv/kopia). Disconnect it
-    with C(kopia repository disconnect) first to switch repositories.
+    match a stored V(22), and V(" 22") does not. Another number in these
+    options is compared as the text passed to kopia, so V(20261115) matches a
+    stored V("20261115"), and that text is the number as Python formats it,
+    as described in O(options). A leading V(~) in the C(path) of
+    V(filesystem) storage is resolved to the home directory first, as kopia
+    does, and that C(path) is compared as a normalized path, so
+    V(/srv/kopia/) and V(//srv/kopia) match V(/srv/kopia). Disconnect it with
+    C(kopia repository disconnect) first to switch repositories.
   - With O(storage=from-config), the existing connection is not compared, so
     a host already connected to any repository is left untouched.
   - C(kopia repository create) can fail after it has initialized the
@@ -612,16 +613,21 @@ def storage_description(module):
     return " ".join([module.params["storage"]] + details)
 
 
+def expand_home(path):
+    """Return path with only a leading "~" resolved to HOME when it is set, as kopia resolves a filesystem path."""
+    home = os.environ.get("HOME", "")
+
+    if path.startswith("~") and home:
+        return home + path[1:]
+
+    return path
+
+
 def storage_value(storage, option, value):
     if storage != "filesystem" or option != "path":
         return value
 
-    home = os.environ.get("HOME", "")
-
-    if value.startswith("~") and home:
-        value = home + value[1:]
-
-    return clean_path(value)
+    return clean_path(expand_home(value))
 
 
 def storage_mismatch(module, status):
@@ -683,13 +689,7 @@ def filesystem_path(module):
     if module.params["storage"] != "filesystem" or path is None:
         return None
 
-    path = str(path)
-    home = os.environ.get("HOME", "")
-
-    if path.startswith("~") and home:
-        path = home + path[1:]
-
-    return path
+    return expand_home(str(path))
 
 
 def missing_directories(module):
