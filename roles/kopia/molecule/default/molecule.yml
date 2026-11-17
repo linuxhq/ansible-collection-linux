@@ -38,7 +38,13 @@ provisioner:
         kopia_maintenance:
           enable_full: true
           enable_quick: true
+          extend_object_locks: true
           full_interval: 86400
+          list_parallelism: 4
+          max_retained_log_age: 0
+          max_retained_log_count: 5
+          max_retained_log_size_mb: 0
+          owner: me
           quick_interval: 3600
 
         kopia_policies:

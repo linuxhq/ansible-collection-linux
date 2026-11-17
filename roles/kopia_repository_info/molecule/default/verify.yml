@@ -43,6 +43,8 @@
           check_mode: true
           environment:
             PATH: /nonexistent
+          tags:
+            - kopia_repository_info
 
     - name: Ensure kopia information in check mode without kopia is verified
       tags:

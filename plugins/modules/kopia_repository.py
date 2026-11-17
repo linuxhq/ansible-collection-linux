@@ -222,7 +222,7 @@ attributes:
   check_mode:
     description: Predicts changes without modifying the target.
     support: full
-    details: Reports a potential change without querying current state when Kopia is unavailable.
+    details: Reports a potential change without querying current state when kopia is unavailable.
   diff_mode:
     description: Diff mode is not supported.
     support: none

@@ -30,6 +30,7 @@
       tags:
         - kopia
       vars:
+        __kopia_client: "{{ __kopia_repository_query.repository.client_options }}"
         __kopia_maintenance: "{{ __kopia_maintenance_query.maintenance }}"
       ansible.builtin.assert:
         that:
@@ -39,6 +40,48 @@
             kopia_maintenance.full_interval * 1000000000
           - __kopia_maintenance.quick.interval ==
             kopia_maintenance.quick_interval * 1000000000
+          - __kopia_maintenance.extend_object_locks
+          - __kopia_maintenance.list_parallelism ==
+            kopia_maintenance.list_parallelism
+          - __kopia_maintenance.log_retention.max_age == 0
+          - __kopia_maintenance.log_retention.max_count ==
+            kopia_maintenance.max_retained_log_count
+          - __kopia_maintenance.log_retention.max_total_size == 0
+          - __kopia_maintenance.owner ==
+            __kopia_client.username ~ '@' ~ __kopia_client.hostname
+
+    - name: Ensure kopia maintenance log retention needing two commands is set
+      tags:
+        - kopia
+      become: true
+      linuxhq.linux.kopia_maintenance:
+        max_retained_log_age: 60
+        max_retained_log_count: 0
+      register: __kopia_maintenance_result
+
+    - name: Ensure kopia maintenance log retention needing two commands is set again
+      tags:
+        - kopia
+      become: true
+      linuxhq.linux.kopia_maintenance:
+        max_retained_log_age: 60
+        max_retained_log_count: 0
+      register: __kopia_maintenance_rerun_result
+
+    - name: Ensure kopia maintenance log retention needing two commands is verified
+      tags:
+        - kopia
+      vars:
+        __kopia_log_retention: "{{ __kopia_maintenance_rerun_result.maintenance.log_retention }}"
+      ansible.builtin.assert:
+        that:
+          - __kopia_maintenance_result.changed
+          - not __kopia_maintenance_rerun_result.changed
+          - __kopia_maintenance_result.maintenance.log_retention ==
+            __kopia_log_retention
+          - __kopia_log_retention.max_age == 60000000000
+          - __kopia_log_retention.max_count == 0
+          - __kopia_log_retention.max_total_size == 0
 
     - name: Ensure kopia policy information is gathered
       tags:

@@ -43,7 +43,7 @@ attributes:
   check_mode:
     description: This module only retrieves information and does not modify state.
     support: full
-    details: Returns empty result data when Kopia is unavailable.
+    details: Returns empty result data when kopia is unavailable.
   diff_mode:
     description: Diff mode is not supported.
     support: none
