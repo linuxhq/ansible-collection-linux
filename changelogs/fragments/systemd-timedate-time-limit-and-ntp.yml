@@ -8,9 +8,10 @@ bugfixes:
     such as ``chronyd``, fails to start, instead of reporting a change with
     ``ntp`` enabled and changing again on every run. ``systemd-timedated``
     reports network time synchronization enabled while the start job runs,
-    so the module now waits until the jobs queued while it changed ``ntp``
-    are gone before it takes the change as reported, and fails when they are
-    still queued after 30 seconds.
+    so the module now waits until systemd has no job left for the network
+    time services named in the ``ntp-units.d/*.list`` files of
+    ``systemd-timedated`` before it takes the change as reported, and fails
+    when one is still queued after 30 seconds.
   - systemd_timedate - document that ``time`` requires ``systemd-analyze``
     from systemd 243 or later in ``requirements``.
   - systemd_hostname - document that an empty ``transient_hostname`` requires

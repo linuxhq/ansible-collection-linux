@@ -80,9 +80,10 @@ def hostname_files(monkeypatch, tmp_path):
 
 
 @pytest.fixture(autouse=True)
-def no_queued_jobs(monkeypatch):
-    """Report no systemd job queued, so the NTP wait reads the NTP property at once unless a test sets the jobs."""
-    monkeypatch.setattr(systemd_timedate, "queued_jobs", Mock(return_value=set()))
+def no_ntp_jobs(monkeypatch):
+    """Report no network time service job queued, so the NTP wait reads NTP at once unless a test sets the jobs."""
+    monkeypatch.setattr(systemd_timedate, "ntp_units", Mock(return_value={"chronyd.service"}))
+    monkeypatch.setattr(systemd_timedate, "ntp_jobs", Mock(return_value=set()))
 
 
 @pytest.fixture(autouse=True)
@@ -1095,39 +1096,39 @@ def test_ntp_change_is_reported_before_time_is_set(monkeypatch, run_module, anal
     monkeypatch.setattr(systemd_timedate, "systemd_properties", calls.systemd_properties)
     monkeypatch.setattr(systemd_timedate, "systemd_call", calls.systemd_call)
     monkeypatch.setattr(systemd_timedate, "sleep", calls.sleep)
-    calls.queued_jobs.return_value = set()
-    monkeypatch.setattr(systemd_timedate, "queued_jobs", calls.queued_jobs)
+    calls.ntp_jobs.return_value = set()
+    monkeypatch.setattr(systemd_timedate, "ntp_jobs", calls.ntp_jobs)
     params = {"ntp": ntp} if ntp else {"ntp": False, "time": "@1784083200"}
     result = run_module(systemd_timedate, params)
     assert result["changed"] and result["timedate"]["ntp"] is ntp
     names = [entry[0] for entry in calls.mock_calls]
     assert names == [
         "systemd_properties",
-        "queued_jobs",
         "systemd_call",
-        "queued_jobs",
-        "queued_jobs",
+        "ntp_jobs",
         "systemd_properties",
         "sleep",
-        "queued_jobs",
+        "ntp_jobs",
         "systemd_properties",
         "sleep",
-        "queued_jobs",
+        "ntp_jobs",
         "systemd_properties",
     ] + (["systemd_call"] if not ntp else []) + ["systemd_properties"]
     if not ntp:
         assert calls.systemd_call.call_args.args[2:] == ("SetTime", 1784083200000000, False, False)
 
 
-def ntp_wait_module(monkeypatch, current, settled, done, other=()):
-    """Report current, then act as systemd-timedated and systemd do once SetNTP queues its job 2.
+def ntp_wait_module(monkeypatch, current, settled, done, queued_before=False):
+    """Report current, then act as systemd-timedated and systemd do once SetNTP is called.
 
-    Job 2 stays queued until the reading of the job IDs or NTP numbered done, and NTP is reported enabled while it is
-    queued, then as settled. The jobs in other stay queued throughout. The clock advances 10 seconds on each reading.
+    Job 2 of chronyd.service, queued by SetNTP or before it with queued_before, stays queued until the reading of the
+    jobs or NTP numbered done, and NTP is reported enabled while it is queued, then as settled. Job 1 of another
+    service, such as the one running ansible-pull, stays queued throughout. The clock advances 10 seconds on each
+    reading.
     """
     clock = iter(range(0, 1000, 10))
     readings = [0]
-    started = []
+    started = [True] if queued_before else []
 
     def job_queued():
         readings[0] += 1
@@ -1139,13 +1140,17 @@ def ntp_wait_module(monkeypatch, current, settled, done, other=()):
 
         return {"ntp": True if job_queued() else settled}
 
+    def list_jobs(module, manager, method):
+        assert method == "ListJobs"
+        jobs = [(1, "ansible-pull.service", "start", "running", "/job/1", "/unit/1")]
+        return jobs + ([(2, "chronyd.service", "start", "waiting", "/job/2", "/unit/2")] if job_queued() else [])
+
     monkeypatch.setattr(systemd_timedate, "monotonic", lambda: next(clock))
     monkeypatch.setattr(systemd_timedate, "sleep", Mock())
     monkeypatch.setattr(systemd_timedate, "systemd_proxy", Mock())
     monkeypatch.setattr(systemd_timedate, "systemd_properties", properties)
-    monkeypatch.setattr(
-        systemd_timedate, "queued_jobs", lambda module, manager: set(other) | ({2} if job_queued() else set())
-    )
+    monkeypatch.setattr(systemd_timedate, "systemd_result", list_jobs)
+    monkeypatch.setattr(systemd_timedate, "ntp_jobs", NTP_JOBS)
     mutate = Mock(side_effect=lambda *args: started.append(args[2]))
     monkeypatch.setattr(systemd_timedate, "systemd_call", mutate)
     return mutate
@@ -1160,7 +1165,7 @@ def test_ntp_change_wait_times_out(monkeypatch, run_module, analyze):
 
 def test_ntp_enabled_while_the_service_fails_to_start_fails(monkeypatch, run_module):
     # NTP is reported enabled while the start job runs, then disabled, as the service failed to start
-    mutate = ntp_wait_module(monkeypatch, False, False, 3, {1})
+    mutate = ntp_wait_module(monkeypatch, False, False, 3)
     result = run_module(systemd_timedate, {"ntp": True})
     assert result["failed"] and result["msg"] == (
         "unable to set ntp to True: network time synchronization did not change within 30 seconds"
@@ -1168,19 +1173,32 @@ def test_ntp_enabled_while_the_service_fails_to_start_fails(monkeypatch, run_mod
     assert [entry.args[2] for entry in mutate.call_args_list] == ["SetNTP"]
 
 
-def test_ntp_enabled_while_another_job_stays_queued(monkeypatch, run_module):
-    # job 1, such as the one running ansible-pull, stays queued throughout, while the start job completes
-    ntp_wait_module(monkeypatch, False, True, 3, {1})
+def test_ntp_enabled_while_another_service_job_stays_queued(monkeypatch, run_module):
+    # job 1 of another service stays queued throughout, while the start job of the time service completes
+    ntp_wait_module(monkeypatch, False, True, 3)
     result = run_module(systemd_timedate, {"ntp": True})
     assert result["changed"] and not result.get("failed")
 
 
-def test_ntp_enabled_while_its_job_stays_queued_fails(monkeypatch, run_module):
-    # the start job still runs at the deadline, so the NTP reported cannot be trusted
-    mutate = ntp_wait_module(monkeypatch, False, True, 1000)
+@pytest.mark.parametrize("queued_before", [False, True])
+def test_ntp_enabled_while_its_job_stays_queued_fails(monkeypatch, run_module, queued_before):
+    # the start job, queued by SetNTP or already queued, which SetNTP then joins, still runs at the deadline
+    mutate = ntp_wait_module(monkeypatch, False, True, 1000, queued_before)
     result = run_module(systemd_timedate, {"ntp": True})
     assert result["failed"] and "30 seconds" in result["msg"]
     assert [entry.args[2] for entry in mutate.call_args_list] == ["SetNTP"]
+
+
+def test_ntp_units_are_read_as_systemd_timedated_reads_them(monkeypatch, tmp_path, module_factory):
+    (tmp_path / "etc").mkdir()
+    (tmp_path / "usr").mkdir()
+    (tmp_path / "etc" / "50-chrony.list").write_text("# comment\n; comment\n\n  chronyd.service  \n")
+    (tmp_path / "usr" / "80-systemd-timesync.list").write_text("systemd-timesyncd.service\n")
+    (tmp_path / "usr" / "other.conf").write_text("ignored.service\n")
+    monkeypatch.setattr(
+        systemd_timedate, "NTP_UNIT_DIRS", (str(tmp_path / "etc"), str(tmp_path / "missing"), str(tmp_path / "usr"))
+    )
+    assert NTP_UNITS(module_factory()) == {"chronyd.service", "systemd-timesyncd.service"}
 
 
 def hostname_module(monkeypatch, tmp_path, current, machine_info=None, etc_hostname=None):
@@ -1914,6 +1932,10 @@ def test_time_requires_systemd_analyze_before_any_write(monkeypatch, run_module,
     assert result["failed"] and "systemd-analyze" in result["msg"]
     mutate.assert_not_called()
 
+
+# the helpers the autouse no_ntp_jobs fixture replaces
+NTP_JOBS = systemd_timedate.ntp_jobs
+NTP_UNITS = systemd_timedate.ntp_units
 
 # the kernel refuses to set the clock at or after TIME_SETTOD_SEC_MAX, KTIME_SEC_MAX less 30 years of uptime
 SETTOD_SEC_MAX = 9223372036 - 30 * 365 * 24 * 3600

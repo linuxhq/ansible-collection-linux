@@ -55,9 +55,10 @@ options:
         be reported before applying O(time), and fails when it is not.
       - C(systemd-timedated) reports network time synchronization enabled
         while it starts the service, even when the service then fails to
-        start, so the module waits until the jobs queued while it changed the
-        setting are gone before it takes the change as reported, and fails
-        when they are still queued after the 30 seconds.
+        start, so the module waits until systemd has no job left for the
+        network time services named in the C(ntp-units.d/*.list) files of
+        C(systemd-timedated) before it takes the change as reported, and fails
+        when one is still queued after the 30 seconds.
     type: bool
   time:
     description:
@@ -154,6 +155,7 @@ timedate:
     timezone: America/Los_Angeles
 """
 
+import glob
 import re
 from time import monotonic, sleep
 
@@ -175,6 +177,15 @@ MICROSECONDS = 1000000
 SETTOD_SEC_MAX = (2**63 - 1) // 1000000000 - 30 * 365 * 24 * 3600
 
 NTP_TIMEOUT = 30
+
+# systemd-timedated reads the network time services it starts and stops from *.list files in these directories
+NTP_UNIT_DIRS = (
+    "/etc/systemd/ntp-units.d",
+    "/run/systemd/ntp-units.d",
+    "/usr/local/lib/systemd/ntp-units.d",
+    "/usr/lib/systemd/ntp-units.d",
+    "/lib/systemd/ntp-units.d",
+)
 
 SECONDS = re.compile(r"^[ \t]*UNIX seconds: @([0-9]+)(?:\.([0-9]{6}))?[ \t]*$", re.MULTILINE)
 
@@ -206,23 +217,39 @@ def parse_time(module, analyze, value, zone):
     return usec
 
 
-def queued_jobs(module, manager):
-    """Return the IDs of the jobs systemd has queued, the first field of each job ListJobs reports."""
-    return {job[0] for job in systemd_result(module, manager, "ListJobs")}
+def ntp_units(module):
+    """Return the network time services systemd-timedated starts and stops, named in its ntp-units.d/*.list files."""
+    units = set()
+
+    for path in [path for directory in NTP_UNIT_DIRS for path in sorted(glob.glob(f"{directory}/*.list"))]:
+        try:
+            with open(path) as handle:
+                lines = handle.read().splitlines()
+        except (OSError, UnicodeDecodeError) as error:
+            module.fail_json(msg=f"unable to read the network time services in {path}: {error}")
+
+        units.update(line.strip() for line in lines if line.strip() and not line.strip().startswith(("#", ";")))
+
+    return units
 
 
-def wait_for_ntp(module, proxy, manager, ntp, jobs):
-    # SetNTP returns once the time service jobs, the ones queued during the call,
-    # are queued, and systemd-timedated refuses other requests until those jobs
-    # finish and NTP reports the change. While they run, it reports NTP enabled,
-    # whatever their result, so NTP is taken as reported only once they are gone.
+def ntp_jobs(module, manager, units):
+    """Return the IDs of the jobs systemd has queued for units, as ListJobs reports each job's ID and unit first."""
+    return {job[0] for job in systemd_result(module, manager, "ListJobs") if job[1] in units}
+
+
+def wait_for_ntp(module, proxy, ntp):
+    # SetNTP returns once the jobs starting or stopping the time services are
+    # queued, and systemd-timedated refuses other requests until they finish
+    # and NTP reports the change. While they run, it reports NTP enabled,
+    # whatever their result, so NTP is taken as reported only once no job of a
+    # time service is left, whether SetNTP queued it or joined an earlier one.
     deadline = monotonic() + NTP_TIMEOUT
+    manager = systemd_proxy(module, "systemd1")
+    units = ntp_units(module)
 
     while True:
-        if (
-            not jobs & queued_jobs(module, manager)
-            and systemd_properties(module, proxy, [("ntp", "NTP")])["ntp"] == ntp
-        ):
+        if not ntp_jobs(module, manager, units) and systemd_properties(module, proxy, [("ntp", "NTP")])["ntp"] == ntp:
             return
 
         if monotonic() >= deadline:
@@ -309,14 +336,10 @@ def ensure_present(module):
             # parse again so a time relative to now does not lag behind the earlier changes and the NTP wait
             args = (parse_time(module, analyze, value, predicted["timezone"]), False, False)
 
-        if method != "SetNTP":
-            systemd_call(module, proxy, method, *args)
-            continue
-
-        manager = systemd_proxy(module, "systemd1")
-        before = queued_jobs(module, manager)
         systemd_call(module, proxy, method, *args)
-        wait_for_ntp(module, proxy, manager, args[0], queued_jobs(module, manager) - before)
+
+        if method == "SetNTP":
+            wait_for_ntp(module, proxy, args[0])
 
     current = systemd_properties(module, proxy, TIMEDATE_PROPERTIES)
 
