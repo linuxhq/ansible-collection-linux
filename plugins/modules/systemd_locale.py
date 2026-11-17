@@ -38,14 +38,19 @@ notes:
     line feed, a carriage return or a NUL and cannot read a line of 1 MiB or
     more, while systemd 239 ends a line only at a line feed, reads a long
     line in pieces of up to 2047 bytes and ignores the rest of a piece after
-    a NUL. Bytes in the map that are not valid UTF-8 are predicted as
-    U+FFFD. A different map set by E(SYSTEMD_LANGUAGE_FALLBACK_MAP) in the
+    a NUL. A different map set by E(SYSTEMD_LANGUAGE_FALLBACK_MAP) in the
     environment of C(systemd-localed) is not read, so the C(language) field
     check mode reports can then differ from the one a real run produces.
   - C(systemd-localed) writes that fallback without the validation it applies
     to the requested values, so C(LANGUAGE) can become a list such as
     V(en_AU:en_GB), which O(locale.language) cannot set again where
     C(systemd-localed) refuses such a list, as described there.
+  - A fallback in that map that is not valid UTF-8 or contains a Unicode
+    noncharacter is written as well, after which C(systemd-localed) fails to
+    report the locale. So when O(locale.lang) changes without a set
+    O(locale.language) and the map lists such a fallback for it, the module
+    fails before any setting is written, also in check mode when dasbus is
+    available, and reads the map in a real run for that check too.
   - A set O(locale.language) is sent together with a changed O(locale.lang),
     so it is kept unless it equals the resulting C(LANG).
   - On EL, C(systemd-localed) rejects a locale that is not installed on the
@@ -310,6 +315,7 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.systemd import (
     systemd_call,
     systemd_proxy,
     systemd_version,
+    utf8_text,
 )
 
 # the first systemd-localed whose SetLocale keeps the variables a request leaves out
@@ -572,12 +578,16 @@ def ensure_present(module):
 
         # localed sets LANGUAGE from its fallback map when LANG is sent without LANGUAGE, before it merges the rest,
         # and keeps the configured one for an empty fallback; a real run reads the result back instead
-        if module.check_mode and "lang" in request and "language" not in request:
+        if "lang" in request and "language" not in request:
             language = language_fallback(module, request["lang"], version)
 
-            if language:
-                # the result must be valid UTF-8, so bytes the map holds that are not are predicted as U+FFFD
-                language = language.encode("utf-8", "surrogateescape").decode("utf-8", "replace")
+            # localed writes a fallback that is not valid UTF-8 or holds a noncharacter, then cannot report the locale
+            if language and utf8_text(language) != language:
+                module.fail_json(
+                    msg=f"unable to set locale.lang {request['lang']}: {LANGUAGE_FALLBACK_MAP} lists invalid UTF-8 or a noncharacter, set locale.language"
+                )
+
+            if module.check_mode and language:
                 locale = dict(locale, language=language)
 
         simplified = locale_simplify(locale)

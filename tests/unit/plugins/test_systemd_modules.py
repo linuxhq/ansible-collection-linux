@@ -446,16 +446,19 @@ def test_language_fallback_map_denied_access_fails(monkeypatch, module_factory, 
     assert result["failed"] and result["msg"].startswith(f"unable to read {keyboard_files['language_fallback_map']}:")
 
 
+@pytest.mark.parametrize("check_mode", [False, True])
 @pytest.mark.parametrize(
-    "content,language",
+    "content,lang",
     [
-        (b"en_AU caf\xe9\n", "caf\ufffd"),
-        (b"en_AU \xed\xa0\x80\n", "\ufffd\ufffd\ufffd"),
-        (b"en_AU en_AU:\xef\xb7\x90\n", "en_AU:\ufdd0"),
+        # systemd-localed writes such a fallback, then fails to read the locale back
+        (b"en_AU caf\xe9\n", "en_AU"),
+        (b"en_AU \xed\xa0\x80\n", "en_AU"),
+        (b"fr_CA fr_CA:fr_FR\nen_AU 'en_AU:\xef\xbf\xbe'\n", "en_AU"),
+        (b"en_AU en_AU:\xef\xb7\x90\n", "en_AU"),
     ],
 )
-def test_locale_check_mode_predicts_fallback_not_valid_utf8_as_replacement(
-    monkeypatch, run_module, keyboard_files, content, language
+def test_locale_fallback_not_valid_utf8_fails_before_any_call(
+    monkeypatch, run_module, keyboard_files, content, lang, check_mode
 ):
     keyboard_files["language_fallback_map"].write_bytes(content)
     monkeypatch.setattr(systemd_locale, "HAS_DASBUS", True)
@@ -464,24 +467,12 @@ def test_locale_check_mode_predicts_fallback_not_valid_utf8_as_replacement(
     monkeypatch.setattr(systemd_locale, "locale_status", Mock(return_value=configured))
     mutate = Mock()
     monkeypatch.setattr(systemd_locale, "systemd_call", mutate)
-    result = run_module(systemd_locale, {"locale": {"lang": "en_AU"}}, True)
-    assert result["changed"] and result["locale"]["locale"]["language"] == language
+    result = run_module(systemd_locale, {"locale": {"lang": lang, "lc_time": "C.UTF-8"}}, check_mode)
+    path = keyboard_files["language_fallback_map"]
+    assert result["failed"] and result["msg"] == (
+        f"unable to set locale.lang {lang}: {path} lists invalid UTF-8 or a noncharacter, set locale.language"
+    )
     mutate.assert_not_called()
-
-
-def test_locale_real_run_does_not_read_fallback_map(monkeypatch, run_module, keyboard_files):
-    # the map only serves the check mode prediction, as a real run reads the result back
-    monkeypatch.setattr(systemd_locale, "HAS_DASBUS", True)
-    monkeypatch.setattr(systemd_locale, "systemd_proxy", Mock())
-    configured = {**LOCALE, "locale": {"lang": "en_US.UTF-8", "language": "en_US"}}
-    updated = {**LOCALE, "locale": {"lang": "en_AU", "language": "en_AU:en_GB"}}
-    monkeypatch.setattr(systemd_locale, "locale_status", Mock(side_effect=[configured, updated]))
-    monkeypatch.setattr(systemd_locale, "language_fallback", Mock(side_effect=AssertionError("must not read the map")))
-    mutate = Mock()
-    monkeypatch.setattr(systemd_locale, "systemd_call", mutate)
-    result = run_module(systemd_locale, {"locale": {"lang": "en_AU"}})
-    assert result == {"changed": True, "locale": updated}
-    assert mutate.call_args.args[2:] == ("SetLocale", ["LANG=en_AU"], False)
 
 
 @pytest.mark.parametrize(
