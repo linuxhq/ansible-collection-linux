@@ -465,9 +465,11 @@ INT_OPTIONS = ("port",)
 
 # the decimal and hexadecimal numbers Go's strconv.ParseFloat reads, a hexadecimal one only with a p exponent; it
 # also reads "inf" and "nan", which are no port
-GO_FLOAT = re.compile(
-    r"[+-]?(?:(?P<decimal>(?:[0-9_]+\.?[0-9_]*|\.[0-9_]+)(?:[eE][+-]?[0-9_]+)?)"
-    r"|(?P<hex>0[xX](?:[0-9a-fA-F_]+\.?[0-9a-fA-F_]*|\.[0-9a-fA-F_]+)[pP][+-]?[0-9_]+))"
+GO_DECIMAL_FLOAT = re.compile(
+    r"(?P<mantissa>[+-]?(?:[0-9_]+\.?[0-9_]*|\.[0-9_]+))(?:[eE](?P<sign>[+-]?)(?P<exponent>[0-9_]+))?"
+)
+GO_HEX_FLOAT = re.compile(
+    r"(?P<mantissa>[+-]?0[xX](?:[0-9a-fA-F_]+\.?[0-9a-fA-F_]*|\.[0-9a-fA-F_]+))[pP](?P<sign>[+-]?)(?P<exponent>[0-9_]+)"
 )
 
 # Go allows an underscore only after a digit or the 0x prefix and before a digit
@@ -535,17 +537,24 @@ def unsaved_options(module):
 def kingpin_int(value):
     """Return value as text of the number kopia's flag parser reads from it, a float truncated, or as given."""
     text = str(value)
-    match = GO_FLOAT.fullmatch(text)
+    hexadecimal = GO_HEX_FLOAT.fullmatch(text)
+    match = hexadecimal or GO_DECIMAL_FLOAT.fullmatch(text)
     if match is None:
         return text
 
-    underscores = GO_HEX_UNDERSCORE if match["hex"] else GO_DECIMAL_UNDERSCORE
+    underscores = GO_HEX_UNDERSCORE if hexadecimal else GO_DECIMAL_UNDERSCORE
     if underscores.search(text):
         return text
 
-    number = text.replace("_", "")
+    # Go stops adding exponent digits once the exponent reaches 10000
+    exponent = 0
+    for digit in (match["exponent"] or "").replace("_", ""):
+        if exponent < 10000:
+            exponent = exponent * 10 + int(digit)
+
+    number = f"{match['mantissa'].replace('_', '')}{'p' if hexadecimal else 'e'}{match['sign'] or ''}{exponent}"
     try:
-        return str(int(float.fromhex(number) if match["hex"] else float(number)))
+        return str(int(float.fromhex(number) if hexadecimal else float(number)))
     except OverflowError:
         # strconv.ParseFloat refuses a number out of the float64 range
         return text

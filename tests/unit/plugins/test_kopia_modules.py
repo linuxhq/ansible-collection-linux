@@ -2711,6 +2711,11 @@ def test_repository_identifying_options_by_storage(
         ("0X1.6P4", "22"),
         ("0x_16p0", "22"),
         ("0x.8p1", "1"),
+        # Go stops adding exponent digits once the exponent reaches 10000
+        ("0." + "0" * 9998 + "22e100000", "22"),
+        ("0x0." + "0" * 2498 + "16p100000", "22"),
+        ("0x0." + "0" * 2498 + "16p1000_00", "22"),
+        ("0." + "0" * 9998 + "22e+100000", "22"),
         # strconv.ParseFloat refuses these, so kopia never reads a number from them
         (" 22", " 22"),
         ("22 ", "22 "),
@@ -2723,6 +2728,7 @@ def test_repository_identifying_options_by_storage(
         ("1e_1", "1e_1"),
         ("0x1_p0", "0x1_p0"),
         ("1e400", "1e400"),
+        ("22e99999", "22e99999"),
         ("0x1p2000", "0x1p2000"),
         ("inf", "inf"),
         ("nan", "nan"),
