@@ -55,6 +55,7 @@
     validate_provider: "{{ kopia_repository.validate_provider | d(omit) }}"
   when:
     - kopia_repository | length > 0
+    - kopia_repository.storage is defined
 
 - name: Ensure kopia maintenance settings are managed
   tags:
