@@ -45,16 +45,6 @@ CONFIG_TAG_SIZE = 16
 # rclone reads the configuration header with bufio.Reader.ReadLine, which returns a longer line in pieces.
 CONFIG_READ_SIZE = 4096
 
-# Go's norm package inserts U+034F after this many consecutive non-starters (UAX #15 Stream-Safe Text Format).
-MAX_NON_STARTERS = 30
-
-# Hangul Jamo, whose medial vowels and final consonants Go counts as non-starters although their class is 0.
-HANGUL_JAMO = range(0x1100, 0x1200)
-
-# Other letters of class 0 that are the second element of a canonical composition, which Go also counts as
-# non-starters: U+16D67 KIRAT RAI VOWEL SIGN E (Unicode 16).
-BACKWARD_COMBINING = frozenset({0x16D67})
-
 # Unicode White_Space, which Go's strings.TrimSpace removes. str.strip() also removes U+001C to U+001F.
 GO_WHITESPACE = "".join(
     chr(code)
@@ -237,56 +227,11 @@ def config_key(password):
     return hashlib.sha256(seed.encode("utf-8")).digest()
 
 
-def is_noncharacter(character):
-    codepoint = ord(character)
-
-    return 0xFDD0 <= codepoint <= 0xFDEF or codepoint & 0xFFFE == 0xFFFE
-
-
-def is_non_starter(character):
-    return (
-        unicodedata.combining(character) != 0
-        or unicodedata.category(character).startswith("M")
-        or ord(character) in HANGUL_JAMO
-        or ord(character) in BACKWARD_COMBINING
-    )
-
-
 def check_password_utf8(password):
     """Raise ValueError for a lone surrogate, which cannot be encoded as the UTF-8 the configuration key is made of."""
     for character in password:
         if unicodedata.category(character) == "Cs":
             raise ValueError(f"character U+{ord(character):04X} is a surrogate, which is not valid UTF-8")
-
-
-def check_config_password(password):
-    """Raise ValueError for a password rclone could not open a configuration encrypted with, as it reads it."""
-    check_password_utf8(password)
-
-    if not password.strip(GO_WHITESPACE):
-        raise ValueError("no characters in password")
-
-    for character in password:
-        # NFKC of a code point unknown to this Python may differ from rclone's newer tables
-        if unicodedata.category(character) == "Cn" and not is_noncharacter(character):
-            raise ValueError(
-                f"character U+{ord(character):04X} is unassigned in this Python's Unicode {unicodedata.unidata_version}, so rclone may normalize it differently"
-            )
-
-    # Python does not insert U+034F into a long run of non-starters, as rclone does. Go also counts characters
-    # of class 0 that combine with the one before as non-starters, so every mark, Hangul jamo and other such
-    # character is counted.
-    run = 0
-    for character in unicodedata.normalize("NFKD", password):
-        if is_non_starter(character):
-            run += 1
-        else:
-            run = 0
-
-        if run > MAX_NON_STARTERS:
-            raise ValueError(
-                f"password has more than {MAX_NON_STARTERS} consecutive combining characters, marks or Hangul jamo, which rclone normalizes differently"
-            )
 
 
 def config_lines(data):

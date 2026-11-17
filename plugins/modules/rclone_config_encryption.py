@@ -62,7 +62,7 @@ options:
         with an unsupported or damaged header, unless that line, trimmed of
         whitespace, is exactly C(RCLONE_ENCRYPT_V0:). Without O(content) such
         a file fails before anything is written. Whitespace here is the set of
-        Unicode space characters rclone trims, as for O(password). This covers
+        Unicode space characters rclone trims. This covers
         a version this module does not support, such as
         C(RCLONE_ENCRYPT_V1:), and a damaged C(RCLONE_ENCRYPT_V0:) line with
         the payload on it, which rclone refuses as well. Like rclone, the
@@ -77,28 +77,16 @@ options:
         a file that is currently encrypted. With O(content), an encrypted file is
         replaced by O(content) even without it, and it is only used to read the
         current configuration for the comparison and the diff.
-      - Whitespace is significant and is not stripped, matching rclone. With
-        O(state=present), a password that is empty or entirely whitespace is
-        rejected, because rclone could not open the file, where whitespace is
-        the set of Unicode space characters rclone trims.
+      - Whitespace is significant and is not stripped, matching rclone.
+        rclone refuses an empty or whitespace-only password, so it cannot
+        open a file encrypted with one.
       - A password containing a lone surrogate code point, such as U+D800,
         which a JSON value can carry, is rejected because it is not valid UTF-8,
         as rclone requires.
       - The password is NFKC normalized with the Unicode tables of the Python
         on the managed node, which can be older than the ones rclone is built
-        with. With O(state=present), a password containing a character that is
-        unassigned in those tables is rejected, because rclone may normalize
-        it differently and then not open the file. Unicode noncharacters, such
-        as U+FFFF, are permanently unassigned and are accepted. A character
-        that this Python normalizes but an older rclone build does not cannot
-        be detected.
-      - With O(state=present), a password whose compatibility decomposition has
-        a run of more than 30 consecutive combining characters, marks or Hangul
-        jamo is rejected, because rclone inserts U+034F into such a run while
-        normalizing and this Python does not. Every mark, every Hangul jamo and
-        every other character that combines with the one before it, such as
-        U+16D67, is counted, including marks that rclone may not count, so some
-        such passwords that rclone could open are rejected as well.
+        with, so rclone may normalize a character unassigned in those tables
+        differently and then not open the file.
     type: str
   path:
     description:
@@ -211,7 +199,6 @@ from ansible.module_utils.common.text.converters import to_bytes, to_native, to_
 
 from ansible_collections.linuxhq.linux.plugins.module_utils.rclone import (
     HAS_PYCRYPTODOME,
-    check_config_password,
     check_password_utf8,
     config_body,
     decrypt_config,
@@ -488,12 +475,8 @@ def main():
 
     if password is not None:
         try:
-            # rclone could not open a file encrypted with a password it reads differently, while a password that only
-            # decrypts needs to be UTF-8, as the key is made of it
-            if module.params["state"] == "present":
-                check_config_password(password)
-            else:
-                check_password_utf8(password)
+            # the configuration key is made of the password encoded as UTF-8
+            check_password_utf8(password)
         except ValueError as error:
             module.fail_json(msg=f"invalid password for configuration file {label(path)}: {to_native(error)}")
 
