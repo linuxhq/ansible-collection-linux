@@ -95,9 +95,16 @@ notes:
     D-Bus library refuses, when another request is sent before its own. The
     locale is sent first, and a value with a Unicode noncharacter in the first
     request is left to that refusal, which leaves nothing written.
-  - Only C(systemd-localed) can tell whether a console keymap or an X11 layout
-    exists, so one it refuses is reported after the earlier settings in the
-    same task, such as O(locale), are applied.
+  - C(systemd-localed) refuses a keyboard value with a control character,
+    V("), V(') or V(\\), and on systemd 261 and later also V(*), V(?) or
+    V([), and a console keymap that is not a valid file name, or on systemd
+    248 and later one of 128 bytes or more. Such a value is rejected before
+    any setting is written, also in check mode, when another request is sent
+    before its own, and is otherwise left to that refusal, which leaves
+    nothing written.
+  - Only C(systemd-localed) can tell whether a console keymap is installed or
+    an X11 keyboard layout compiles, so one it refuses is reported after the
+    earlier settings in the same task, such as O(locale), are applied.
   - C(systemd-localed) refuses to rewrite C(/etc/vconsole.conf) when it
     contains a NUL byte or a setting that is not valid UTF-8, and on Debian 12
     likewise C(/etc/default/keyboard), where it keeps the X11 keyboard
@@ -412,6 +419,8 @@ locale:
     x11_variant: ''
 """
 
+import re
+
 from ansible.module_utils import distro
 from ansible.module_utils.basic import AnsibleModule
 
@@ -449,6 +458,18 @@ LANGUAGE_FALLBACK_MAP = "/usr/share/systemd/language-fallback-map"
 
 # Debian's systemd-localed before 253 keeps the X11 settings in this file instead of the X11 configuration
 DEBIAN_KEYBOARD = "/etc/default/keyboard"
+
+# string_is_safe() refuses control characters, quotes and backslashes in keyboard values, and from systemd 261 also
+# glob characters
+KEYBOARD_UNSAFE = re.compile(r"[\x01-\x1f\x7f\"'\\]")
+KEYBOARD_UNSAFE_GLOB = re.compile(r"[\x01-\x1f\x7f\"'\\*?\[]")
+KEYBOARD_GLOB_VERSION = 261
+
+# keymap_is_valid() from systemd 248 refuses a console keymap of 128 bytes or more, and filename_is_valid() before it
+# one longer than FILENAME_MAX
+FILENAME_MAX = 4096
+KEYMAP_MAX = 127
+KEYMAP_MAX_VERSION = 248
 
 VCONSOLE_SETTINGS = ["vconsole_keymap", "vconsole_keymap_toggle"]
 X11_SETTINGS = ["x11_layout", "x11_model", "x11_variant", "x11_options"]
@@ -586,6 +607,31 @@ def keyboard_change(module, current, names):
     return desired
 
 
+def check_keyboard(module, settings, version):
+    """Fail when systemd-localed of the given version refuses the syntax of a keyboard value it is sent.
+
+    Whether a console keymap is installed or an X11 keyboard layout compiles is left to systemd-localed.
+    """
+    if version >= KEYBOARD_GLOB_VERSION:
+        unsafe, rule = KEYBOARD_UNSAFE_GLOB, "control characters, quotes, backslashes or glob characters"
+    else:
+        unsafe, rule = KEYBOARD_UNSAFE, "control characters, quotes or backslashes"
+
+    for name, value in settings:
+        if not value:
+            continue
+
+        if name in VCONSOLE_SETTINGS:
+            if value in (".", "..") or "/" in value:
+                module.fail_json(msg=f"invalid {name} {value!r}: it must be a valid file name")
+
+            if len(value.encode("utf-8")) > (KEYMAP_MAX if version >= KEYMAP_MAX_VERSION else FILENAME_MAX):
+                module.fail_json(msg=f"invalid {name} {value!r}: it is longer than systemd {version} allows")
+
+        if unsafe.search(value):
+            module.fail_json(msg=f"invalid {name} {value!r}: systemd {version} refuses {rule} in it")
+
+
 def first_requested(module, names):
     return next(name for name in names if module.params[name] is not None)
 
@@ -675,10 +721,22 @@ def ensure_present(module):
     later = requests[1:]
 
     if "SetVConsoleKeyboard" in later:
-        check_utf8(module, [(name, keymap[name]) for name in VCONSOLE_SETTINGS])
+        settings = [(name, keymap[name]) for name in VCONSOLE_SETTINGS]
+        check_utf8(module, settings)
+        check_keyboard(module, settings, version)
 
-    if "SetX11Keyboard" in later:
-        check_utf8(module, [(name, keyboard[name]) for name in X11_SETTINGS])
+    if convert_keymap:
+        # SetVConsoleKeyboard first replaces the X11 settings with the converted ones, after which SetX11Keyboard sends
+        # the requested ones, including any that match the configured ones now
+        settings = [(name, module.params[name]) for name in X11_SETTINGS if module.params[name] is not None]
+    elif "SetX11Keyboard" in later:
+        settings = [(name, keyboard[name]) for name in X11_SETTINGS]
+    else:
+        settings = []
+
+    if settings:
+        check_utf8(module, settings)
+        check_keyboard(module, settings, version)
 
     checked = set()
 

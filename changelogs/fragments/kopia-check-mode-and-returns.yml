@@ -35,4 +35,6 @@ breaking_changes:
     ``_kopia_policy_info_dict``, which held the effective policy, and
     ``_kopia_policy_info_policies`` in place of ``_kopia_policy_info_list``.
     ``_kopia_policy_info_dict`` and ``_kopia_policy_info_list`` are no longer
-    published.
+    published. ``_kopia_policy_info_defined`` is null when the module does not
+    report ``defined``, as without ``kopia_policy_info_target`` or when kopia
+    is unavailable in check mode.

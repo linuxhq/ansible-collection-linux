@@ -13,7 +13,7 @@
     - kopia_policy_info
   ansible.builtin.set_fact:
     _kopia_policy_info_defined:
-      "{{ __kopia_policy_info_query.defined | d(false) }}"
+      "{{ __kopia_policy_info_query.defined | d(none) }}"
     _kopia_policy_info_effective_policy:
       "{{ __kopia_policy_info_query.effective_policy | d({}) }}"
     _kopia_policy_info_policies:

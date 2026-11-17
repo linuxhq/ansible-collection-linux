@@ -1,0 +1,7 @@
+---
+bugfixes:
+  - systemd_hostname - refuse ``$``, a backtick and ``\`` in ``icon_name``,
+    ``location`` and ``pretty_hostname`` on systemd 241 to 246 before any
+    setting is written, also in check mode, as those versions read them back
+    from ``/etc/machine-info`` with an added backslash, so the task reported a
+    change on every run.

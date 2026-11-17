@@ -1,3 +1,4 @@
+import itertools
 import json
 import os
 import sys
@@ -229,36 +230,53 @@ DAY = 86400000000000
 
 
 @pytest.mark.parametrize(
-    "stored,params,expected,flags",
+    "stored,params,expected,commands",
     [
         (
             ZERO_RETENTION,
             {"max_retained_log_count": 5},
             {"maxAge": 30 * DAY, "maxCount": 5, "maxTotalSize": 1073741824},
-            ["--max-retained-log-count=5"],
+            [["--max-retained-log-count=5"]],
         ),
         (
             ZERO_RETENTION,
             {"max_retained_log_count": 0, "max_retained_log_age": 60},
             {"maxAge": 60000000000, "maxCount": 0, "maxTotalSize": 1073741824},
-            ["--max-retained-log-count=0", "--max-retained-log-age=60s"],
+            [["--max-retained-log-count=0", "--max-retained-log-age=60s"]],
         ),
+        # one command would clear every setting with the count, then reset the count to 10000 before the age
         (
             {"maxAge": 0, "maxCount": 5, "maxTotalSize": 0},
             {"max_retained_log_count": 0, "max_retained_log_age": 60},
-            {"maxAge": 60000000000, "maxCount": 10000, "maxTotalSize": 1073741824},
-            ["--max-retained-log-count=0", "--max-retained-log-age=60s"],
+            {"maxAge": 60000000000, "maxCount": 0, "maxTotalSize": 0},
+            [["--max-retained-log-age=60s"], ["--max-retained-log-count=0"]],
         ),
         (
             {"maxAge": 30 * DAY, "maxCount": 10, "maxTotalSize": 1073741824},
             {"max_retained_log_count": 10, "max_retained_log_size_mb": 1},
             {"maxAge": 30 * DAY, "maxCount": 10, "maxTotalSize": 1048576},
-            ["--max-retained-log-count=10", "--max-retained-log-size-mb=1"],
+            [["--max-retained-log-size-mb=1"]],
+        ),
+        # all three at zero, which one command with every flag would leave at count 10000
+        (
+            {"maxAge": 0, "maxCount": 10000, "maxTotalSize": 0},
+            {"max_retained_log_count": 0, "max_retained_log_age": 0, "max_retained_log_size_mb": 0},
+            ZERO_RETENTION,
+            [["--max-retained-log-count=0"]],
+        ),
+        # the defaults kopia applies to an all-zero retention before the count are cleared again after the age
+        (
+            ZERO_RETENTION,
+            {"max_retained_log_count": 0, "max_retained_log_age": 60, "max_retained_log_size_mb": 0},
+            {"maxAge": 60000000000, "maxCount": 0, "maxTotalSize": 0},
+            [["--max-retained-log-count=0", "--max-retained-log-age=60s", "--max-retained-log-size-mb=0"]],
         ),
     ],
 )
 @pytest.mark.parametrize("check_mode", [False, True])
-def test_maintenance_log_retention_follows_kopia(monkeypatch, run_module, stored, params, expected, flags, check_mode):
+def test_maintenance_log_retention_follows_kopia(
+    monkeypatch, run_module, stored, params, expected, commands, check_mode
+):
     monkeypatch.setattr(kopia_maintenance, "kopia_available", lambda module: True)
     info = Mock(side_effect=[{"logRetention": dict(stored)}, {"logRetention": expected}])
     monkeypatch.setattr(kopia_maintenance, "maintenance_info", info)
@@ -274,7 +292,59 @@ def test_maintenance_log_retention_follows_kopia(monkeypatch, run_module, stored
     if check_mode:
         command.assert_not_called()
     else:
-        assert command.call_args.args[1] == ["maintenance", "set"] + flags
+        assert [entry.args[1] for entry in command.call_args_list] == [
+            ["maintenance", "set"] + flags for flags in commands
+        ]
+
+
+# kopia 0.23.1 applies these flags in this order, each to the log retention or, when all of it is zero, its defaults
+KOPIA_LOG_FLAGS = [
+    ("--max-retained-log-count", "maxCount", 1),
+    ("--max-retained-log-age", "maxAge", 1000000000),
+    ("--max-retained-log-size-mb", "maxTotalSize", 1048576),
+]
+
+
+def kopia_log_retention(retention, flags):
+    """Apply one kopia maintenance set command as setLogCleanupParametersFromFlags of kopia 0.23.1 does."""
+    retention = dict(retention)
+    values = dict(flag.split("=") for flag in flags)
+
+    for flag, key, unit in KOPIA_LOG_FLAGS:
+        if flag in values:
+            if not any(retention.values()):
+                retention = {"maxAge": 30 * DAY, "maxCount": 10000, "maxTotalSize": 1073741824}
+
+            retention[key] = int(values[flag].rstrip("s")) * unit
+
+    return retention
+
+
+@pytest.mark.parametrize("stored", list(itertools.product((0, 1), repeat=3)))
+@pytest.mark.parametrize(
+    "requested", [value for value in itertools.product((None, 0, 1, 2), repeat=3) if value != (None,) * 3]
+)
+def test_maintenance_log_retention_converges(monkeypatch, run_module, stored, requested):
+    # every zero and non-zero combination of stored and requested values is stored as requested in one run
+    names = ["max_retained_log_count", "max_retained_log_age", "max_retained_log_size_mb"]
+    state = {key: value * unit for (_flag, key, unit), value in zip(KOPIA_LOG_FLAGS, stored)}
+    params = {name: value for name, value in zip(names, requested) if value is not None}
+
+    def command(module, args):
+        state.update(kopia_log_retention(state, args[2:]))
+        return 0, "", ""
+
+    monkeypatch.setattr(kopia_maintenance, "kopia_available", lambda module: True)
+    monkeypatch.setattr(kopia_maintenance, "maintenance_info", lambda module, **kwargs: {"logRetention": dict(state)})
+    monkeypatch.setattr(kopia_maintenance, "kopia_command", command)
+
+    predicted = run_module(kopia_maintenance, params, True)["maintenance"]["log_retention"]
+    result = run_module(kopia_maintenance, params)
+    assert result["maintenance"]["log_retention"] == predicted
+    assert [state[key] for _flag, key, unit in KOPIA_LOG_FLAGS] == [
+        state[key] if value is None else value * unit for (_flag, key, unit), value in zip(KOPIA_LOG_FLAGS, requested)
+    ]
+    assert not run_module(kopia_maintenance, params)["changed"]
 
 
 @pytest.mark.parametrize(
@@ -282,6 +352,8 @@ def test_maintenance_log_retention_follows_kopia(monkeypatch, run_module, stored
     [
         (ZERO_RETENTION, {"max_retained_log_count": 0, "max_retained_log_age": 0, "max_retained_log_size_mb": 0}),
         ({"maxAge": 30 * DAY, "maxCount": 0, "maxTotalSize": 1073741824}, {"max_retained_log_count": 0}),
+        # a zero already stored is not sent again, which would reset an all-zero retention to kopia's defaults
+        (ZERO_RETENTION, {"max_retained_log_count": 0}),
     ],
 )
 def test_maintenance_log_retention_is_idempotent(monkeypatch, run_module, stored, params):
@@ -289,6 +361,18 @@ def test_maintenance_log_retention_is_idempotent(monkeypatch, run_module, stored
     monkeypatch.setattr(kopia_maintenance, "maintenance_info", Mock(return_value={"logRetention": stored}))
     monkeypatch.setattr(kopia_maintenance, "kopia_command", Mock(side_effect=AssertionError("must not mutate")))
     assert not run_module(kopia_maintenance, params)["changed"]
+
+
+def test_maintenance_second_log_retention_command_failure_reports_change(monkeypatch, run_module):
+    monkeypatch.setattr(kopia_maintenance, "kopia_available", lambda module: True)
+    stored = {"maxAge": 0, "maxCount": 5, "maxTotalSize": 0}
+    monkeypatch.setattr(kopia_maintenance, "maintenance_info", Mock(return_value={"logRetention": stored}))
+    command = Mock(side_effect=[(0, "", ""), (1, "", "locked")])
+    monkeypatch.setattr(kopia_maintenance, "kopia_command", command)
+    result = run_module(kopia_maintenance, {"max_retained_log_count": 0, "max_retained_log_age": 60})
+    assert result["failed"] and result["changed"] is True and "locked" in result["msg"]
+    assert result["maintenance"] == {}
+    assert command.call_count == 2
 
 
 def test_maintenance_no_change_and_info(monkeypatch, run_module):
@@ -963,6 +1047,12 @@ def test_repository_status_uses_password(monkeypatch, run_module):
     "params,storage,message",
     [
         (repository_params(), {"type": "s3", "config": {"bucket": "b"}}, "storage type is s3, not filesystem"),
+        # kopia reports an empty storage type and no configuration for a connection to a kopia repository server
+        (
+            repository_params(),
+            {"type": "", "config": None},
+            "path=/backup: it is connected to a kopia repository server, which this module does not manage",
+        ),
         (repository_params(), {"type": "filesystem", "config": {"path": "/other"}}, "path is /other, not /backup"),
         (
             {"storage": "s3", "password": "secret", "options": {"bucket": "new", "prefix": "a/"}},

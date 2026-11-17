@@ -106,6 +106,9 @@ options:
       - Unicode noncharacters, such as U+FDD0 or U+FFFE, are not allowed.
       - systemd 262 and later also refuse control characters, V(\\), V('),
         V("), V(*), V(?) and V([), which earlier versions accept.
+      - systemd 241 to 246 read V($), V(`) and V(\\) back from
+        C(/etc/machine-info) with an added backslash, so the module refuses
+        them there before any setting is written, also in check mode.
       - Written to C(/etc/machine-info).
       - An empty string removes it from C(/etc/machine-info).
     type: str
@@ -114,6 +117,9 @@ options:
       - Physical location of the machine, such as a rack or room name.
       - Control characters and Unicode noncharacters, such as U+FDD0 or
         U+FFFE, are not allowed.
+      - systemd 241 to 246 read V($), V(`) and V(\\) back from
+        C(/etc/machine-info) with an added backslash, so the module refuses
+        them there before any setting is written, also in check mode.
       - Written to C(/etc/machine-info).
       - An empty string removes it from C(/etc/machine-info).
     type: str
@@ -123,6 +129,9 @@ options:
         C(hostnamectl hostname --pretty) sets.
       - Control characters and Unicode noncharacters, such as U+FDD0 or
         U+FFFE, are not allowed.
+      - systemd 241 to 246 read V($), V(`) and V(\\) back from
+        C(/etc/machine-info) with an added backslash, so the module refuses
+        them there before any setting is written, also in check mode.
       - Written to C(/etc/machine-info).
       - An empty string removes it from C(/etc/machine-info).
     type: str
@@ -453,6 +462,9 @@ import string
 from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.linux.plugins.module_utils.systemd import (
+    ENV_QUOTE_ESCAPE_VERSION,
+    ENV_SHELL_ESCAPE_VERSION,
+    ENV_SHELL_NEED_ESCAPE,
     ENV_WHITESPACE,
     HAS_DASBUS,
     HOSTNAME_PROPERTIES,
@@ -485,6 +497,11 @@ SETTINGS = [
     ("location", "SetLocation"),
     ("pretty_hostname", "SetPrettyHostname"),
 ]
+
+# systemd-hostnamed writes these quoted in /etc/machine-info, where systemd 241 to 246 read '$', '`' and '\\' back with
+# the backslash that escapes them
+QUOTED_SETTINGS = ["icon_name", "location", "pretty_hostname"]
+SHELL_ESCAPED = frozenset(ENV_SHELL_NEED_ESCAPE) - {'"'}
 
 STRING_SETTINGS = ["deployment", "icon_name", "location", "pretty_hostname", "static_hostname", "transient_hostname"]
 
@@ -728,6 +745,17 @@ def ensure_present(module):
         if machine_info_error and param in MACHINE_INFO_KEYS.values():
             module.fail_json(
                 msg=f"unable to set {param}: {MACHINE_INFO} {machine_info_error}, which systemd-hostnamed refuses to rewrite"
+            )
+
+        # this never converges, so it is refused also for the first request
+        if (
+            param in QUOTED_SETTINGS
+            and ENV_QUOTE_ESCAPE_VERSION <= version < ENV_SHELL_ESCAPE_VERSION
+            and SHELL_ESCAPED.intersection(value)
+        ):
+            module.fail_json(
+                msg=f"invalid {param} {value!r}: systemd {version} reads '$', '`' and '\\' back from {MACHINE_INFO} "
+                "with an added backslash, so the setting would never match"
             )
 
         # systemd 247 and earlier keep the hostname in effect in place of a static one naming the local host, and report
