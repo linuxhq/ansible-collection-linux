@@ -58,7 +58,9 @@ options:
         start, so the module waits until systemd has no job left for the
         network time services named in the C(ntp-units.d/*.list) files of
         C(systemd-timedated) before it takes the change as reported, and fails
-        when one is still queued after the 30 seconds.
+        when one is still queued after the 30 seconds. Services named only in
+        E(SYSTEMD_TIMEDATED_NTP_SERVICES) in the environment of
+        C(systemd-timedated) are not waited for.
     type: bool
   time:
     description:
@@ -218,10 +220,19 @@ def parse_time(module, analyze, value, zone):
 
 
 def ntp_units(module):
-    """Return the network time services systemd-timedated starts and stops, named in its ntp-units.d/*.list files."""
+    """Return the network time services systemd-timedated starts and stops, named in its ntp-units.d/*.list files.
+
+    A file overrides any file of the same name in a later directory, and one linked to /dev/null names nothing.
+    """
+    files = {}
+
+    for directory in NTP_UNIT_DIRS:
+        for path in glob.glob(f"{directory}/*.list"):
+            files.setdefault(path.rsplit("/", 1)[1], path)
+
     units = set()
 
-    for path in [path for directory in NTP_UNIT_DIRS for path in sorted(glob.glob(f"{directory}/*.list"))]:
+    for _name, path in sorted(files.items()):
         try:
             with open(path) as handle:
                 lines = handle.read().splitlines()
@@ -234,8 +245,9 @@ def ntp_units(module):
 
 
 def ntp_jobs(module, manager, units):
-    """Return the IDs of the jobs systemd has queued for units, as ListJobs reports each job's ID and unit first."""
-    return {job[0] for job in systemd_result(module, manager, "ListJobs") if job[1] in units}
+    """Return the IDs of the jobs systemd has queued for the unit object paths units, as ListJobs reports them."""
+    # each job is its ID, unit name, type, state, job object path and unit object path
+    return {job[0] for job in systemd_result(module, manager, "ListJobs") if job[5] in units}
 
 
 def wait_for_ntp(module, proxy, ntp):
@@ -246,7 +258,8 @@ def wait_for_ntp(module, proxy, ntp):
     # time service is left, whether SetNTP queued it or joined an earlier one.
     deadline = monotonic() + NTP_TIMEOUT
     manager = systemd_proxy(module, "systemd1")
-    units = ntp_units(module)
+    # systemd reports a job under the unit's own name, which LoadUnit resolves an alias to
+    units = {systemd_result(module, manager, "LoadUnit", name) for name in ntp_units(module)}
 
     while True:
         if not ntp_jobs(module, manager, units) and systemd_properties(module, proxy, [("ntp", "NTP")])["ntp"] == ntp:

@@ -1140,7 +1140,11 @@ def ntp_wait_module(monkeypatch, current, settled, done, queued_before=False):
 
         return {"ntp": True if job_queued() else settled}
 
-    def list_jobs(module, manager, method):
+    def list_jobs(module, manager, method, *args):
+        # chrony.service is an alias of chronyd.service
+        if method == "LoadUnit":
+            return {"chrony.service": "/unit/2", "chronyd.service": "/unit/2"}.get(args[0], f"/unit/{args[0]}")
+
         assert method == "ListJobs"
         jobs = [(1, "ansible-pull.service", "start", "running", "/job/1", "/unit/1")]
         return jobs + ([(2, "chronyd.service", "start", "waiting", "/job/2", "/unit/2")] if job_queued() else [])
@@ -1180,10 +1184,13 @@ def test_ntp_enabled_while_another_service_job_stays_queued(monkeypatch, run_mod
     assert result["changed"] and not result.get("failed")
 
 
+@pytest.mark.parametrize("unit", ["chronyd.service", "chrony.service"])
 @pytest.mark.parametrize("queued_before", [False, True])
-def test_ntp_enabled_while_its_job_stays_queued_fails(monkeypatch, run_module, queued_before):
-    # the start job, queued by SetNTP or already queued, which SetNTP then joins, still runs at the deadline
+def test_ntp_enabled_while_its_job_stays_queued_fails(monkeypatch, run_module, queued_before, unit):
+    # the start job, queued by SetNTP or already queued, which SetNTP then joins, still runs at the deadline, also
+    # when the list names an alias of the unit
     mutate = ntp_wait_module(monkeypatch, False, True, 1000, queued_before)
+    monkeypatch.setattr(systemd_timedate, "ntp_units", Mock(return_value={unit}))
     result = run_module(systemd_timedate, {"ntp": True})
     assert result["failed"] and "30 seconds" in result["msg"]
     assert [entry.args[2] for entry in mutate.call_args_list] == ["SetNTP"]
@@ -1195,6 +1202,10 @@ def test_ntp_units_are_read_as_systemd_timedated_reads_them(monkeypatch, tmp_pat
     (tmp_path / "etc" / "50-chrony.list").write_text("# comment\n; comment\n\n  chronyd.service  \n")
     (tmp_path / "usr" / "80-systemd-timesync.list").write_text("systemd-timesyncd.service\n")
     (tmp_path / "usr" / "other.conf").write_text("ignored.service\n")
+    # a file overrides one of the same name in a later directory, and a file linked to /dev/null names nothing
+    (tmp_path / "usr" / "50-chrony.list").write_text("overridden.service\n")
+    (tmp_path / "usr" / "90-masked.list").write_text("masked.service\n")
+    (tmp_path / "etc" / "90-masked.list").symlink_to("/dev/null")
     monkeypatch.setattr(
         systemd_timedate, "NTP_UNIT_DIRS", (str(tmp_path / "etc"), str(tmp_path / "missing"), str(tmp_path / "usr"))
     )
