@@ -13,16 +13,9 @@ bugfixes:
     ``LANGUAGE`` instead. The map is read line by line as ``systemd-localed``
     reads it, with quotes removed, backslash escapes, a NUL ending a line,
     and no fallback after a line it cannot read or split, such as one of
-    1 MiB or more or one with an unbalanced quote. The module reads the map
-    only when it is a regular file and otherwise predicts no fallback.
-  - systemd_locale - fail before any setting is written, also in check mode,
-    when ``lang`` changes without a set ``language`` and the language
-    fallback map lists a fallback for it that is not valid UTF-8 or contains
-    a Unicode noncharacter.
-    ``systemd-localed`` writes such a fallback to the locale configuration
-    and then fails to report the locale, as seen on systemd 252, and check
-    mode returned it as lone surrogates. A real run reads the map for this
-    check, and returns the locale ``systemd-localed`` reports otherwise.
+    1 MiB or more or one with an unbalanced quote. Bytes in the map that are
+    not valid UTF-8 are predicted as U+FFFD. A real run does not read the map
+    and returns the locale ``systemd-localed`` reports.
   - systemd_locale - document that ``systemd-localed`` writes the fallback
     ``LANGUAGE`` without validating it, so it can be a list such as
     ``en_AU:en_GB``, which ``locale.language`` cannot set again where

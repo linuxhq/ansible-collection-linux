@@ -1,6 +1,5 @@
 import io
 import os
-import signal
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -325,55 +324,6 @@ def test_read_map_lines_240_reads_as_read_line():
     assert read_all(b"a\rb\n", 240, systemd.read_map_lines) == ["a", "b"]
 
 
-def test_open_regular_reads_a_regular_file(tmp_path):
-    path = tmp_path / "file"
-    path.write_bytes(b"data")
-
-    with systemd.open_regular(str(path)) as handle:
-        assert handle.read() == b"data"
-
-
-@pytest.mark.parametrize("kind", ["directory", "fifo", "device"])
-def test_open_regular_skips_other_files_without_blocking(tmp_path, kind):
-    path = tmp_path / "file"
-    if kind == "directory":
-        path.mkdir()
-    elif kind == "fifo":
-        os.mkfifo(path)
-    else:
-        path.symlink_to("/dev/null")
-
-    # opening a FIFO without O_NONBLOCK would wait for a writer, so fail after 5 seconds instead
-    def expire(signum, frame):
-        raise AssertionError("open_regular blocked")
-
-    previous = signal.signal(signal.SIGALRM, expire)
-    signal.alarm(5)
-    try:
-        assert systemd.open_regular(str(path)) is None
-    finally:
-        signal.alarm(0)
-        signal.signal(signal.SIGALRM, previous)
-
-
-def test_open_regular_does_not_open_a_device(monkeypatch, tmp_path):
-    path = tmp_path / "file"
-    path.symlink_to("/dev/null")
-    monkeypatch.setattr(systemd.os, "open", Mock(side_effect=AssertionError("a device must not be opened")))
-    assert systemd.open_regular(str(path)) is None
-
-
-def test_open_regular_rechecks_the_opened_file(monkeypatch, tmp_path):
-    # a regular file replaced by a device between the check and the open is still not read
-    path = tmp_path / "file"
-    path.write_bytes(b"data")
-    replaced = tmp_path / "replaced"
-    replaced.symlink_to("/dev/null")
-    real_open = os.open
-    monkeypatch.setattr(systemd.os, "open", lambda name, flags: real_open(str(replaced), flags))
-    assert systemd.open_regular(str(path)) is None
-
-
 @pytest.mark.parametrize(
     "settings,noncharacters,message",
     [
@@ -394,31 +344,14 @@ def test_check_utf8_noncharacters_can_be_left_to_systemd(module_factory):
     module.fail_json.assert_not_called()
 
 
-def test_open_regular_raises_for_a_missing_file(tmp_path):
-    with pytest.raises(FileNotFoundError):
-        systemd.open_regular(str(tmp_path / "missing"))
+def test_read_bytes_reads_a_missing_file_as_none(module_factory, tmp_path):
+    assert systemd.read_bytes(module_factory(), str(tmp_path / "missing")) is None
 
 
-@pytest.mark.parametrize("kind", ["fifo", "device", "missing"])
-def test_read_bytes_reads_no_content_from_other_files(module_factory, tmp_path, kind):
+def test_read_bytes_reads_a_file_that_is_not_regular(module_factory, tmp_path):
     path = tmp_path / "file"
-    if kind == "fifo":
-        os.mkfifo(path)
-    elif kind == "device":
-        # a device such as /dev/zero would never end, so /dev/null stands for any device, which reads as empty
-        path.symlink_to("/dev/null")
-
-    # reading a FIFO would wait for a writer, so fail after 5 seconds instead
-    def expire(signum, frame):
-        raise AssertionError("read_bytes blocked")
-
-    previous = signal.signal(signal.SIGALRM, expire)
-    signal.alarm(5)
-    try:
-        assert systemd.read_bytes(module_factory(), str(path)) is None
-    finally:
-        signal.alarm(0)
-        signal.signal(signal.SIGALRM, previous)
+    path.symlink_to("/dev/null")
+    assert systemd.read_bytes(module_factory(), str(path)) == b""
 
 
 def test_read_bytes_reads_a_regular_file(module_factory, tmp_path):

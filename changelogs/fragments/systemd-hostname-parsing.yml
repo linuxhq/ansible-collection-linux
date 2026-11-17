@@ -17,9 +17,7 @@ bugfixes:
     so a line of 1 MiB or more before the hostname, which makes
     ``systemd-hostnamed`` ignore the file, reads as no static hostname. The
     module read a later hostname line instead and reported no change where
-    ``systemd-hostnamed`` would write it. A file that is not a regular file,
-    such as a directory or a FIFO, also reads as no static hostname instead of
-    failing or blocking.
+    ``systemd-hostnamed`` would write it.
   - systemd_hostname - fail before writing any setting, also in check mode,
     when ``chassis``, ``deployment``, ``icon_name``, ``location`` or
     ``pretty_hostname`` would change and ``/etc/machine-info`` contains a
