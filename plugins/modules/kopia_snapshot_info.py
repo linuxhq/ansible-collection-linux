@@ -162,7 +162,7 @@ snapshots:
         mode:
           description:
             - Permissions of the directory in octal, such as C(0755).
-          returned: always
+          returned: unless the directory has no permission bits set
           type: str
         mtime:
           description:
