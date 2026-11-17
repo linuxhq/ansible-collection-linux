@@ -21,6 +21,7 @@ description:
     to U+DCFF, which Ansible uses for such bytes, so
     P(linuxhq.linux.rclone_obscure#filter) obscures them as those bytes again.
   - A vault encrypted value is decrypted before it is revealed.
+  - Values that are not strings or bytes raise an error.
 positional: _input
 options:
   _input:
