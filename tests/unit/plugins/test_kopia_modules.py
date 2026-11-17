@@ -552,6 +552,33 @@ def test_snapshot_skipped_as_identical_is_unchanged(monkeypatch, run_module):
     assert command.call_args_list[0].args[1] == ["snapshot", "create", "/data", "--json"]
 
 
+@pytest.mark.parametrize(
+    "listed,expected",
+    [
+        # kopia compares the source with its newest complete snapshot, and lists incomplete ones after it
+        (
+            [{"id": "old", "source": DATA}, {"id": "checkpoint", "source": DATA, "incomplete": "checkpoint"}],
+            {"id": "old", "source": DATA_RESULT},
+        ),
+        ([{"id": "canceled", "source": DATA, "incomplete": "canceled"}], {}),
+    ],
+)
+def test_snapshot_skipped_as_identical_returns_newest_complete(monkeypatch, run_module, listed, expected):
+    skipped = (0, "", "Not saving snapshot because no files have been changed since previous snapshot")
+    command = Mock(side_effect=[skipped, (0, json.dumps(listed), "")])
+    monkeypatch.setattr(kopia_snapshot, "kopia_command", command)
+    assert run_module(kopia_snapshot, {"path": "/data"}) == {"changed": False, "snapshot": expected}
+
+
+def test_snapshot_not_listed_returns_newest_snapshot(monkeypatch, run_module):
+    # kopia saves and prints a partial snapshot when interrupted, so the newest one may be incomplete
+    listing = json.dumps([{"id": "old", "source": DATA}, {"id": "partial", "source": DATA, "incomplete": "canceled"}])
+    command = Mock(side_effect=[(0, '{"id":"new"}\n', ""), (0, listing, "")])
+    monkeypatch.setattr(kopia_snapshot, "kopia_command", command)
+    result = run_module(kopia_snapshot, {"path": "/data"})
+    assert result == {"changed": True, "snapshot": {"id": "partial", "source": DATA_RESULT, "incomplete": "canceled"}}
+
+
 @pytest.mark.parametrize("path", [None, "/data"])
 def test_snapshot_info(monkeypatch, run_module, path):
     command = Mock(return_value=(0, '[{"startTime":"now"}]', ""))
@@ -2624,6 +2651,16 @@ def test_mkdir_all_paths_cuts_parents_as_go_does(path, paths):
         ("sftp", {"path": "/p", "host": "h", "port": 22, "username": "u"}, {"port": "+22"}, None),
         ("sftp", {"path": "/p", "host": "h", "port": 22, "username": "u"}, {"port": "22.5"}, None),
         ("sftp", {"path": "/p", "host": "h", "port": 22, "username": "u"}, {"port": "x"}, "port is 22, not x"),
+        # kingpin reads the port with Go's strconv.ParseFloat, which takes a hexadecimal float but no spaces or
+        # non-ASCII digits
+        ("sftp", {"path": "/p", "host": "h", "port": 22, "username": "u"}, {"port": "0x16p0"}, None),
+        ("sftp", {"path": "/p", "host": "h", "port": 22, "username": "u"}, {"port": " 22"}, "port is 22, not  22"),
+        (
+            "sftp",
+            {"path": "/p", "host": "h", "port": 22, "username": "u"},
+            {"port": "٢٢"},
+            "port is 22, not ٢٢",
+        ),
         ("azure", {"container": "c", "storageDomain": "blob.core.usgovcloudapi.net"}, {}, None),
         (
             "azure",
@@ -2656,6 +2693,44 @@ def test_repository_identifying_options_by_storage(
         assert result["failed"] and result["msg"].endswith(f": {mismatch}")
     else:
         assert result["changed"] is False and not result.get("failed")
+
+
+@pytest.mark.parametrize(
+    "value,expected",
+    [
+        (22, "22"),
+        (22.5, "22"),
+        ("+22", "22"),
+        ("-22.9", "-22"),
+        ("2.2e1", "22"),
+        ("+.5e1", "5"),
+        ("5.", "5"),
+        ("2_2", "22"),
+        ("1e1_0", "10000000000"),
+        ("0x16p0", "22"),
+        ("0X1.6P4", "22"),
+        ("0x_16p0", "22"),
+        ("0x.8p1", "1"),
+        # strconv.ParseFloat refuses these, so kopia never reads a number from them
+        (" 22", " 22"),
+        ("22 ", "22 "),
+        ("٢٢", "٢٢"),
+        ("0x16", "0x16"),
+        ("_22", "_22"),
+        ("22_", "22_"),
+        ("2__2", "2__2"),
+        ("1_e1", "1_e1"),
+        ("1e_1", "1e_1"),
+        ("0x1_p0", "0x1_p0"),
+        ("1e400", "1e400"),
+        ("0x1p2000", "0x1p2000"),
+        ("inf", "inf"),
+        ("nan", "nan"),
+        (True, "True"),
+    ],
+)
+def test_kingpin_int_reads_numbers_as_go_parse_float(value, expected):
+    assert kopia_repository.kingpin_int(value) == expected
 
 
 @pytest.mark.parametrize("check_mode", [False, True])

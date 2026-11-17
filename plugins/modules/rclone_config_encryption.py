@@ -26,8 +26,10 @@ description:
     churn on repeated runs.
   - The password is never returned. The decrypted configuration is returned
     only in the diff, when diff mode is enabled.
-  - A symbolic link at O(path) is followed and its target is written, as rclone
-    does.
+  - A symbolic link at O(path) is followed through every link in its chain,
+    and the final file is written. This matches rclone only for a single link;
+    for a chain of links, rclone follows one link and replaces the next link
+    with a regular file.
   - A file the module creates is given mode C(0600), as rclone does, unless
     O(mode) is set. It is created with that mode, so it is never readable by
     other users, even before O(mode) is applied. An existing file keeps its

@@ -7,6 +7,9 @@ bugfixes:
     systemd_timedate, systemd_timedate_info - document the fields of nested
     return values with ``contains``, noting the fields kopia passes through
     unchanged.
+  - kopia_maintenance, kopia_maintenance_info - document that kopia reports
+    ``maintenance.extend_object_locks`` from kopia 0.14.0 and
+    ``maintenance.list_parallelism`` from kopia 0.18.0.
   - kopia_snapshot, kopia_snapshot_info, kopia_maintenance,
     kopia_maintenance_info, kopia_repository, kopia_repository_info - correct
     the return samples to match kopia's output, with 32-digit snapshot IDs,

@@ -16,9 +16,10 @@ description:
     idempotent and belongs in a play that is meant to run on a schedule rather
     than in a converge that is expected to settle.
   - When the policy for the path sets C(retention.ignore_identical_snapshots)
-    and no files have changed since the previous snapshot, kopia does not save
-    a new snapshot. The module then reports RV(ignore:changed) as V(false) and
-    returns the existing newest snapshot. Otherwise it reports
+    and no files have changed since the newest complete snapshot, kopia does
+    not save a new snapshot. The module then reports RV(ignore:changed) as
+    V(false) and returns that snapshot, never a newer incomplete one, such as
+    a checkpoint. Otherwise it reports
     RV(ignore:changed) as V(true).
   - When kopia printed the snapshot it saved, then exited with an error, for
     example fatal errors found while snapshotting or automatic maintenance
@@ -158,12 +159,13 @@ snapshot:
   description:
     - Snapshot for the path, as reported by C(kopia snapshot list).
     - This is the snapshot just created, identified by the ID kopia prints when
-      it saves it, or the existing newest snapshot when kopia skipped an
-      identical snapshot. When the printed ID cannot be read or is not listed,
-      the newest snapshot of the path is returned, never one of a parent
-      directory, which C(kopia snapshot list) also reports, or empty when the
-      path has none, such as when another client deleted the new snapshot
-      before the module listed it.
+      it saves it, or the newest complete snapshot of the path when kopia
+      skipped an identical snapshot, or empty when the path has no complete
+      snapshot. When the printed ID cannot be read or is not listed, the newest
+      snapshot of the path is returned, never one of a parent directory, which
+      C(kopia snapshot list) also reports, or empty when the path has none,
+      such as when another client deleted the new snapshot before the module
+      listed it.
     - Also returned when the module fails because kopia printed the snapshot
       it saved, then exited with an error, and kopia lists that snapshot.
       Otherwise empty when the module fails after running kopia.
@@ -482,16 +484,20 @@ def recorded_path(manifest, path):
     return recorded["path"] if recorded else absolute_path(path)
 
 
-def latest_snapshot(module, source, path, snapshot_id=None):
+def latest_snapshot(module, source, path, snapshot_id=None, complete=False):
     snapshots = list_snapshots(module, source) or []
 
     # another snapshot of the path, such as a scheduled one, can be newer than the one just created
     snapshot = find_snapshot(snapshots, snapshot_id)
 
     # another client can delete the new snapshot before it is listed, and kopia also lists the snapshots of every
-    # parent directory of the source, for the same user and host
+    # parent directory of the source, for the same user and host, and incomplete ones, such as checkpoints
     if snapshot is None:
-        own = [entry for entry in snapshots if entry["source"]["path"] == path]
+        own = [
+            entry
+            for entry in snapshots
+            if entry["source"]["path"] == path and not (complete and entry.get("incomplete"))
+        ]
         snapshot = own[-1] if own else None
 
     return snapshot_result(snapshot)
@@ -565,9 +571,12 @@ def ensure_present(module):
         module.fail_json(msg=f"unable to create kopia snapshot of {label}: {stderr.strip()}", snapshot={})
 
     # kopia prints the new manifest only when it saves a snapshot; nothing is
-    # printed when ignore_identical_snapshots skips an unchanged source.
+    # printed when ignore_identical_snapshots skips a source identical to its
+    # newest complete snapshot.
     if not stdout.strip():
-        module.exit_json(changed=False, snapshot=latest_snapshot(module, source, recorded_path(manifest, path)))
+        module.exit_json(
+            changed=False, snapshot=latest_snapshot(module, source, recorded_path(manifest, path), complete=True)
+        )
 
     module.exit_json(
         changed=True,

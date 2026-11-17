@@ -15,4 +15,6 @@
           - _systemd_timedate_info_dict.ntp is true
           - _systemd_timedate_info_dict.time_usec > 0
           - _systemd_timedate_info_dict.timezone == 'America/Los_Angeles'
+          - _systemd_timedate_info_list is sequence
+          - "'America/Los_Angeles' in _systemd_timedate_info_list"
 ...

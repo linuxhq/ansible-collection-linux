@@ -30,8 +30,9 @@ description:
     from the connected storage configuration. A C(storage_domain) that is not
     stored is compared as C(blob.core.windows.net), the domain kopia uses
     then. C(port) is compared as the number kopia reads from it, which it
-    reads as a decimal number and truncates, so V("+22") matches a stored
-    V(22). Another number in these options is compared as the text passed to
+    reads as a decimal or hexadecimal floating-point number, as Go's
+    C(strconv.ParseFloat) does, and truncates, so V("+22") and V("0x16p0")
+    match a stored V(22), and V(" 22") does not. Another number in these options is compared as the text passed to
     kopia, so V(20261115) matches a stored V("20261115"), and that text is the
     number as Python formats it, as described in O(options). A leading V(~)
     in the C(path) of V(filesystem) storage is resolved to the home directory
@@ -425,6 +426,7 @@ repository:
 """
 
 import os
+import re
 
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.common.dict_transformations import camel_dict_to_snake_dict
@@ -460,6 +462,17 @@ STORAGE_TYPE_KEYS = {"sftp": {"username": "username"}}
 
 # kingpin reads an int flag as a float and truncates it, so "+22" or "22.0" set the port 22
 INT_OPTIONS = ("port",)
+
+# the decimal and hexadecimal numbers Go's strconv.ParseFloat reads, a hexadecimal one only with a p exponent; it
+# also reads "inf" and "nan", which are no port
+GO_FLOAT = re.compile(
+    r"[+-]?(?:(?P<decimal>(?:[0-9_]+\.?[0-9_]*|\.[0-9_]+)(?:[eE][+-]?[0-9_]+)?)"
+    r"|(?P<hex>0[xX](?:[0-9a-fA-F_]+\.?[0-9a-fA-F_]*|\.[0-9a-fA-F_]+)[pP][+-]?[0-9_]+))"
+)
+
+# Go allows an underscore only after a digit or the 0x prefix and before a digit
+GO_DECIMAL_UNDERSCORE = re.compile(r"(?<![0-9])_|_(?![0-9])")
+GO_HEX_UNDERSCORE = re.compile(r"(?<![0-9a-fA-FxX])_|_(?![0-9a-fA-F])")
 
 # kopia uses this azure storage domain when none is stored
 STORAGE_DEFAULTS = {"storageDomain": "blob.core.windows.net"}
@@ -521,13 +534,21 @@ def unsaved_options(module):
 
 def kingpin_int(value):
     """Return value as text of the number kopia's flag parser reads from it, a float truncated, or as given."""
-    if isinstance(value, bool):
-        return str(value)
+    text = str(value)
+    match = GO_FLOAT.fullmatch(text)
+    if match is None:
+        return text
 
+    underscores = GO_HEX_UNDERSCORE if match["hex"] else GO_DECIMAL_UNDERSCORE
+    if underscores.search(text):
+        return text
+
+    number = text.replace("_", "")
     try:
-        return str(int(float(value)))
-    except (OverflowError, TypeError, ValueError):
-        return str(value)
+        return str(int(float.fromhex(number) if match["hex"] else float(number)))
+    except OverflowError:
+        # strconv.ParseFloat refuses a number out of the float64 range
+        return text
 
 
 def identifying_keys(storage):
