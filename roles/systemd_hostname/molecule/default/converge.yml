@@ -13,5 +13,45 @@
       tags:
         - molecule-idempotence-notest
 
-    - systemd_hostname
+- name: Converge transient hostname
+  hosts: all
+  tags:
+    - molecule-idempotence-notest
+  roles:
+    - role: systemd_hostname
+      systemd_hostname_static_hostname: ""
+      systemd_hostname_transient_hostname: "{{ inventory_hostname }}-transient"
+
+  post_tasks:
+    - name: Ensure systemd hostname information is gathered
+      ansible.builtin.include_role:
+        name: systemd_hostname_info
+      when:
+        - not ansible_check_mode
+
+    - name: Ensure systemd static hostname file is checked
+      become: true
+      ansible.builtin.stat:
+        path: /etc/hostname
+      register: __systemd_hostname_static_file
+      when:
+        - not ansible_check_mode
+
+    - name: Ensure systemd transient hostname settings are verified
+      ansible.builtin.assert:
+        that:
+          - _systemd_hostname_info_dict.hostname ==
+            inventory_hostname ~ '-transient'
+          - _systemd_hostname_info_dict.hostname_source == 'transient'
+          - _systemd_hostname_info_dict.static_hostname == ''
+          - _systemd_hostname_info_dict.location == 'molecule'
+          - not __systemd_hostname_static_file.stat.exists
+      when:
+        - not ansible_check_mode
+
+- name: Converge
+  hosts: all
+  roles:
+    - role: systemd_hostname
+      systemd_hostname_location: ""
 ...

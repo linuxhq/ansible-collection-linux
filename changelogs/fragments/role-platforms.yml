@@ -5,3 +5,4 @@ breaking_changes:
     declare only EL 9 and 10 and Debian 12 (bookworm) and 13 (trixie) as
     supported platforms.
   - rclone role - declare only EL 9 and 10 as supported platforms.
+  - kopia role - declare only EL 9 and 10 as supported platforms.

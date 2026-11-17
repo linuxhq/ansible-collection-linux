@@ -11,5 +11,58 @@
       tags:
         - molecule-idempotence-notest
 
+- name: Converge system clock
+  hosts: all
+  tags:
+    - molecule-idempotence-notest
+  vars:
+    # the controller's time when the clock is set, so the clock stays put
+    __systemd_timedate_epoch: "{{ now(utc=true).timestamp() | int }}"
+  roles:
+    - role: systemd_timedate
+      systemd_timedate_adjust_system_clock: true
+      systemd_timedate_local_rtc: true
+      systemd_timedate_ntp: false
+      systemd_timedate_time: "@{{ __systemd_timedate_epoch }}"
+
+  post_tasks:
+    - name: Ensure systemd system clock is verified
+      when:
+        - not ansible_check_mode
+      block:
+        - name: Ensure systemd system clock time is recorded
+          ansible.builtin.set_fact:
+            __systemd_timedate_time: "{{ __systemd_timedate_epoch | int }}"
+
+        - name: Ensure systemd time and date information is gathered
+          ansible.builtin.include_role:
+            name: systemd_timedate_info
+
+        # the clock is set after the RTC adjusts it, so it ends near the time
+        - name: Ensure systemd system clock settings are verified
+          ansible.builtin.assert:
+            that:
+              - _systemd_timedate_info_dict.local_rtc is true
+              - _systemd_timedate_info_dict.ntp is false
+              - (_systemd_timedate_info_dict.time_usec // 1000000
+                 - __systemd_timedate_time | int) | abs < 300
+
+        - name: Ensure systemd system clock change is predicted again
+          become: true
+          linuxhq.linux.systemd_timedate:
+            time: "@{{ __systemd_timedate_time }}"
+          check_mode: true
+          register: __systemd_timedate_time_result
+
+        - name: Ensure systemd system clock change is reported
+          ansible.builtin.assert:
+            that:
+              - __systemd_timedate_time_result is changed
+              - __systemd_timedate_time_result.timedate.time_usec ==
+                (__systemd_timedate_time | int) * 1000000
+
+- name: Converge
+  hosts: all
+  roles:
     - systemd_timedate
 ...

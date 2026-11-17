@@ -1,0 +1,10 @@
+---
+bugfixes:
+  - systemd_locale - on systemd 253 and later, fail before writing any
+    setting, also in check mode, when a keyboard change would make
+    systemd-localed rewrite ``/etc/vconsole.conf`` while it contains a NUL byte
+    or a setting that is not valid UTF-8, even when that keyboard request is
+    the first one sent. These systemd versions only log the failed rewrite and
+    report the request as applied, so once systemd-localed had cached the
+    unreadable file the module reported a change on every run although
+    nothing was written.
