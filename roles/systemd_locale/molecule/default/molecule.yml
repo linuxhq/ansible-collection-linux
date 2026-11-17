@@ -50,10 +50,16 @@ provisioner:
           lang: C.UTF-8
           lc_numeric: C.UTF-8
           lc_time: C
-        systemd_locale_vconsole_keymap: us
-        systemd_locale_vconsole_keymap_toggle: de
         systemd_locale_x11_layout: us
         systemd_locale_x11_model: pc105
+    # Debian ships no console keymaps that systemd-localed finds, *.map or *.map.gz, so it refuses any keymap there
+    host_vars:
+      almalinux9:
+        systemd_locale_vconsole_keymap: us
+        systemd_locale_vconsole_keymap_toggle: de
+      almalinux10:
+        systemd_locale_vconsole_keymap: us
+        systemd_locale_vconsole_keymap_toggle: de
 
 scenario:
   test_sequence:

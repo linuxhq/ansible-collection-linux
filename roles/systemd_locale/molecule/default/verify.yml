@@ -13,8 +13,16 @@
           - _systemd_locale_info_dict.locale.lang == 'C.UTF-8'
           - _systemd_locale_info_dict.locale.lc_numeric is none
           - _systemd_locale_info_dict.locale.lc_time == 'C'
-          - _systemd_locale_info_dict.vconsole_keymap == 'us'
-          - _systemd_locale_info_dict.vconsole_keymap_toggle == 'de'
           - _systemd_locale_info_dict.x11_layout == 'us'
           - _systemd_locale_info_dict.x11_model == 'pc105'
+
+    - name: Ensure systemd console keyboard settings are verified
+      tags:
+        - systemd_locale
+      ansible.builtin.assert:
+        that:
+          - _systemd_locale_info_dict.vconsole_keymap == 'us'
+          - _systemd_locale_info_dict.vconsole_keymap_toggle == 'de'
+      when:
+        - systemd_locale_vconsole_keymap is defined
 ...
