@@ -1,0 +1,14 @@
+---
+bugfixes:
+  - kopia_maintenance, kopia_maintenance_info, kopia_policy,
+    kopia_policy_info, kopia_repository, kopia_repository_info,
+    kopia_snapshot, kopia_snapshot_info, systemd_hostname,
+    systemd_hostname_info, systemd_locale, systemd_locale_info,
+    systemd_timedate, systemd_timedate_info - document the fields of nested
+    return values with ``contains``, noting the fields kopia passes through
+    unchanged.
+  - kopia_snapshot, kopia_snapshot_info, kopia_maintenance,
+    kopia_maintenance_info, kopia_repository, kopia_repository_info - correct
+    the return samples to match kopia's output, with 32-digit snapshot IDs,
+    64-digit repository IDs, UTC timestamps with nanoseconds, the snapshot
+    ``source`` and the maintenance ``schedule.runs``.

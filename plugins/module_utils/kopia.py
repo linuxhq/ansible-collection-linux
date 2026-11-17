@@ -492,16 +492,50 @@ def omit_empty(value, schema):
     return result
 
 
+def null_items(value):
+    """Return value with each None in a list at any depth written as "", as kopia stores it in its lists of strings.
+
+    Go's encoding/json leaves the zero value in place of a null list item.
+    """
+    if isinstance(value, dict):
+        return {key: null_items(item) for key, item in value.items()}
+
+    if isinstance(value, list):
+        return ["" if item is None else null_items(item) for item in value]
+
+    return value
+
+
 def policy_normalize(policy):
+    actions = policy.get("actions")
     policy = prune_empty(omit_empty(policy, POLICY_OMITEMPTY))
+
+    # kopia stores each action as a pointer, so it stores and exports an empty action, which blocks the action the
+    # target would otherwise inherit, as {}; a null action is not stored
+    if isinstance(actions, dict):
+        kept = {
+            key: prune_empty(omit_empty(item, ACTION_COMMAND_OMITEMPTY))
+            for key, item in actions.items()
+            if item is not None
+        }
+
+        if kept:
+            policy["actions"] = kept
+
     scheduling = policy.get("scheduling")
 
+    # kopia stores both fields of a scheduling.timeOfDay entry, a null entry or field as 0
     if isinstance(scheduling, dict) and isinstance(scheduling.get("timeOfDay"), list):
         scheduling["timeOfDay"] = [
-            dict(TIME_OF_DAY, **entry) if isinstance(entry, dict) else entry for entry in scheduling["timeOfDay"]
+            (
+                dict(TIME_OF_DAY, **prune_empty(entry))
+                if isinstance(entry, dict)
+                else dict(TIME_OF_DAY) if entry is None else entry
+            )
+            for entry in scheduling["timeOfDay"]
         ]
 
-    return policy
+    return null_items(policy)
 
 
 def same_value(left, right):

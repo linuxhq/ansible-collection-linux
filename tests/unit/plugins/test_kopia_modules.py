@@ -348,6 +348,72 @@ def test_policy_imports_json_and_refreshes(monkeypatch, run_module, tmp_path):
     assert captured == [{"global": {"keepLatest": 2}}]
 
 
+@pytest.mark.parametrize(
+    "current, policy, sent",
+    [
+        # kopia stores an empty action, which blocks the inherited action, and exports it as {}
+        ({"actions": {"beforeSnapshotRoot": {}}}, {"retention": {"keep_latest": 2}}, {"retention": {"keepLatest": 2}}),
+        (
+            {"actions": {}},
+            {"actions": {"before_snapshot_root": {}}},
+            {"actions": {"beforeSnapshotRoot": {}}},
+        ),
+        # kopia stores a null list item as the zero value of the item
+        (
+            None,
+            {"scheduling": {"time_of_day": [{"hour": 5, "min": None}]}},
+            {"scheduling": {"timeOfDay": [{"hour": 5, "min": 0}]}},
+        ),
+        (None, {"files": {"ignore": [None]}}, {"files": {"ignore": [""]}}),
+    ],
+)
+def test_policy_imports_what_kopia_stores(monkeypatch, run_module, tmp_path, current, policy, sent):
+    stored = {
+        "actions": {"beforeSnapshotRoot": {}},
+        "scheduling": {"timeOfDay": [{"hour": 5, "min": 0}]},
+        "files": {"ignore": [""]},
+        "retention": {"keepLatest": 2},
+    }
+    monkeypatch.setattr(kopia_policy, "policy_export", Mock(side_effect=[current, stored]))
+    captured = []
+
+    def command(module, args):
+        with open(args[-1]) as stream:
+            captured.append(json.load(stream))
+
+        return 0, "", ""
+
+    monkeypatch.setattr(kopia_policy, "kopia_command", command)
+    result = run_module(kopia_policy, {"target": "global", "policy": policy, "_ansible_remote_tmp": str(tmp_path)})
+    assert result["changed"]
+    assert captured == [{"global": sent}]
+
+
+@pytest.mark.parametrize(
+    "current, policy",
+    [
+        ({"actions": {"beforeSnapshotRoot": {}}}, {"actions": {"before_snapshot_root": {"timeout": 0}}}),
+        (
+            {"scheduling": {"timeOfDay": [{"hour": 5, "min": 0}]}},
+            {"scheduling": {"time_of_day": [{"hour": 5, "min": None}]}},
+        ),
+        ({"scheduling": {"cron": [""]}, "files": {}}, {"scheduling": {"cron": [None]}}),
+        (
+            {"actions": {"afterFolder": {"path": "/bin/true", "args": [""]}}},
+            {"actions": {"after_folder": {"path": "/bin/true", "args": [None]}}},
+        ),
+    ],
+)
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_policy_as_kopia_stores_it_is_idempotent(monkeypatch, run_module, current, policy, check_mode):
+    monkeypatch.setattr(kopia_policy, "kopia_available", lambda module: True)
+    monkeypatch.setattr(kopia_policy, "repository_connected", lambda module, **kwargs: True)
+    monkeypatch.setattr(kopia_policy, "policy_export", lambda *args, **kwargs: current)
+    monkeypatch.setattr(kopia_policy, "kopia_command", Mock(side_effect=AssertionError("must not mutate")))
+    result = run_module(kopia_policy, {"target": "global", "policy": policy}, check_mode)
+    assert result["changed"] is False, result
+
+
 @pytest.mark.parametrize("current,check_mode,changed", [(None, False, False), ({}, True, True), ({}, False, True)])
 def test_policy_delete(monkeypatch, run_module, current, check_mode, changed):
     monkeypatch.setattr(kopia_policy, "kopia_available", lambda module: True)
@@ -686,7 +752,7 @@ def test_policy_zero_values_kopia_omits_are_idempotent(monkeypatch, run_module):
         "scheduling": {"interval_seconds": 3600, "manual": False, "time_of_day": [], "no_parent_time_of_day": False},
         "files": {"ignore": [], "max_file_size": 0, "no_parent_ignore": False},
         "compression": {"compressor_name": "", "min_size": 0, "max_size": 0},
-        "actions": {"before_folder": {"script": "", "timeout": 0}},
+        "actions": {"before_folder": None},
     }
     result = run_module(kopia_policy, {"target": "global", "policy": policy})
     # the policy is returned as kopia exports it, with its empty sections

@@ -230,6 +230,37 @@ def test_policy_normalize_fills_time_of_day_fields():
     assert policy == original
 
 
+def test_policy_normalize_writes_null_list_items_as_kopia_stores_them():
+    # Go's encoding/json leaves the zero value for a null list item or a null field of a list item
+    policy = {
+        "scheduling": {"timeOfDay": [{"hour": 5, "min": None}, None], "cron": [None]},
+        "files": {"ignore": [None, "*.tmp"]},
+        "actions": {"beforeSnapshotRoot": {"path": "/bin/true", "args": [None]}},
+    }
+    original = deepcopy(policy)
+    stored = {
+        "scheduling": {"timeOfDay": [{"hour": 5, "min": 0}, {"hour": 0, "min": 0}], "cron": [""]},
+        "files": {"ignore": ["", "*.tmp"]},
+        "actions": {"beforeSnapshotRoot": {"path": "/bin/true", "args": [""]}},
+    }
+    assert kopia.policy_normalize(policy) == stored
+    assert kopia.same_value(kopia.policy_normalize(stored), kopia.policy_normalize(policy))
+    assert policy == original
+
+
+@pytest.mark.parametrize("action", ["afterFolder", "afterSnapshotRoot", "beforeFolder", "beforeSnapshotRoot"])
+@pytest.mark.parametrize("empty", [{}, {"script": "", "timeout": 0, "args": []}])
+def test_policy_normalize_keeps_an_empty_action(action, empty):
+    # kopia stores an action as a pointer, so an empty one is exported as {} and blocks the inherited action
+    normalized = kopia.policy_normalize({"actions": {action: empty}})
+    assert normalized == {"actions": {action: {}}}
+    assert not kopia.same_value(normalized, kopia.policy_normalize({"actions": {}}))
+
+
+def test_policy_normalize_drops_a_null_action():
+    assert kopia.policy_normalize({"actions": {"beforeSnapshotRoot": None}, "files": {}}) == {}
+
+
 def test_policy_normalize_keeps_wrong_types():
     assert kopia.policy_normalize({"scheduling": {"manual": 0, "intervalSeconds": False}}) == {
         "scheduling": {"manual": 0, "intervalSeconds": False}

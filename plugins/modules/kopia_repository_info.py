@@ -80,6 +80,147 @@ repository:
       such as for a NUL character in a value passed to it.
   returned: unless Ansible rejects or cannot log the arguments or start kopia
   type: dict
+  contains:
+    blob_retention:
+      description:
+        - Blob retention of the repository.
+        - Its fields are passed through.
+      returned: always
+      type: dict
+    client_options:
+      description:
+        - Options of the client connection.
+        - Other fields kopia reports are passed through.
+      returned: always
+      type: dict
+      contains:
+        description:
+          description:
+            - Description of the connection.
+          returned: when set
+          type: str
+        enable_actions:
+          description:
+            - Whether snapshot actions run.
+          returned: always
+          type: bool
+        format_blob_cache_duration:
+          description:
+            - Nanoseconds the repository format is cached.
+          returned: when set
+          type: int
+        hostname:
+          description:
+            - Host name the client records in its snapshots.
+          returned: always
+          type: str
+        readonly:
+          description:
+            - Whether the connection is read-only.
+          returned: when the connection is read-only
+          type: bool
+        username:
+          description:
+            - User name the client records in its snapshots.
+          returned: always
+          type: str
+    config_file:
+      description:
+        - Configuration file of the connection.
+      returned: always
+      type: str
+    content_format:
+      description:
+        - Format of the repository contents.
+        - Other fields kopia reports are passed through.
+      returned: always
+      type: dict
+      contains:
+        enable_password_change:
+          description:
+            - Whether the repository password can be changed.
+          returned: always
+          type: bool
+        encryption:
+          description:
+            - Encryption algorithm.
+          returned: always
+          type: str
+        epoch_parameters:
+          description:
+            - Parameters of the epoch manager.
+            - Its fields are passed through.
+          returned: always
+          type: dict
+        hash:
+          description:
+            - Hash algorithm.
+          returned: always
+          type: str
+        index_version:
+          description:
+            - Version of the index format.
+          returned: when kopia reports it
+          type: int
+        max_pack_size:
+          description:
+            - Size in bytes of the largest pack.
+          returned: when kopia reports it
+          type: int
+        version:
+          description:
+            - Version of the repository format.
+          returned: always
+          type: int
+    object_format:
+      description:
+        - Format of the repository objects.
+      returned: always
+      type: dict
+      contains:
+        splitter:
+          description:
+            - Splitter algorithm.
+          returned: always
+          type: str
+    storage:
+      description:
+        - Storage of the repository.
+      returned: always
+      type: dict
+      contains:
+        config:
+          description:
+            - Configuration of the storage, whose fields depend on its type and
+              are passed through.
+          returned: always
+          type: dict
+        type:
+          description:
+            - Storage type, such as C(filesystem) or C(s3).
+          returned: always
+          type: str
+    unique_id_hex:
+      description:
+        - Unique ID of the repository in hexadecimal.
+      returned: always
+      type: str
+    volume:
+      description:
+        - Capacity of the storage volume.
+      returned: when the storage reports it
+      type: dict
+      contains:
+        available:
+          description:
+            - Bytes available.
+          returned: always
+          type: int
+        capacity:
+          description:
+            - Bytes in all.
+          returned: always
+          type: int
   sample:
     config_file: /root/.config/kopia/repository.config
     client_options:
@@ -96,7 +237,7 @@ repository:
       type: filesystem
       config:
         path: /srv/backup/kopia
-    unique_id_hex: 557e318faad94ead
+    unique_id_hex: 0f5b8a29110e21bf6bd1e81e7a807933b0c40f3478064e63f63f7d253c785a9b
 """
 
 from ansible.module_utils.basic import AnsibleModule

@@ -68,6 +68,14 @@ options:
         or C(no_parent), so these values are treated as left out, the same as
         kopia treats them. Fields kopia stores as optional values, such as the
         C(retention) counts, keep V(0) and V(false).
+      - kopia stores an action under C(actions), such as
+        C(actions.before_snapshot_root), even when it is empty, such as V({}),
+        and the target then no longer inherits that action, so an empty action
+        is not treated as left out. A V(null) action is left out.
+      - kopia stores V(null) in a list as the empty value of its items, so a
+        V(null) item of a list of strings, such as C(files.ignore), is treated
+        as an empty string, and a V(null) C(scheduling.time_of_day) entry, or a
+        V(null) C(hour) or C(min) of one, as V(0).
       - Required when O(state=present).
     type: dict
   state:
@@ -193,6 +201,470 @@ policy:
       cannot be started, such as for a NUL character in a value passed to it.
   returned: when O(state=present)
   type: dict
+  contains:
+    actions:
+      description:
+        - Actions run before and after snapshots. Always returned, empty when
+          no action is set.
+      returned: always
+      type: dict
+      contains:
+        after_folder:
+          description:
+            - Action run after the directory of the policy is snapshotted. An
+              empty dictionary is an action defined without a command.
+          returned: when set in the policy
+          type: dict
+          contains:
+            path:
+              description:
+                - Command the action runs.
+              returned: when set in the action
+              type: str
+            args:
+              description:
+                - Arguments passed to the command.
+              returned: when set in the action
+              type: list
+              elements: str
+            script:
+              description:
+                - Inline script the action runs in place of a command.
+              returned: when set in the action
+              type: str
+            timeout:
+              description:
+                - Seconds kopia waits for the action to finish.
+              returned: when set in the action
+              type: int
+            mode:
+              description:
+                - How kopia treats the action, such as C(essential),
+                  C(optional) or C(async).
+              returned: when set in the action
+              type: str
+        after_snapshot_root:
+          description:
+            - Action run after each snapshot root. An empty dictionary is an
+              action defined without a command.
+          returned: when set in the policy
+          type: dict
+          contains:
+            path:
+              description:
+                - Command the action runs.
+              returned: when set in the action
+              type: str
+            args:
+              description:
+                - Arguments passed to the command.
+              returned: when set in the action
+              type: list
+              elements: str
+            script:
+              description:
+                - Inline script the action runs in place of a command.
+              returned: when set in the action
+              type: str
+            timeout:
+              description:
+                - Seconds kopia waits for the action to finish.
+              returned: when set in the action
+              type: int
+            mode:
+              description:
+                - How kopia treats the action, such as C(essential),
+                  C(optional) or C(async).
+              returned: when set in the action
+              type: str
+        before_folder:
+          description:
+            - Action run before the directory of the policy is snapshotted. An
+              empty dictionary is an action defined without a command.
+          returned: when set in the policy
+          type: dict
+          contains:
+            path:
+              description:
+                - Command the action runs.
+              returned: when set in the action
+              type: str
+            args:
+              description:
+                - Arguments passed to the command.
+              returned: when set in the action
+              type: list
+              elements: str
+            script:
+              description:
+                - Inline script the action runs in place of a command.
+              returned: when set in the action
+              type: str
+            timeout:
+              description:
+                - Seconds kopia waits for the action to finish.
+              returned: when set in the action
+              type: int
+            mode:
+              description:
+                - How kopia treats the action, such as C(essential),
+                  C(optional) or C(async).
+              returned: when set in the action
+              type: str
+        before_snapshot_root:
+          description:
+            - Action run before each snapshot root. An empty dictionary is an
+              action defined without a command.
+          returned: when set in the policy
+          type: dict
+          contains:
+            path:
+              description:
+                - Command the action runs.
+              returned: when set in the action
+              type: str
+            args:
+              description:
+                - Arguments passed to the command.
+              returned: when set in the action
+              type: list
+              elements: str
+            script:
+              description:
+                - Inline script the action runs in place of a command.
+              returned: when set in the action
+              type: str
+            timeout:
+              description:
+                - Seconds kopia waits for the action to finish.
+              returned: when set in the action
+              type: int
+            mode:
+              description:
+                - How kopia treats the action, such as C(essential),
+                  C(optional) or C(async).
+              returned: when set in the action
+              type: str
+    compression:
+      description:
+        - Compression of file contents. Always returned, empty when nothing is
+          set.
+      returned: always
+      type: dict
+      contains:
+        compressor_name:
+          description:
+            - Compressor kopia uses, such as C(zstd) or C(none).
+          returned: when set in the policy
+          type: str
+        max_size:
+          description:
+            - Size in bytes above which files are not compressed.
+          returned: when set in the policy
+          type: int
+        min_size:
+          description:
+            - Size in bytes below which files are not compressed.
+          returned: when set in the policy
+          type: int
+        never_compress:
+          description:
+            - File name patterns that are never compressed.
+          returned: when set in the policy
+          type: list
+          elements: str
+        no_parent_never_compress:
+          description:
+            - Whether C(never_compress) of parent policies is ignored.
+          returned: when set in the policy
+          type: bool
+        no_parent_only_compress:
+          description:
+            - Whether C(only_compress) of parent policies is ignored.
+          returned: when set in the policy
+          type: bool
+        only_compress:
+          description:
+            - File name patterns that are the only ones compressed.
+          returned: when set in the policy
+          type: list
+          elements: str
+    error_handling:
+      description:
+        - Errors a snapshot ignores. Always returned, empty when nothing is
+          set.
+      returned: always
+      type: dict
+      contains:
+        ignore_directory_errors:
+          description:
+            - Whether errors reading directories are ignored.
+          returned: when set in the policy
+          type: bool
+        ignore_file_errors:
+          description:
+            - Whether errors reading files are ignored.
+          returned: when set in the policy
+          type: bool
+        ignore_unknown_types:
+          description:
+            - Whether entries of unknown types are ignored.
+          returned: when set in the policy
+          type: bool
+    files:
+      description:
+        - Files a snapshot ignores. Always returned, empty when nothing is set.
+      returned: always
+      type: dict
+      contains:
+        ignore:
+          description:
+            - Ignore rules, in C(.gitignore) syntax.
+          returned: when set in the policy
+          type: list
+          elements: str
+        ignore_cache_dirs:
+          description:
+            - Whether directories holding a C(CACHEDIR.TAG) file are ignored.
+          returned: when set in the policy
+          type: bool
+        ignore_dot_files:
+          description:
+            - Names of files in each directory holding further ignore rules.
+          returned: when set in the policy
+          type: list
+          elements: str
+        max_file_size:
+          description:
+            - Size in bytes above which files are ignored.
+          returned: when set in the policy
+          type: int
+        no_parent_dot_files:
+          description:
+            - Whether C(ignore_dot_files) of parent policies is ignored.
+          returned: when set in the policy
+          type: bool
+        no_parent_ignore:
+          description:
+            - Whether C(ignore) of parent policies is ignored.
+          returned: when set in the policy
+          type: bool
+        one_file_system:
+          description:
+            - Whether a snapshot stays on the file system of its root.
+          returned: when set in the policy
+          type: bool
+    logging:
+      description:
+        - Detail of the log kopia writes for snapshots, from C(0) for none
+          through C(5) for normal to C(10) for most.
+      returned: always
+      type: dict
+      contains:
+        directories:
+          description:
+            - Log detail for directories. Always returned, empty when nothing
+              is set.
+          returned: always
+          type: dict
+          contains:
+            ignored:
+              description:
+                - Log detail for ignored directories.
+              returned: when set in the policy
+              type: int
+            snapshotted:
+              description:
+                - Log detail for snapshotted directories.
+              returned: when set in the policy
+              type: int
+        entries:
+          description:
+            - Log detail for entries. Always returned, empty when nothing is
+              set.
+          returned: always
+          type: dict
+          contains:
+            cache_hit:
+              description:
+                - Log detail for entries found in the cache.
+              returned: when set in the policy
+              type: int
+            cache_miss:
+              description:
+                - Log detail for entries not found in the cache.
+              returned: when set in the policy
+              type: int
+            ignored:
+              description:
+                - Log detail for ignored entries.
+              returned: when set in the policy
+              type: int
+            snapshotted:
+              description:
+                - Log detail for snapshotted entries.
+              returned: when set in the policy
+              type: int
+    metadata_compression:
+      description:
+        - Compression of directory metadata. Always returned, empty when
+          nothing is set.
+      returned: always
+      type: dict
+      contains:
+        compressor_name:
+          description:
+            - Compressor kopia uses for metadata.
+          returned: when set in the policy
+          type: str
+    no_parent:
+      description:
+        - Whether the policy inherits nothing from parent policies.
+      returned: when set in the policy
+      type: bool
+    os_snapshots:
+      description:
+        - Operating system snapshots taken before a snapshot.
+      returned: always
+      type: dict
+      contains:
+        volume_shadow_copy:
+          description:
+            - Windows Volume Shadow Copy. Always returned, empty when nothing
+              is set.
+          returned: always
+          type: dict
+          contains:
+            enable:
+              description:
+                - Whether a snapshot is taken, C(0) never, C(1) always, failing
+                  without one, or C(2) when available.
+              returned: when set in the policy
+              type: int
+    retention:
+      description:
+        - Snapshots kept. Always returned, empty when nothing is set.
+      returned: always
+      type: dict
+      contains:
+        ignore_identical_snapshots:
+          description:
+            - Whether a snapshot identical to the previous one is not saved.
+          returned: when set in the policy
+          type: bool
+        keep_annual:
+          description:
+            - Number of annual snapshots kept.
+          returned: when set in the policy
+          type: int
+        keep_daily:
+          description:
+            - Number of daily snapshots kept.
+          returned: when set in the policy
+          type: int
+        keep_hourly:
+          description:
+            - Number of hourly snapshots kept.
+          returned: when set in the policy
+          type: int
+        keep_latest:
+          description:
+            - Number of latest snapshots kept.
+          returned: when set in the policy
+          type: int
+        keep_monthly:
+          description:
+            - Number of monthly snapshots kept.
+          returned: when set in the policy
+          type: int
+        keep_weekly:
+          description:
+            - Number of weekly snapshots kept.
+          returned: when set in the policy
+          type: int
+    scheduling:
+      description:
+        - When kopia takes snapshots. Always returned, empty when nothing is
+          set.
+      returned: always
+      type: dict
+      contains:
+        cron:
+          description:
+            - Cron expressions.
+          returned: when set in the policy
+          type: list
+          elements: str
+        interval_seconds:
+          description:
+            - Seconds between snapshots.
+          returned: when set in the policy
+          type: int
+        manual:
+          description:
+            - Whether snapshots are only taken manually.
+          returned: when set in the policy
+          type: bool
+        no_parent_time_of_day:
+          description:
+            - Whether C(time_of_day) of parent policies is ignored.
+          returned: when set in the policy
+          type: bool
+        run_missed:
+          description:
+            - Whether a missed snapshot is taken at once.
+          returned: when set in the policy
+          type: bool
+        time_of_day:
+          description:
+            - Times of day snapshots are taken.
+          returned: when set in the policy
+          type: list
+          elements: dict
+          contains:
+            hour:
+              description:
+                - Hour, from C(0) to C(23).
+              returned: always
+              type: int
+            min:
+              description:
+                - Minute, from C(0) to C(59).
+              returned: always
+              type: int
+    splitter:
+      description:
+        - How files are split into content. Always returned, empty when nothing
+          is set.
+      returned: always
+      type: dict
+      contains:
+        algorithm:
+          description:
+            - Splitter algorithm.
+          returned: when set in the policy
+          type: str
+    upload:
+      description:
+        - Upload parallelism. Always returned, empty when nothing is set.
+      returned: always
+      type: dict
+      contains:
+        max_parallel_file_reads:
+          description:
+            - Number of files read at the same time.
+          returned: when set in the policy
+          type: int
+        max_parallel_snapshots:
+          description:
+            - Number of snapshots taken at the same time.
+          returned: when set in the policy
+          type: int
+        parallel_upload_above_size:
+          description:
+            - Size in bytes above which a file is uploaded in parallel parts.
+          returned: when set in the policy
+          type: int
   sample:
     actions: {}
     compression:

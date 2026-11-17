@@ -161,10 +161,15 @@ options:
         would never match.
       - C(/etc/hostname) takes the highest preference in C(systemd-hostnamed), so
         a transient hostname cannot take effect while a static one is configured.
+        systemd 247 and earlier instead prefer the transient hostname to a
+        static hostname naming the local host, ignoring case, such as
+        V(localhost), V(localhost.localdomain) or a name ending in
+        V(.localhost), each with or without a trailing V(.).
       - Nothing is done when RV(hostname) already matches, whatever the source.
-        When it differs and a static hostname is configured, this fails rather
-        than reporting a change it cannot make, so set O(static_hostname) to the
-        same value instead, either on its own or alongside.
+        When it differs and a static hostname that takes precedence is
+        configured, this fails rather than reporting a change it cannot make, so
+        set O(static_hostname) to the same value instead, either on its own or
+        alongside.
       - It cannot be combined with changing O(static_hostname) to a value
         containing a V(?) wildcard or a V($) token, as the module cannot
         predict the hostname
@@ -216,6 +221,196 @@ hostname:
     - Empty when dasbus is unavailable in check mode.
   returned: always
   type: dict
+  contains:
+    boot_id:
+      description:
+        - Boot ID, as C(BootID) reports it.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    chassis:
+      description:
+        - Chassis type, such as C(server) or C(vm).
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    chassis_asset_tag:
+      description:
+        - Asset tag of the chassis.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    default_hostname:
+      description:
+        - Hostname used when no static or transient hostname is set.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    deployment:
+      description:
+        - Deployment environment, such as C(production).
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    firmware_date:
+      description:
+        - Firmware release date in microseconds since the epoch.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: int
+    firmware_vendor:
+      description:
+        - Firmware vendor.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    firmware_version:
+      description:
+        - Firmware version.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    hardware_model:
+      description:
+        - Hardware model.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    hardware_sku:
+      description:
+        - Hardware SKU.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    hardware_vendor:
+      description:
+        - Hardware vendor.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    hardware_version:
+      description:
+        - Hardware version.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    home_url:
+      description:
+        - Home page of the operating system.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    hostname:
+      description:
+        - Hostname in effect, the kernel hostname.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    hostname_source:
+      description:
+        - Source of the hostname in effect, C(static), C(transient) or
+          C(default).
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    icon_name:
+      description:
+        - Icon name of the host.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    kernel_name:
+      description:
+        - Kernel name, such as C(Linux).
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    kernel_release:
+      description:
+        - Kernel release.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    kernel_version:
+      description:
+        - Kernel version.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    location:
+      description:
+        - Location of the host.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    machine_id:
+      description:
+        - Machine ID, as C(MachineID) reports it.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    operating_system_cpe_name:
+      description:
+        - CPE name of the operating system.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    operating_system_fancy_name:
+      description:
+        - Fancy name of the operating system.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    operating_system_image_id:
+      description:
+        - Image ID of the operating system.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    operating_system_image_version:
+      description:
+        - Image version of the operating system.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    operating_system_pretty_name:
+      description:
+        - Pretty name of the operating system.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    operating_system_support_end:
+      description:
+        - End of support of the operating system in microseconds since the
+          epoch.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: int
+    pretty_hostname:
+      description:
+        - Pretty hostname.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    static_hostname:
+      description:
+        - Static hostname from C(/etc/hostname).
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    tags:
+      description:
+        - Tags of the host.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: list
+      elements: str
+    vsock_cid:
+      description:
+        - VSOCK context ID of the host.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: int
   sample:
     boot_id: 8d1e0f2a4b6c8d0e1f2a3b4c5d6e7f80
     chassis: server
@@ -311,12 +506,29 @@ NAME_MAX = 255
 # the first systemd that also refuses control characters, backslashes, quotes and glob characters in an icon name
 ICON_NAME_SAFE_VERSION = 262
 ICON_NAME_UNSAFE = re.compile(r"[\x00-\x1f\x7f\\'\"*?\[]")
+# systemd 247 and earlier prefer a transient hostname to a static one that is_localhost() matches, ignoring ASCII case,
+# as one of these names or as a name ending in "." and one of them; later ones always apply a static hostname
+LOCALHOST_NAMES = (b"localhost", b"localhost.", b"localhost.localdomain", b"localhost.localdomain.")
+STATIC_PRECEDENCE_VERSION = 248
 
 
 def hostname_valid(value, version):
     """Return whether systemd-hostnamed of the given version accepts value as a hostname, without wildcards."""
     pattern = HOSTNAME if version >= HOSTNAME_LDH_VERSION else HOSTNAME_239
     return len(value) <= HOSTNAME_MAX and pattern.match(value) is not None
+
+
+def static_takes_precedence(static_hostname, version):
+    """Return whether systemd-hostnamed of the given version applies static_hostname in place of a transient one."""
+    if not static_hostname:
+        return False
+
+    if version >= STATIC_PRECEDENCE_VERSION:
+        return True
+
+    # bytes.lower() folds only ASCII letters, as strcasecmp() does
+    name = static_hostname.encode("utf-8").lower()
+    return not (name in LOCALHOST_NAMES or name.endswith(tuple(b"." + local for local in LOCALHOST_NAMES)))
 
 
 def check_icon_name(module, value, version):
@@ -489,6 +701,8 @@ def ensure_present(module):
     compare_machine_info = any(module.params[param] is not None for param in MACHINE_INFO_KEYS.values())
     compare_static_hostname = module.params["static_hostname"] is not None
 
+    version = None
+
     # the files are read as the running systemd reads them, which changes between versions
     if compare_machine_info or compare_static_hostname:
         version = systemd_version(module)
@@ -516,21 +730,32 @@ def ensure_present(module):
                 msg=f"unable to set {param}: {MACHINE_INFO} {machine_info_error}, which systemd-hostnamed refuses to rewrite"
             )
 
+        # systemd 247 and earlier keep the hostname in effect in place of a static one naming the local host, and report
+        # no HostnameSource
         if param == "static_hostname":
-            predicted["hostname"] = value or default or current["hostname"]
-            predicted["hostname_source"] = "static" if value else "default"
+            predicted["hostname"] = value if static_takes_precedence(value, version) else default or current["hostname"]
+
+            if current["hostname_source"] is not None:
+                predicted["hostname_source"] = "static" if value else "default"
 
         predicted[param] = value
         pending.append((param, method, (value, False)))
 
     if transient and predicted["hostname"] != transient:
-        if predicted["static_hostname"]:
+        # whether a static hostname takes precedence depends on the running systemd
+        if predicted["static_hostname"] and version is None:
+            version = systemd_version(module)
+
+        if static_takes_precedence(predicted["static_hostname"], version):
             module.fail_json(
                 msg=f"unable to set the transient hostname: the static hostname {predicted['static_hostname']} takes precedence"
             )
 
         predicted["hostname"] = transient
-        predicted["hostname_source"] = "transient"
+
+        if current["hostname_source"] is not None:
+            predicted["hostname_source"] = "transient"
+
         pending.append(("transient_hostname", "SetHostname", (transient, False)))
 
     if transient == "":

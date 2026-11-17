@@ -1429,6 +1429,80 @@ def test_hostname_cleanup_239(value, expected):
     assert systemd_hostname.hostname_cleanup(value, 239) == expected
 
 
+@pytest.mark.parametrize(
+    "static_hostname",
+    [
+        "localhost",
+        "LocalHost.",
+        "localhost.localdomain",
+        "localhost.localdomain.",
+        "web.localhost",
+        "web.LOCALHOST.",
+        "web.localhost.localdomain",
+        "web.localhost.localdomain.",
+    ],
+)
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_hostname_transient_takes_precedence_over_localhost_before_248(
+    monkeypatch, tmp_path, run_module, systemd_version, static_hostname, check_mode
+):
+    # systemd-hostnamed 247 and earlier apply a static hostname only when hostname_is_useful(), not is_localhost()
+    systemd_version.return_value = 247
+    current = {
+        **HOSTNAME,
+        "default_hostname": None,
+        "hostname": "localhost",
+        "hostname_source": None,
+        "static_hostname": static_hostname,
+    }
+    mutate = hostname_module(monkeypatch, tmp_path, current)
+    result = run_module(systemd_hostname, {"transient_hostname": "web01"}, check_mode)
+    assert result["changed"] and not result.get("failed"), result
+    if check_mode:
+        assert result["hostname"] == {**current, "hostname": "web01"}
+        mutate.assert_not_called()
+    else:
+        assert mutate.call_count == 1
+        assert mutate.call_args.args[2:] == ("SetHostname", "web01", False)
+
+
+@pytest.mark.parametrize(
+    "version, static_hostname",
+    [(248, "localhost"), (248, "web02"), (247, "web01.localdomain"), (247, "localhostx"), (247, "localhost.web")],
+)
+def test_hostname_static_hostname_takes_precedence(
+    monkeypatch, tmp_path, run_module, systemd_version, version, static_hostname
+):
+    # from systemd 248 every static hostname takes precedence, and before it every one but those naming the local host
+    systemd_version.return_value = version
+    current = {**HOSTNAME, "hostname": static_hostname, "static_hostname": static_hostname}
+    mutate = hostname_module(monkeypatch, tmp_path, current)
+    result = run_module(systemd_hostname, {"transient_hostname": "web01"})
+    assert result == {
+        "failed": True,
+        "msg": f"unable to set the transient hostname: the static hostname {static_hostname} takes precedence",
+    }
+    mutate.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "version, static_hostname, hostname",
+    [(247, "localhost", "old"), (247, "web01", "web01"), (248, "localhost", "localhost")],
+)
+def test_hostname_check_mode_predicts_static_hostname_precedence(
+    monkeypatch, tmp_path, run_module, systemd_version, version, static_hostname, hostname
+):
+    # systemd 247 and earlier keep the hostname in effect when the static hostname names the local host
+    systemd_version.return_value = version
+    # DefaultHostname and HostnameSource were added in systemd 248
+    current = {**HOSTNAME, "default_hostname": None, "hostname_source": None} if version < 248 else HOSTNAME
+    hostname_module(monkeypatch, tmp_path, current, etc_hostname="old\n")
+    result = run_module(systemd_hostname, {"static_hostname": static_hostname}, True)
+    assert result["changed"]
+    assert result["hostname"]["hostname"] == hostname
+    assert result["hostname"]["hostname_source"] == current["hostname_source"]
+
+
 def test_hostname_version_read_only_to_compare(monkeypatch, tmp_path, run_module, systemd_version):
     hostname_module(monkeypatch, tmp_path, HOSTNAME)
     assert run_module(systemd_hostname, {"transient_hostname": "old"})["changed"] is False

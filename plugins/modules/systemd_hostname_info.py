@@ -42,6 +42,196 @@ hostname:
     - Empty when dasbus is unavailable in check mode.
   returned: always
   type: dict
+  contains:
+    boot_id:
+      description:
+        - Boot ID, as C(BootID) reports it.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    chassis:
+      description:
+        - Chassis type, such as C(server) or C(vm).
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    chassis_asset_tag:
+      description:
+        - Asset tag of the chassis.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    default_hostname:
+      description:
+        - Hostname used when no static or transient hostname is set.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    deployment:
+      description:
+        - Deployment environment, such as C(production).
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    firmware_date:
+      description:
+        - Firmware release date in microseconds since the epoch.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: int
+    firmware_vendor:
+      description:
+        - Firmware vendor.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    firmware_version:
+      description:
+        - Firmware version.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    hardware_model:
+      description:
+        - Hardware model.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    hardware_sku:
+      description:
+        - Hardware SKU.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    hardware_vendor:
+      description:
+        - Hardware vendor.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    hardware_version:
+      description:
+        - Hardware version.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    home_url:
+      description:
+        - Home page of the operating system.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    hostname:
+      description:
+        - Hostname in effect, the kernel hostname.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    hostname_source:
+      description:
+        - Source of the hostname in effect, C(static), C(transient) or
+          C(default).
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    icon_name:
+      description:
+        - Icon name of the host.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    kernel_name:
+      description:
+        - Kernel name, such as C(Linux).
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    kernel_release:
+      description:
+        - Kernel release.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    kernel_version:
+      description:
+        - Kernel version.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    location:
+      description:
+        - Location of the host.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    machine_id:
+      description:
+        - Machine ID, as C(MachineID) reports it.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    operating_system_cpe_name:
+      description:
+        - CPE name of the operating system.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    operating_system_fancy_name:
+      description:
+        - Fancy name of the operating system.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    operating_system_image_id:
+      description:
+        - Image ID of the operating system.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    operating_system_image_version:
+      description:
+        - Image version of the operating system.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    operating_system_pretty_name:
+      description:
+        - Pretty name of the operating system.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    operating_system_support_end:
+      description:
+        - End of support of the operating system in microseconds since the
+          epoch.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: int
+    pretty_hostname:
+      description:
+        - Pretty hostname.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    static_hostname:
+      description:
+        - Static hostname from C(/etc/hostname).
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: str
+    tags:
+      description:
+        - Tags of the host.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: list
+      elements: str
+    vsock_cid:
+      description:
+        - VSOCK context ID of the host.
+      returned: >-
+        always, as V(none) when the running systemd does not implement it
+      type: int
   sample:
     boot_id: 8d1e0f2a4b6c8d0e1f2a3b4c5d6e7f80
     chassis: server

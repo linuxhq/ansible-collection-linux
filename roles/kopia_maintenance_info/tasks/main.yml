@@ -11,6 +11,6 @@
   tags:
     - kopia_maintenance_info
   ansible.builtin.set_fact:
-    _kopia_maintenance_info_dict:
+    _kopia_maintenance_info_maintenance:
       "{{ __kopia_maintenance_info_query.maintenance | d({}) }}"
 ...

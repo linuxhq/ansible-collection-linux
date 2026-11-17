@@ -281,6 +281,113 @@ locale:
     - Empty when dasbus is unavailable in check mode.
   returned: always
   type: dict
+  contains:
+    locale:
+      description:
+        - Locale variables, each named after its variable in lowercase.
+      returned: always
+      type: dict
+      contains:
+        lang:
+          description:
+            - Value of C(LANG).
+          returned: always, as V(none) when it is not configured
+          type: str
+        language:
+          description:
+            - Value of C(LANGUAGE).
+          returned: always, as V(none) when it is not configured
+          type: str
+        lc_address:
+          description:
+            - Value of C(LC_ADDRESS).
+          returned: always, as V(none) when it is not configured
+          type: str
+        lc_collate:
+          description:
+            - Value of C(LC_COLLATE).
+          returned: always, as V(none) when it is not configured
+          type: str
+        lc_ctype:
+          description:
+            - Value of C(LC_CTYPE).
+          returned: always, as V(none) when it is not configured
+          type: str
+        lc_identification:
+          description:
+            - Value of C(LC_IDENTIFICATION).
+          returned: always, as V(none) when it is not configured
+          type: str
+        lc_measurement:
+          description:
+            - Value of C(LC_MEASUREMENT).
+          returned: always, as V(none) when it is not configured
+          type: str
+        lc_messages:
+          description:
+            - Value of C(LC_MESSAGES).
+          returned: always, as V(none) when it is not configured
+          type: str
+        lc_monetary:
+          description:
+            - Value of C(LC_MONETARY).
+          returned: always, as V(none) when it is not configured
+          type: str
+        lc_name:
+          description:
+            - Value of C(LC_NAME).
+          returned: always, as V(none) when it is not configured
+          type: str
+        lc_numeric:
+          description:
+            - Value of C(LC_NUMERIC).
+          returned: always, as V(none) when it is not configured
+          type: str
+        lc_paper:
+          description:
+            - Value of C(LC_PAPER).
+          returned: always, as V(none) when it is not configured
+          type: str
+        lc_telephone:
+          description:
+            - Value of C(LC_TELEPHONE).
+          returned: always, as V(none) when it is not configured
+          type: str
+        lc_time:
+          description:
+            - Value of C(LC_TIME).
+          returned: always, as V(none) when it is not configured
+          type: str
+    vconsole_keymap:
+      description:
+        - Virtual console keymap.
+      returned: always
+      type: str
+    vconsole_keymap_toggle:
+      description:
+        - Virtual console toggle keymap.
+      returned: always
+      type: str
+    x11_layout:
+      description:
+        - X11 keyboard layout.
+      returned: always
+      type: str
+    x11_model:
+      description:
+        - X11 keyboard model.
+      returned: always
+      type: str
+    x11_options:
+      description:
+        - X11 keyboard options.
+      returned: always
+      type: str
+    x11_variant:
+      description:
+        - X11 keyboard variant.
+      returned: always
+      type: str
   sample:
     locale:
       lang: en_US.UTF-8

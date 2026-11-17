@@ -1,16 +1,36 @@
 ---
 - name: Verify
   hosts: all
-  roles:
-    - kopia_repository_info
+  tasks:
+    - name: Ensure kopia repository information is gathered
+      tags:
+        - kopia_repository_info
+      ansible.builtin.include_role:
+        name: kopia_repository_info
 
-  post_tasks:
     - name: Ensure kopia information is verified
       tags:
         - kopia_repository_info
       ansible.builtin.assert:
         that:
-          - _kopia_repository_info_dict.storage.type == kopia_repository.storage
-          - _kopia_repository_info_dict.storage.config.path ==
+          - _kopia_repository_info_connected is true
+          - _kopia_repository_info_repository.storage.type == kopia_repository.storage
+          - _kopia_repository_info_repository.storage.config.path ==
             kopia_repository.options.path
+
+    - name: Ensure kopia repository information is gathered for a configuration file without a connection
+      tags:
+        - kopia_repository_info
+      ansible.builtin.include_role:
+        name: kopia_repository_info
+      vars:
+        kopia_repository_info_config_file: /root/.config/kopia/molecule-unconnected.config
+
+    - name: Ensure kopia information for a configuration file without a connection is verified
+      tags:
+        - kopia_repository_info
+      ansible.builtin.assert:
+        that:
+          - _kopia_repository_info_connected is false
+          - _kopia_repository_info_repository == {}
 ...
