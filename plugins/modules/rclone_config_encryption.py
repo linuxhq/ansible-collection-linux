@@ -87,6 +87,10 @@ options:
         on the managed node, which can be older than the ones rclone is built
         with, so rclone may normalize a character unassigned in those tables
         differently and then not open the file.
+      - rclone inserts U+034F into a run of more than 30 combining characters
+        while normalizing the password, and Python does not, so rclone cannot
+        open a file encrypted with a password holding such a run, such as
+        V(a) followed by 31 U+0301.
     type: str
   path:
     description:
