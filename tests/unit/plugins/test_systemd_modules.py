@@ -717,6 +717,19 @@ def test_locale_keyboard_syntax_accepted_after_another_request(
     assert mutate.call_args_list[0].args[2] == "SetLocale"
 
 
+@pytest.mark.parametrize("value", ["grp:'alt'", "grp:\ufffe"])
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_locale_keyboard_syntax_checks_matching_x11_settings_sent_after_conversion(
+    monkeypatch, run_module, value, check_mode
+):
+    # the converted console keymap replaces the configured X11 options, which SetX11Keyboard then sends again
+    mutate = locale_keyboard_module(monkeypatch, {**LOCALE, "x11_options": value})
+    params = {"vconsole_keymap": "de", "x11_options": value, "_ansible_no_log": True}
+    result = run_module(systemd_locale, params, check_mode)
+    assert result["failed"] and result["msg"].startswith("invalid x11_options")
+    mutate.assert_not_called()
+
+
 def test_locale_keyboard_syntax_skips_x11_settings_replaced_by_conversion(monkeypatch, run_module):
     # the console keymap is converted first, so the configured X11 options are replaced rather than sent again
     current = {**LOCALE, "x11_options": 'grp:"alt"'}

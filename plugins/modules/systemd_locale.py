@@ -612,10 +612,10 @@ def check_keyboard(module, settings, version):
 
     Whether a console keymap is installed or an X11 keyboard layout compiles is left to systemd-localed.
     """
-    unsafe = KEYBOARD_UNSAFE_GLOB if version >= KEYBOARD_GLOB_VERSION else KEYBOARD_UNSAFE
-    rule = "control characters, quotes, backslashes" + (
-        " and glob characters" if unsafe is KEYBOARD_UNSAFE_GLOB else ""
-    )
+    if version >= KEYBOARD_GLOB_VERSION:
+        unsafe, rule = KEYBOARD_UNSAFE_GLOB, "control characters, quotes, backslashes or glob characters"
+    else:
+        unsafe, rule = KEYBOARD_UNSAFE, "control characters, quotes or backslashes"
 
     for name, value in settings:
         if not value:
@@ -725,11 +725,16 @@ def ensure_present(module):
         check_utf8(module, settings)
         check_keyboard(module, settings, version)
 
-    if "SetX11Keyboard" in later:
-        # a console keymap converted first replaces the X11 settings left unset, so only the requested ones are sent
-        settings = [
-            (name, keyboard[name]) for name in X11_SETTINGS if not convert_keymap or module.params[name] is not None
-        ]
+    if convert_keymap:
+        # SetVConsoleKeyboard first replaces the X11 settings with the converted ones, after which SetX11Keyboard sends
+        # the requested ones, including any that match the configured ones now
+        settings = [(name, module.params[name]) for name in X11_SETTINGS if module.params[name] is not None]
+    elif "SetX11Keyboard" in later:
+        settings = [(name, keyboard[name]) for name in X11_SETTINGS]
+    else:
+        settings = []
+
+    if settings:
         check_utf8(module, settings)
         check_keyboard(module, settings, version)
 

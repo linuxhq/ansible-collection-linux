@@ -20,9 +20,9 @@ description:
     10000 sessions and 1024 megabytes. So the module sends only the log
     retention options that differ, the non-zero ones first, in a second
     C(kopia maintenance set) when needed, so that each one set is stored as
-    requested. When every stored log retention setting is zero, the ones left
-    unset take the default values. The result and check mode predictions
-    follow kopia.
+    requested. When every stored log retention setting is zero and a log
+    retention option is sent, the ones left unset take the default values.
+    The result and check mode predictions follow kopia.
 notes:
   - kopia reads the repository password persisted next to the configuration
     file, in a file named after it with C(.kopia-password) added. When there
