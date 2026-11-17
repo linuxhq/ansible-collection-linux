@@ -411,6 +411,22 @@ def test_file_attributes_are_checked_before_writing(tmp_path, run_module, params
     assert (path.read_text() if existing else path.exists()) == ("old" if existing else False)
 
 
+@pytest.mark.parametrize("kind, option", [("user", "owner"), ("group", "group")])
+@pytest.mark.parametrize("value", ["-5", "-1", "4294967295", "4294967296"])
+@pytest.mark.parametrize("state", ["present", "absent"])
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_id_out_of_range_fails_before_writing(tmp_path, run_module, kind, option, value, state, check_mode):
+    # os.lchown raises OverflowError beyond uid_t, which Ansible does not catch, and reads -1 and 2**32 - 1 as no change
+    path = tmp_path / "rclone.conf"
+    params = {"path": str(path), "password": "secret", "state": state, "content": "new", option: value}
+    result = run_module(plugin, params, check_mode)
+    assert result == {
+        "failed": True,
+        "msg": f"unable to manage configuration file {path}: {kind} ID {value} must be from 0 to 4294967294",
+    }
+    assert not path.exists()
+
+
 @pytest.mark.parametrize(
     "params", [{"owner": str(os.getuid())}, {"group": str(os.getgid())}, {"mode": "u=rw,g=r,o="}, {"mode": "0640"}]
 )

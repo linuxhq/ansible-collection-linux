@@ -161,6 +161,101 @@ maintenance:
       cannot be started, such as for a NUL character in a value passed to it.
   returned: unless Ansible rejects or cannot log the arguments or start kopia
   type: dict
+  contains:
+    extend_object_locks:
+      description:
+        - Whether maintenance extends object locks.
+      returned: always
+      type: bool
+    full:
+      description:
+        - Full maintenance cycle.
+      returned: always
+      type: dict
+      contains:
+        enabled:
+          description:
+            - Whether the cycle is enabled.
+          returned: always
+          type: bool
+        interval:
+          description:
+            - Interval of the cycle in nanoseconds.
+          returned: always
+          type: int
+    list_parallelism:
+      description:
+        - Number of parallel listings, C(0) for kopia's default.
+      returned: always
+      type: int
+    log_retention:
+      description:
+        - Retention of kopia's logs in the repository.
+      returned: always
+      type: dict
+      contains:
+        max_age:
+          description:
+            - Age in nanoseconds above which logs are deleted.
+          returned: always
+          type: int
+        max_count:
+          description:
+            - Number of logs kept.
+          returned: always
+          type: int
+        max_total_size:
+          description:
+            - Total size in bytes of the logs kept.
+          returned: always
+          type: int
+    owner:
+      description:
+        - User and host, as C(user@host), that runs maintenance.
+      returned: always
+      type: str
+    quick:
+      description:
+        - Quick maintenance cycle.
+      returned: always
+      type: dict
+      contains:
+        enabled:
+          description:
+            - Whether the cycle is enabled.
+          returned: always
+          type: bool
+        interval:
+          description:
+            - Interval of the cycle in nanoseconds.
+          returned: always
+          type: int
+    schedule:
+      description:
+        - Maintenance schedule and history.
+      returned: always
+      type: dict
+      contains:
+        next_full_maintenance:
+          description:
+            - Time of the next full maintenance, in RFC 3339 with nanoseconds.
+          returned: always
+          type: str
+        next_quick_maintenance:
+          description:
+            - Time of the next quick maintenance, in RFC 3339 with nanoseconds.
+          returned: always
+          type: str
+        runs:
+          description:
+            - Recent runs of each maintenance task, keyed by the task kopia
+              names, such as C(snapshot-gc), newest first.
+            - Each run is a dictionary with its C(start) and C(end) times, in
+              RFC 3339 with nanoseconds, C(success) set to V(true) when it
+              succeeded, C(error) when it failed, and C(extra), the statistics
+              kopia reports, passed through.
+          returned: always, as V(none) when kopia has recorded no run
+          type: dict
   sample:
     extend_object_locks: false
     full:
@@ -176,8 +271,18 @@ maintenance:
       enabled: true
       interval: 3600000000000
     schedule:
-      next_full_maintenance: '2026-07-21T22:59:38.254277-07:00'
-      next_quick_maintenance: '2026-07-20T23:59:38.254277-07:00'
+      next_full_maintenance: '2026-07-22T05:59:38.254277061Z'
+      next_quick_maintenance: '2026-07-21T06:59:38.25427727Z'
+      runs:
+        snapshot-gc:
+          - end: '2026-07-21T05:59:38.051437598Z'
+            extra:
+              - data:
+                  deleted_content_count: 0
+                  deleted_content_size: 0
+                kind: snapshotGCStats
+            start: '2026-07-21T05:59:38.050921016Z'
+            success: true
 """
 
 from copy import deepcopy

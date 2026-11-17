@@ -13,6 +13,6 @@
   tags:
     - kopia_snapshot_info
   ansible.builtin.set_fact:
-    _kopia_snapshot_info_list:
+    _kopia_snapshot_info_snapshots:
       "{{ __kopia_snapshot_info_query.snapshots | d([]) }}"
 ...

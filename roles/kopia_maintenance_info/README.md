@@ -18,7 +18,7 @@ None
 
 ## Return Values
 
-    _kopia_maintenance_info_dict
+    _kopia_maintenance_info_maintenance
 
 ## Example Playbook
 

@@ -20,7 +20,7 @@ None
 
 ## Return Values
 
-    _kopia_snapshot_info_list
+    _kopia_snapshot_info_snapshots
 
 ## Example Playbook
 

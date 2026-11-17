@@ -18,7 +18,8 @@ None
 
 ## Return Values
 
-    _kopia_repository_info_dict
+    _kopia_repository_info_connected
+    _kopia_repository_info_repository
 
 ## Example Playbook
 

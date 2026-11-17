@@ -118,15 +118,243 @@ snapshots:
   returned: unless Ansible rejects or cannot log the arguments or start kopia
   type: list
   elements: dict
+  contains:
+    description:
+      description:
+        - Description of the snapshot, empty when none was given.
+      returned: always
+      type: str
+    end_time:
+      description:
+        - Time the snapshot ended, in UTC with nanoseconds, such as
+          C(2026-07-25T17:15:04.123456789Z).
+      returned: always
+      type: str
+    id:
+      description:
+        - Manifest ID of the snapshot, 32 lowercase hexadecimal digits.
+      returned: always
+      type: str
+    incomplete:
+      description:
+        - Reason kopia saved the snapshot incomplete.
+      returned: when the snapshot is incomplete
+      type: str
+    pins:
+      description:
+        - Pins that keep the snapshot from expiring.
+      returned: when the snapshot is pinned
+      type: list
+      elements: str
+    retention_reason:
+      description:
+        - Retention rules that keep the snapshot, such as C(latest-1).
+      returned: when a retention rule keeps the snapshot
+      type: list
+      elements: str
+    root_entry:
+      description:
+        - Root directory entry of the snapshot.
+        - Other fields kopia reports are passed through.
+      returned: always
+      type: dict
+      contains:
+        mode:
+          description:
+            - Permissions of the directory in octal, such as C(0755).
+          returned: always
+          type: str
+        mtime:
+          description:
+            - Modification time of the directory, in UTC with nanoseconds.
+          returned: always
+          type: str
+        name:
+          description:
+            - Name of the directory.
+          returned: always
+          type: str
+        obj:
+          description:
+            - Object ID of the directory listing.
+          returned: always
+          type: str
+        summ:
+          description:
+            - Summary of the directory tree.
+            - Other fields kopia reports are passed through.
+          returned: always
+          type: dict
+          contains:
+            dirs:
+              description:
+                - Number of directories.
+              returned: always
+              type: int
+            files:
+              description:
+                - Number of files.
+              returned: always
+              type: int
+            max_time:
+              description:
+                - Latest modification time in the tree, in UTC with
+                  nanoseconds.
+              returned: always
+              type: str
+            num_failed:
+              description:
+                - Number of entries that failed.
+              returned: always
+              type: int
+            size:
+              description:
+                - Total size of the files in bytes.
+              returned: always
+              type: int
+            symlinks:
+              description:
+                - Number of symbolic links.
+              returned: always
+              type: int
+        type:
+          description:
+            - Entry type, C(d) for a directory.
+          returned: always
+          type: str
+    source:
+      description:
+        - Source of the snapshot.
+      returned: always
+      type: dict
+      contains:
+        host:
+          description:
+            - Host name of the client that took the snapshot.
+          returned: always
+          type: str
+        path:
+          description:
+            - Absolute path of the snapshotted directory.
+          returned: always
+          type: str
+        user_name:
+          description:
+            - User name of the client that took the snapshot.
+          returned: always
+          type: str
+    start_time:
+      description:
+        - Time the snapshot started, in UTC with nanoseconds, such as
+          C(2026-07-25T17:15:00.123456789Z).
+      returned: always
+      type: str
+    stats:
+      description:
+        - Statistics of the snapshot.
+      returned: always
+      type: dict
+      contains:
+        cached_files:
+          description:
+            - Number of files found unchanged in the previous snapshot.
+          returned: always
+          type: int
+        dir_count:
+          description:
+            - Number of directories.
+          returned: always
+          type: int
+        error_count:
+          description:
+            - Number of errors.
+          returned: always
+          type: int
+        excluded_dir_count:
+          description:
+            - Number of excluded directories.
+          returned: always
+          type: int
+        excluded_file_count:
+          description:
+            - Number of excluded files.
+          returned: always
+          type: int
+        excluded_total_size:
+          description:
+            - Total size of the excluded files in bytes.
+          returned: always
+          type: int
+        file_count:
+          description:
+            - Number of files read.
+          returned: always
+          type: int
+        ignored_error_count:
+          description:
+            - Number of ignored errors.
+          returned: always
+          type: int
+        non_cached_files:
+          description:
+            - Number of files read because they changed.
+          returned: always
+          type: int
+        total_size:
+          description:
+            - Total size of the files in bytes.
+          returned: always
+          type: int
+    storage_stats:
+      description:
+        - Storage used by the snapshot, as kopia reports it.
+        - Its fields are passed through.
+      returned: when kopia has computed it
+      type: dict
+    tags:
+      description:
+        - Tags of the snapshot, keyed as kopia reports them, such as
+          C(tag:role).
+      returned: when the snapshot has tags
+      type: dict
   sample:
-    - id: k9c8f0b1c2d3e4f5
-      description: nightly
+    - description: nightly
+      end_time: '2026-07-25T17:15:04.008021971Z'
+      id: 18667b2ef651cb5660945854da507d80
+      retention_reason:
+        - latest-1
+        - daily-1
+      root_entry:
+        mode: '0755'
+        mtime: '2026-07-25T17:10:43.219843589Z'
+        name: vagrant
+        obj: k0188cac21bdbd0700f80f3623444f0dc
+        summ:
+          dirs: 4
+          files: 120
+          max_time: '2026-07-25T17:10:43.219843589Z'
+          num_failed: 0
+          size: 10485760
+          symlinks: 0
+        type: d
       source:
         host: server
         path: /home/vagrant
         user_name: root
-      start_time: '2026-07-25T10:15:00.000000-07:00'
-      end_time: '2026-07-25T10:15:04.000000-07:00'
+      start_time: '2026-07-25T17:15:00.005833669Z'
+      stats:
+        cached_files: 0
+        dir_count: 4
+        error_count: 0
+        excluded_dir_count: 0
+        excluded_file_count: 0
+        excluded_total_size: 0
+        file_count: 120
+        ignored_error_count: 0
+        non_cached_files: 120
+        total_size: 10485760
+      tags:
+        tag:role: web
 """
 
 import json

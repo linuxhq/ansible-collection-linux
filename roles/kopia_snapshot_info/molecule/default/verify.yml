@@ -13,8 +13,8 @@
         - kopia_snapshot_info
       ansible.builtin.assert:
         that:
-          - _kopia_snapshot_info_list | length > 0
-          - _kopia_snapshot_info_list | map(attribute='source.path') | unique == ['/home/vagrant']
+          - _kopia_snapshot_info_snapshots | length > 0
+          - _kopia_snapshot_info_snapshots | map(attribute='source.path') | unique == ['/home/vagrant']
 
     - name: Ensure kopia snapshot information is gathered for a path
       tags:
@@ -29,8 +29,8 @@
         - kopia_snapshot_info
       ansible.builtin.assert:
         that:
-          - _kopia_snapshot_info_list | length > 0
-          - _kopia_snapshot_info_list | map(attribute='source.path') | unique == ['/home/vagrant']
+          - _kopia_snapshot_info_snapshots | length > 0
+          - _kopia_snapshot_info_snapshots | map(attribute='source.path') | unique == ['/home/vagrant']
 
     - name: Ensure kopia snapshot information is gathered for a path without snapshots
       tags:
@@ -45,5 +45,5 @@
         - kopia_snapshot_info
       ansible.builtin.assert:
         that:
-          - _kopia_snapshot_info_list == []
+          - _kopia_snapshot_info_snapshots == []
 ...

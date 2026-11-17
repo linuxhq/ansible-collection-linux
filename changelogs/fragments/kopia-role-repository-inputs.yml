@@ -1,0 +1,6 @@
+---
+minor_changes:
+  - kopia role - pass ``kopia_repository.storage`` to kopia_repository as
+    given, and leave out ``validate_provider`` when
+    ``kopia_repository.validate_provider`` is not set, so the module's default
+    applies, instead of forcing ``false``.

@@ -147,6 +147,42 @@ timedate:
     - Empty when dasbus is unavailable in check mode.
   returned: always
   type: dict
+  contains:
+    can_ntp:
+      description:
+        - Whether a network time service is available.
+      returned: always
+      type: bool
+    local_rtc:
+      description:
+        - Whether the real-time clock is in local time.
+      returned: always
+      type: bool
+    ntp:
+      description:
+        - Whether network time synchronization is enabled.
+      returned: always
+      type: bool
+    ntp_synchronized:
+      description:
+        - Whether the system clock is synchronized.
+      returned: always
+      type: bool
+    rtc_time_usec:
+      description:
+        - Time of the real-time clock in microseconds since the epoch.
+      returned: always
+      type: int
+    time_usec:
+      description:
+        - System time in microseconds since the epoch.
+      returned: always
+      type: int
+    timezone:
+      description:
+        - Time zone, such as C(UTC).
+      returned: always
+      type: str
   sample:
     can_ntp: true
     local_rtc: false

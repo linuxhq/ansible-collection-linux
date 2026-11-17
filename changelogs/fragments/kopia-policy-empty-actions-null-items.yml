@@ -1,0 +1,15 @@
+---
+bugfixes:
+  - kopia_policy - compare an empty action, such as
+    ``actions.before_snapshot_root`` set to ``{}``, as kopia stores it. kopia
+    stores and exports such an action, which blocks the action the target
+    would otherwise inherit, but the module treated it as left out, so a
+    policy with an empty action stored outside the module was reported as
+    unchanged and never converged, and an empty action in ``policy`` was not
+    sent to kopia.
+  - kopia_policy - compare and send a ``null`` list item as kopia stores it,
+    an empty string in a list of strings such as ``files.ignore``,
+    ``scheduling.cron`` or the ``args`` of an action, and ``0`` for a
+    ``null`` ``scheduling.time_of_day`` entry or for its ``null`` ``hour`` or
+    ``min``. Such a policy was reported as changed on every run, and check mode
+    predicted ``null`` where kopia stores the empty value.

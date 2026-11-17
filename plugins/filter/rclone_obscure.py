@@ -51,6 +51,7 @@ EXAMPLES = r"""
 RETURN = r"""
 _value:
   description: The obscured value.
+  returned: success
   type: string
 """
 

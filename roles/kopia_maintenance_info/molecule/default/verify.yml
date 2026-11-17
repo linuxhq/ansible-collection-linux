@@ -1,15 +1,53 @@
 ---
 - name: Verify
   hosts: all
-  roles:
-    - kopia_maintenance_info
+  tasks:
+    - name: Ensure kopia maintenance information is gathered
+      tags:
+        - kopia_maintenance_info
+      ansible.builtin.include_role:
+        name: kopia_maintenance_info
 
-  post_tasks:
     - name: Ensure kopia information is verified
       tags:
         - kopia_maintenance_info
       ansible.builtin.assert:
         that:
-          - _kopia_maintenance_info_dict | length > 0
-          - _kopia_maintenance_info_dict.quick is defined
+          - _kopia_maintenance_info_maintenance | length > 0
+          - _kopia_maintenance_info_maintenance.quick is defined
+
+    - name: Ensure kopia maintenance information is gathered for a configuration file
+      tags:
+        - kopia_maintenance_info
+      ansible.builtin.include_role:
+        name: kopia_maintenance_info
+      vars:
+        kopia_maintenance_info_config_file: /root/.config/kopia/repository.config
+
+    - name: Ensure kopia information for a configuration file is verified
+      tags:
+        - kopia_maintenance_info
+      ansible.builtin.assert:
+        that:
+          - _kopia_maintenance_info_maintenance.quick is defined
+          - _kopia_maintenance_info_maintenance.owner is match('root@')
+
+    - name: Ensure kopia maintenance information is gathered in check mode without a connection
+      tags:
+        - kopia_maintenance_info
+      ansible.builtin.include_role:
+        name: kopia_maintenance_info
+        apply:
+          check_mode: true
+          tags:
+            - kopia_maintenance_info
+      vars:
+        kopia_maintenance_info_config_file: /root/.config/kopia/molecule-unconnected.config
+
+    - name: Ensure kopia information in check mode without a connection is verified
+      tags:
+        - kopia_maintenance_info
+      ansible.builtin.assert:
+        that:
+          - _kopia_maintenance_info_maintenance == {}
 ...

@@ -42,6 +42,7 @@ EXAMPLES = r"""
 RETURN = r"""
 _value:
   description: The plaintext value.
+  returned: success
   type: string
 """
 

@@ -32,9 +32,10 @@ description:
     O(mode) is set. It is created with that mode, so it is never readable by
     other users, even before O(mode) is applied. An existing file keeps its
     mode.
-  - An O(owner) or O(group) that cannot be looked up and an O(mode) that is
-    neither octal nor symbolic, or is an octal number beyond the range of a
-    C int, fail before anything is written. An SELinux context or
+  - An O(owner) or O(group) that cannot be looked up or is an ID outside
+    V(0) to V(4294967294), and an O(mode) that is neither octal nor symbolic,
+    or is an octal number beyond the range of a C int, fail before anything is
+    written. An SELinux context or
     O(attributes) value the system refuses, and an O(owner) or O(group) the
     module may not set, such as another user's when it does not run as root,
     fail only after the file is written.
@@ -215,6 +216,9 @@ CONFIG_UMASK = 0o077
 # os.chmod takes a mode as a C int and refuses a larger one only after the file is written
 INT_MAX = 2**31 - 1
 
+# the largest user or group ID chown sets, as uid_t and gid_t are 32 bits and (uid_t)-1 leaves the ID unchanged
+ID_MAX = 2**32 - 2
+
 # a regular file of mode 0600, against which a symbolic mode is checked before the configuration file is written
 SAMPLE_STAT = os.stat_result((stat.S_IFREG | 0o600, 0, 0, 0, 0, 0, 0, 0, 0, 0))
 
@@ -347,34 +351,40 @@ def check_path(module, path):
         )
 
 
+def check_id(module, path, kind, value, lookup):
+    """Fail for a user or group that Ansible refuses, or never sets, only after the file is written."""
+    # Ansible takes a value that int() accepts as an ID and looks up any other as a name
+    try:
+        number = int(value)
+    except ValueError:
+        try:
+            lookup(value)
+        except (KeyError, ValueError):
+            module.fail_json(
+                msg=f"unable to manage configuration file {label(path)}: failed to look up {kind} {label(value)}"
+            )
+
+        return
+
+    # os.lchown raises OverflowError, which Ansible does not catch, beyond uid_t and gid_t, and reads ID_MAX + 1 and -1
+    # as no change, which Ansible reports as changed on every run
+    if not 0 <= number <= ID_MAX:
+        module.fail_json(
+            msg=f"unable to manage configuration file {label(path)}: {kind} ID {label(value)} must be from 0 to {ID_MAX}"
+        )
+
+
 def check_file_attributes(module, path):
     """Fail before writing for an owner, group or mode that Ansible refuses only after the file is written."""
     owner = module.params["owner"]
     group = module.params["group"]
     mode = module.params["mode"]
 
-    # Ansible takes a value that int() accepts as an ID and looks up any other as a name, as checked here
     if owner is not None:
-        try:
-            int(owner)
-        except ValueError:
-            try:
-                pwd.getpwnam(owner)
-            except (KeyError, ValueError):
-                module.fail_json(
-                    msg=f"unable to manage configuration file {label(path)}: failed to look up user {label(owner)}"
-                )
+        check_id(module, path, "user", owner, pwd.getpwnam)
 
     if group is not None:
-        try:
-            int(group)
-        except ValueError:
-            try:
-                grp.getgrnam(group)
-            except (KeyError, ValueError):
-                module.fail_json(
-                    msg=f"unable to manage configuration file {label(path)}: failed to look up group {label(group)}"
-                )
+        check_id(module, path, "group", group, grp.getgrnam)
 
     if mode is None:
         return

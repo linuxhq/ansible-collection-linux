@@ -11,6 +11,8 @@
   tags:
     - kopia_repository_info
   ansible.builtin.set_fact:
-    _kopia_repository_info_dict:
+    _kopia_repository_info_connected:
+      "{{ __kopia_repository_info_query.connected | d(false) }}"
+    _kopia_repository_info_repository:
       "{{ __kopia_repository_info_query.repository | d({}) }}"
 ...
