@@ -33,4 +33,22 @@
         that:
           - _kopia_repository_info_connected is false
           - _kopia_repository_info_repository == {}
+
+    - name: Ensure kopia repository information is gathered in check mode without kopia
+      tags:
+        - kopia_repository_info
+      ansible.builtin.include_role:
+        name: kopia_repository_info
+        apply:
+          check_mode: true
+          environment:
+            PATH: /nonexistent
+
+    - name: Ensure kopia information in check mode without kopia is verified
+      tags:
+        - kopia_repository_info
+      ansible.builtin.assert:
+        that:
+          - _kopia_repository_info_connected is none
+          - _kopia_repository_info_repository == {}
 ...

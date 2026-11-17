@@ -12,7 +12,7 @@
     - kopia_repository_info
   ansible.builtin.set_fact:
     _kopia_repository_info_connected:
-      "{{ __kopia_repository_info_query.connected | d(false) }}"
+      "{{ __kopia_repository_info_query.connected | d(none) }}"
     _kopia_repository_info_repository:
       "{{ __kopia_repository_info_query.repository | d({}) }}"
 ...

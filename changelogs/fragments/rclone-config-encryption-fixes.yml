@@ -13,8 +13,10 @@ bugfixes:
     boundaries.
   - rclone_config_encryption - create a new configuration file with mode
     ``0600``, as rclone does, unless ``mode`` is set.
-  - rclone_config_encryption - follow a symbolic link at ``path`` and write its
-    target, as rclone does, instead of replacing the link with a regular file.
+  - rclone_config_encryption - follow a symbolic link at ``path`` through every
+    link in its chain and write the final file, instead of replacing the link
+    with a regular file. This matches rclone for a single link; for a chain of
+    links, rclone replaces the second link with a regular file.
   - rclone_config_encryption - include the path in every failure message.
   - rclone_config_encryption - document diff mode support, which returns the
     decrypted configuration in the diff.

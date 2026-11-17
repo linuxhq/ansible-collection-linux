@@ -165,7 +165,7 @@ maintenance:
     extend_object_locks:
       description:
         - Whether maintenance extends object locks.
-      returned: always
+      returned: with kopia 0.14.0 or later
       type: bool
     full:
       description:
@@ -186,7 +186,7 @@ maintenance:
     list_parallelism:
       description:
         - Number of parallel listings, C(0) for kopia's default.
-      returned: always
+      returned: with kopia 0.18.0 or later
       type: int
     log_retention:
       description:

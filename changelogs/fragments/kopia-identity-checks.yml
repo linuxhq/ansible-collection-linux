@@ -10,7 +10,9 @@ bugfixes:
     an azure container in another storage domain, fails instead of reporting
     no change. A ``storage_domain`` that is not stored is compared as
     ``blob.core.windows.net``, the domain kopia uses then, and ``port`` as the
-    number kopia reads from it, so ``"+22"`` matches a stored ``22``.
+    number kopia reads from it, a decimal or hexadecimal floating-point number
+    read as Go's ``strconv.ParseFloat`` does and truncated, so ``"+22"`` and
+    ``"0x16p0"`` match a stored ``22``, and ``" 22"`` does not.
   - kopia_repository - document that kopia refuses a Boolean flag given a
     value, such as ``embed_credentials`` set to the string ``"true"``, before
     it changes anything.
