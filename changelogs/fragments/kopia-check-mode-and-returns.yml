@@ -31,8 +31,11 @@ bugfixes:
     are snapshotted, and that ``kopia_snapshot`` takes a new snapshot on every
     run.
 breaking_changes:
-  - kopia_policy_info role - publish ``_kopia_policy_info_defined``,
+  - kopia_policy_info role - name the published facts after the module's
+    return values. Publish ``_kopia_policy_info_defined``,
     ``_kopia_policy_info_policy`` and ``_kopia_policy_info_effective_policy``
     with ``kopia_policy_info_target`` set, in place of
-    ``_kopia_policy_info_dict``, which held the effective policy and is no
-    longer published. ``_kopia_policy_info_list`` is unchanged.
+    ``_kopia_policy_info_dict``, which held the effective policy, and
+    ``_kopia_policy_info_policies`` in place of ``_kopia_policy_info_list``.
+    ``_kopia_policy_info_dict`` and ``_kopia_policy_info_list`` are no longer
+    published.

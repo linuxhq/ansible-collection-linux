@@ -21,7 +21,7 @@ None
 
     _kopia_policy_info_defined
     _kopia_policy_info_effective_policy
-    _kopia_policy_info_list
+    _kopia_policy_info_policies
     _kopia_policy_info_policy
 
 ## Example Playbook

@@ -16,7 +16,7 @@
           - _kopia_policy_info_defined
           - _kopia_policy_info_policy.retention.keep_latest == 2
           - _kopia_policy_info_effective_policy.retention.keep_latest == 2
-          - _kopia_policy_info_list == []
+          - _kopia_policy_info_policies == []
 
     - name: Ensure kopia policy information is gathered for a target without a policy
       tags:
@@ -48,7 +48,7 @@
         - kopia_policy_info
       vars:
         __kopia_policy_info_target: >-
-          {{ _kopia_policy_info_list
+          {{ _kopia_policy_info_policies
              | selectattr('target.path', 'equalto', kopia_policy_info_target)
              | first }}
       ansible.builtin.assert:
@@ -56,6 +56,6 @@
           - not _kopia_policy_info_defined
           - _kopia_policy_info_policy == {}
           - _kopia_policy_info_effective_policy == {}
-          - _kopia_policy_info_list | length > 1
+          - _kopia_policy_info_policies | length > 1
           - __kopia_policy_info_target.retention.keep_latest == 2
 ...
