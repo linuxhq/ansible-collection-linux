@@ -38,17 +38,10 @@ options:
         configuration directory, C($XDG_CONFIG_HOME/kopia) or
         C(~/.config/kopia), not in the working directory, so write V(./name)
         for a file in the working directory.
-      - The module fails before kopia runs, also in check mode, when the file,
-        or kopia's default one when this is unset, is a FIFO or a character
-        device, on which kopia can wait forever. So is the password file kopia
-        reads, named after the file with
-        C(.kopia-password) added. kopia reports any other file it cannot read,
-        such as a directory.
-      - A path with a NUL character, which the module cannot look up, or a
-        lone surrogate code point from U+D800 to U+DC7F, which cannot be passed
-        to kopia, is rejected before kopia runs, also in check mode. U+DC80 to
-        U+DCFF, which Ansible uses for bytes that are not valid UTF-8, are
-        passed as those bytes.
+      - A path with a lone surrogate code point from U+D800 to U+DC7F, which
+        cannot be passed to kopia, is rejected before kopia runs, also in
+        check mode. U+DC80 to U+DCFF, which Ansible uses for bytes that are
+        not valid UTF-8, are passed as those bytes.
     type: path
   enable_full:
     description: Enable or disable periodic full maintenance.

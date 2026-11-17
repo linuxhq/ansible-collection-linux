@@ -4,7 +4,6 @@
 import json
 import os
 import re
-import stat
 
 ACTION_COMMAND_OMITEMPTY = {"args": [], "mode": "", "path": "", "script": "", "timeout": 0}
 
@@ -228,39 +227,18 @@ def config_path(module):
     return clean_path(os.path.join(settings, "kopia", path))
 
 
-def check_readable(module, path, label, failed_result):
-    """Fail when path is a FIFO or a character device, on which kopia can wait forever reading it."""
-    try:
-        mode = os.stat(path).st_mode
-    except OSError:
-        return
-
-    # kopia reports any other file it cannot read or decode, such as a directory
-    if stat.S_ISFIFO(mode) or stat.S_ISCHR(mode):
-        module.fail_json(
-            msg=f"invalid {label} {text_label(path)}: it is a FIFO or a character device, which kopia can wait reading forever",
-            **failed_result,
-        )
-
-
 def check_connection(module, failed_result=None):
-    """Fail before kopia runs for a config_file that cannot be passed to kopia, or files kopia would wait reading."""
+    """Fail before kopia runs for a config_file that cannot be passed to kopia."""
     failed_result = failed_result or {}
-    config_file = module.params.get("config_file")
 
-    # os.stat fails with a traceback for a NUL, and run_command for U+D800 to U+DC7F; it passes U+DC80 to U+DCFF to
-    # kopia as the bytes they stand for
-    if config_file and "\x00" in config_file:
-        module.fail_json(msg="invalid config_file: it must not contain a NUL character", **failed_result)
-
-    check_utf8(module, [("config_file", config_file)], errors="surrogateescape", failed_result=failed_result)
-
-    path = config_path(module)
-    check_readable(module, path, "config_file" if config_file else "kopia configuration file", failed_result)
-
-    # kopia reads the persisted password when none is given, as it reads an empty KOPIA_PASSWORD
-    if not module.params.get("password"):
-        check_readable(module, f"{path}.kopia-password", "kopia password file", failed_result)
+    # run_command fails with a traceback for U+D800 to U+DC7F; it passes U+DC80 to U+DCFF to kopia as the bytes they
+    # stand for
+    check_utf8(
+        module,
+        [("config_file", module.params.get("config_file"))],
+        errors="surrogateescape",
+        failed_result=failed_result,
+    )
 
 
 def kopia_available(module):

@@ -61,17 +61,10 @@ options:
         configuration directory, C($XDG_CONFIG_HOME/kopia) or
         C(~/.config/kopia), not in the working directory, so write V(./name)
         for a file in the working directory.
-      - The module fails before kopia runs, also in check mode, when the file,
-        or kopia's default one when this is unset, is a FIFO or a character
-        device, on which kopia can wait forever. So is the password file kopia
-        reads when O(password) is not given, named after the file with
-        C(.kopia-password) added. kopia reports any other file it cannot read,
-        such as a directory.
-      - A path with a NUL character, which the module cannot look up, or a
-        lone surrogate code point from U+D800 to U+DC7F, which cannot be passed
-        to kopia, is rejected before kopia runs, also in check mode. U+DC80 to
-        U+DCFF, which Ansible uses for bytes that are not valid UTF-8, are
-        passed as those bytes.
+      - A path with a lone surrogate code point from U+D800 to U+DC7F, which
+        cannot be passed to kopia, is rejected before kopia runs, also in
+        check mode. U+DC80 to U+DCFF, which Ansible uses for bytes that are
+        not valid UTF-8, are passed as those bytes.
     type: path
   description:
     description:
@@ -104,27 +97,23 @@ options:
       - Local path to snapshot.
       - Ansible expands a leading V(~) and environment variables in it, as for
         any C(path) option, before it is passed to kopia.
-      - A path that is not valid UTF-8, such as one with a lone surrogate code
-        point, which Ansible uses for a byte that is not valid UTF-8, is
-        rejected before kopia runs, also in check mode, because kopia records
-        it with U+FFFD in its place and cannot list its snapshots.
+      - A path with a lone surrogate code point from U+D800 to U+DC7F, which
+        cannot be passed to kopia, is rejected before kopia runs, also in check
+        mode. U+DC80 to U+DCFF, which Ansible uses for bytes that are not valid
+        UTF-8, are passed as those bytes, which kopia records with U+FFFD in
+        their place.
     type: path
     required: true
   tags:
     description:
       - Tags to record on the snapshot.
       - Each entry becomes one C(--tags key:value) flag, with the key used as
-        given.
+        given and the value written as Python writes it.
       - kopia splits each flag at its first V(:), so a key containing V(:) is
-        rejected before kopia runs. Values may contain V(:).
-      - Values must be strings or numbers. A number is recorded as Python
-        writes it, such as C(42) or C(1.5), so quote a value that YAML reads as
-        a number whose text differs, such as V("1.10"), V("0755") or
-        V("12:30"), to record it as written.
-      - A null, Boolean, list or dictionary value is rejected before kopia
-        runs, because kopia would record its Python text, such as C(None) or
-        C(True), rather than the value written. Quote a Boolean, such as
-        V("true"), to record it as text.
+        recorded as a different key and value. Values may contain V(:).
+      - Quote a value that YAML reads as a number, a Boolean or null whose
+        text differs, such as V("1.10"), V("0755"), V("12:30") or V("true"),
+        to record it as written.
       - A key or value with a lone surrogate code point from U+D800 to
         U+DC7F, which cannot be passed to kopia, is rejected before kopia runs,
         also in check mode. U+DC80 to U+DCFF, which Ansible uses for bytes that
@@ -207,6 +196,7 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
     kopia_command,
     reads_as_user_host,
     snapshot_source,
+    text_label,
 )
 
 OPERATION = "create kopia snapshot"
@@ -262,27 +252,13 @@ def ensure_present(module):
     path = module.params["path"]
 
     check_connection(module, failed_result={"snapshot": {}})
-    # kopia would silently record another path, with U+FFFD in place of bytes that are not valid UTF-8, and then not
-    # list its snapshots by the path, and run_command cannot pass U+D800 to U+DC7F to kopia
-    check_utf8(module, [("path", path)], failed_result={"snapshot": {}})
+    # run_command cannot pass U+D800 to U+DC7F to kopia
     check_utf8(
         module,
-        [(name, module.params[name]) for name in ("description", "tags")],
+        [(name, module.params[name]) for name in ("path", "description", "tags")],
         errors="surrogateescape",
         failed_result={"snapshot": {}},
     )
-
-    for key, value in (module.params["tags"] or {}).items():
-        # kopia would silently record another key and value, split at the first ':'
-        if ":" in key:
-            module.fail_json(msg=f"invalid tag key {key!r}: kopia splits tags at the first ':'", snapshot={})
-
-        # kopia would silently record the Python text of the value, such as None or True, not the value written
-        if value is None or isinstance(value, (bool, dict, list)):
-            module.fail_json(
-                msg=f"tag {key!r} value must be a string or a number, as kopia would record the Python text of {type(value).__name__}",
-                snapshot={},
-            )
 
     if module.check_mode:
         if reads_as_user_host(absolute_path(path)) and kopia_available(module):
@@ -313,7 +289,7 @@ def ensure_present(module):
         snapshots = list_snapshots(module, listed_source(manifest, source))
         if snapshots is None:
             module.fail_json(
-                msg=f"kopia snapshot {snapshot_id} of {path} may have been created, but kopia reported errors and could not list it: {stderr.strip()}",
+                msg=f"kopia snapshot {snapshot_id} of {text_label(path)} may have been created, but kopia reported errors and could not list it: {stderr.strip()}",
                 changed=True,
                 snapshot={},
             )
@@ -321,13 +297,13 @@ def ensure_present(module):
         snapshot = find_snapshot(snapshots, snapshot_id)
         if snapshot:
             module.fail_json(
-                msg=f"created kopia snapshot {snapshot_id} of {path}, but kopia reported errors: {stderr.strip()}",
+                msg=f"created kopia snapshot {snapshot_id} of {text_label(path)}, but kopia reported errors: {stderr.strip()}",
                 changed=True,
                 snapshot=snapshot_result(snapshot),
             )
 
     if rc != 0:
-        module.fail_json(msg=f"unable to create kopia snapshot of {path}: {stderr.strip()}", snapshot={})
+        module.fail_json(msg=f"unable to create kopia snapshot of {text_label(path)}: {stderr.strip()}", snapshot={})
 
     # kopia prints the new manifest only when it saves a snapshot; nothing is
     # printed when ignore_identical_snapshots skips an unchanged source.

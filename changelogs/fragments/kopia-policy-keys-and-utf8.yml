@@ -8,22 +8,20 @@ bugfixes:
     change on every run. Write keys in snake_case or in kopia's camelCase.
     Keys are matched as Go folds them, so the Kelvin sign matches ``k`` and
     the long s matches ``s``, but the dotless i matches no field.
-  - kopia_policy - fail before running kopia, also in check mode, when two
-    ``policy`` keys convert to the same key, such as ``keep_latest`` and
-    ``keepLatest``. One of the values was dropped without notice.
+  - kopia_policy - document that of two ``policy`` keys that convert to the
+    same key, such as ``keep_latest`` and ``keepLatest``, only the last one
+    given is used.
   - kopia_policy - document that kopia refuses a ``policy`` key that matches
     none of its fields when it imports the policy, before it changes it, and
     that check mode does not predict that refusal. In check mode, such a key
     that is not valid UTF-8 is returned escaped.
-  - kopia_policy, kopia_maintenance, kopia_repository, kopia_snapshot - fail
-    before running kopia, also in check mode, when a ``policy`` value, the
-    ``target`` with ``state=present``, a maintenance ``owner``, a storage
-    option or secret value, or a snapshot ``path`` is not valid UTF-8, such
-    as text with a lone surrogate code point. kopia recorded such text with
-    U+FFFD in its place, so a policy was imported again on every run, the
-    maintenance owner was set on every run, the snapshots of the path were
-    not found, and the next run failed against the module's own repository
-    connection. Some such values made the module fail with a traceback. A
+  - kopia_policy, kopia_maintenance, kopia_repository - fail before running
+    kopia, also in check mode, when a ``policy`` value, the ``target`` with
+    ``state=present``, a maintenance ``owner``, or a storage option or secret
+    value is not valid UTF-8, such as text with a lone surrogate code point.
+    kopia recorded such text with U+FFFD in its place, so a policy was
+    imported again on every run, the maintenance owner was set on every run,
+    and the next run failed against the module's own repository connection. Some such values made the module fail with a traceback. A
     failure names the option or key, never a value. For kopia_repository,
     kopia saves the storage options and secrets in its configuration and
     connects again from that copy, so a value such as an sftp ``keyfile``

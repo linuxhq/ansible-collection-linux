@@ -4,12 +4,10 @@ bugfixes:
     option, such as ``bucket``, with the connected repository as the text
     passed to kopia, so a host connected to a different repository fails
     instead of reporting no change.
-  - kopia_repository - fail before running kopia when a value in ``options``
-    or ``secrets`` is a dictionary, which was passed to kopia as Python text
-    that kopia stored instead of the value, or when an option that identifies
-    the repository, such as ``bucket`` or
-    ``path``, is given a list, which was passed as one flag per element and
-    not compared with the connected repository. kopia rejects a Boolean for
+  - kopia_repository - fail before running kopia when an option that
+    identifies the repository, such as ``bucket`` or ``path``, is given a
+    list, which was passed as one flag per element and not compared with the
+    connected repository. kopia rejects a Boolean for
     these options, so quote a value such as ``no`` that YAML reads as a
     Boolean.
   - kopia_repository - compare the options that identify the repository with
