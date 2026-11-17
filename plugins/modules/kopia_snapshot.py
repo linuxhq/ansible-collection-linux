@@ -280,6 +280,7 @@ def ensure_present(module):
 
     rc, stdout, stderr = kopia_command(module, command, password=module.params["password"])
     manifest = created_manifest(stdout)
+    label = text_label(path)
     snapshot_id = manifest.get("id")
 
     if rc != 0 and snapshot_id:
@@ -289,7 +290,7 @@ def ensure_present(module):
         snapshots = list_snapshots(module, listed_source(manifest, source))
         if snapshots is None:
             module.fail_json(
-                msg=f"kopia snapshot {snapshot_id} of {text_label(path)} may have been created, but kopia reported errors and could not list it: {stderr.strip()}",
+                msg=f"kopia snapshot {snapshot_id} of {label} may have been created, but kopia reported errors and could not list it: {stderr.strip()}",
                 changed=True,
                 snapshot={},
             )
@@ -297,13 +298,13 @@ def ensure_present(module):
         snapshot = find_snapshot(snapshots, snapshot_id)
         if snapshot:
             module.fail_json(
-                msg=f"created kopia snapshot {snapshot_id} of {text_label(path)}, but kopia reported errors: {stderr.strip()}",
+                msg=f"created kopia snapshot {snapshot_id} of {label}, but kopia reported errors: {stderr.strip()}",
                 changed=True,
                 snapshot=snapshot_result(snapshot),
             )
 
     if rc != 0:
-        module.fail_json(msg=f"unable to create kopia snapshot of {text_label(path)}: {stderr.strip()}", snapshot={})
+        module.fail_json(msg=f"unable to create kopia snapshot of {label}: {stderr.strip()}", snapshot={})
 
     # kopia prints the new manifest only when it saves a snapshot; nothing is
     # printed when ignore_identical_snapshots skips an unchanged source.
