@@ -10,5 +10,6 @@
         - kopia_snapshot_info
       ansible.builtin.assert:
         that:
-          - _kopia_snapshot_info_list is iterable
+          - _kopia_snapshot_info_list | length > 0
+          - _kopia_snapshot_info_list | map(attribute='source.path') | unique == ['/home/vagrant']
 ...

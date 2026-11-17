@@ -1,0 +1,6 @@
+---
+trivial:
+  - rclone role - verify in Molecule the unencrypted configuration written
+    when ``rclone_config_pass`` is ``null``.
+  - kopia_snapshot_info role - create a snapshot fixture in Molecule and
+    verify the snapshots returned.

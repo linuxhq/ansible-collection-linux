@@ -41,6 +41,16 @@ provisioner:
               retention:
                 keep_latest: 2
 
+          - target: molecule@molecule:/srv
+            policy:
+              retention:
+                keep_latest: 1
+
+          - target: /srv/molecule-absent
+            state: absent
+
+        kopia_snapshot: true
+
         kopia_snapshot_info_password: molecule-kopia-pass
 
 scenario:
