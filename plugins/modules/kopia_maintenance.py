@@ -15,10 +15,14 @@ description:
     with C(kopia maintenance set) when they differ, options left unset are not
     touched.
   - At least one setting option besides O(config_file) is required.
-  - When every stored log retention setting is zero, kopia starts from its
-    default log retention before applying the requested log retention
-    options, so the ones left unset take the default values. The result and
-    check mode predictions follow kopia.
+  - Before applying each log retention option, kopia replaces a log retention
+    whose settings are all zero with its default log retention, 30 days,
+    10000 sessions and 1024 megabytes. So the module sends only the log
+    retention options that differ, the non-zero ones first, in a second
+    C(kopia maintenance set) when needed, so that each one set is stored as
+    requested. When every stored log retention setting is zero, the ones left
+    unset take the default values. The result and check mode predictions
+    follow kopia.
 notes:
   - kopia reads the repository password persisted next to the configuration
     file, in a file named after it with C(.kopia-password) added. When there
@@ -73,8 +77,8 @@ options:
       - Maximum age of retained log sessions, in seconds.
       - V(0) means no age limit. When O(max_retained_log_age),
         O(max_retained_log_count) and O(max_retained_log_size_mb) are all
-        V(0), kopia applies its default log retention instead, 30 days, 10000
-        sessions and 1024 megabytes.
+        V(0), they are stored as V(0), and kopia applies its default log
+        retention during maintenance instead.
     type: int
   max_retained_log_count:
     description:
@@ -86,8 +90,8 @@ options:
         also in check mode.
       - V(0) means no count limit. When O(max_retained_log_age),
         O(max_retained_log_count) and O(max_retained_log_size_mb) are all
-        V(0), kopia applies its default log retention instead, 30 days, 10000
-        sessions and 1024 megabytes.
+        V(0), they are stored as V(0), and kopia applies its default log
+        retention during maintenance instead.
     type: int
   max_retained_log_size_mb:
     description:
@@ -99,8 +103,8 @@ options:
         fails before kopia runs, also in check mode.
       - V(0) means no size limit. When O(max_retained_log_age),
         O(max_retained_log_count) and O(max_retained_log_size_mb) are all
-        V(0), kopia applies its default log retention instead, 30 days, 10000
-        sessions and 1024 megabytes.
+        V(0), they are stored as V(0), and kopia applies its default log
+        retention during maintenance instead.
     type: int
   owner:
     description:
@@ -371,33 +375,67 @@ def flag_value(kind, value):
     return f"{value}"
 
 
-def log_retention_or_default(retention):
-    if all(not retention[key] for key in LOG_RETENTION_DEFAULTS):
-        return dict(retention, **LOG_RETENTION_DEFAULTS)
+def log_retention_apply(retention, params, requested):
+    """Return the log retention kopia stores after one command with the flags of params, in kopia's order."""
+    retention = dict(retention)
 
-    return dict(retention)
+    for param in LOG_RETENTION:
+        if param in params:
+            if all(not retention[key] for key in LOG_RETENTION_DEFAULTS):
+                retention = dict(retention, **LOG_RETENTION_DEFAULTS)
+
+            key, value, _flag = requested[param]
+            retention[key] = value
+
+    return retention
 
 
 def log_retention_change(module, current):
+    """Return the log retention kopia stores once the requested one is applied, and the flags of each command.
+
+    kopia resets an all-zero log retention to its defaults before each flag, so the non-zero values that differ are
+    sent first, which resets it at most before the first of them, and the zero values that then differ after them, in
+    a second command when one command, in kopia's order, would reset the earlier ones.
+    """
     settings = {setting[0]: setting for setting in SETTINGS}
-    stored = current["logRetention"]
-    expected = dict(stored)
-    flags = []
+    requested = {}
 
     for param in LOG_RETENTION:
         value = module.params[param]
-        if value is None:
-            continue
+        if value is not None:
+            _dummy, flag, path, kind = settings[param]
+            requested[param] = (path[-1], normalize(kind, value), f"{flag}={flag_value(kind, value)}")
 
-        _dummy, flag, path, kind = settings[param]
-        expected = log_retention_or_default(expected)
-        expected[path[-1]] = normalize(kind, value)
-        flags.append(f"{flag}={flag_value(kind, value)}")
-
-    if same_value(expected, stored):
+    if not requested:
         return None, []
 
-    return expected, flags
+    stored = current["logRetention"]
+
+    def differ(retention, nonzero):
+        return [
+            param
+            for param, (key, value, _flag) in requested.items()
+            if bool(value) is nonzero and not same_value(retention[key], value)
+        ]
+
+    first = differ(stored, True)
+    retention = log_retention_apply(stored, first, requested)
+    second = differ(retention, False)
+
+    if not first and not second:
+        return None, []
+
+    combined = log_retention_apply(stored, first + second, requested)
+
+    if differ(combined, True) or differ(combined, False):
+        retention = log_retention_apply(retention, second, requested)
+        commands = [first, second]
+    else:
+        retention = combined
+        commands = [first + second]
+
+    flags = [[requested[param][2] for param in LOG_RETENTION if param in command] for command in commands]
+    return retention, flags
 
 
 def owner_me(module, status):
@@ -479,20 +517,24 @@ def ensure_present(module):
             flags.append(f"{flag}={flag_value(kind, value)}")
 
     retention, retention_flags = log_retention_change(module, current)
+    commands = [flags]
     if retention_flags:
         predicted["logRetention"] = retention
-        flags.extend(retention_flags)
+        commands = [flags + retention_flags[0]] + retention_flags[1:]
 
-    if not flags:
+    if not commands[0]:
         module.exit_json(changed=False, maintenance=camel_dict_to_snake_dict(current))
 
     if module.check_mode:
         module.exit_json(changed=True, maintenance=camel_dict_to_snake_dict(predicted))
 
-    rc, _dummy, stderr = kopia_command(module, ["maintenance", "set"] + flags)
+    for index, command in enumerate(commands):
+        rc, _dummy, stderr = kopia_command(module, ["maintenance", "set"] + command)
 
-    if rc != 0:
-        module.fail_json(msg=f"unable to set kopia maintenance settings: {stderr.strip()}", maintenance={})
+        if rc != 0:
+            module.fail_json(
+                msg=f"unable to set kopia maintenance settings: {stderr.strip()}", changed=index > 0, maintenance={}
+            )
 
     current = maintenance_info(module, failed_result={"changed": True, "maintenance": {}})
 

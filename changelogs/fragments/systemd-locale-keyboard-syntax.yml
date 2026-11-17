@@ -1,0 +1,8 @@
+---
+bugfixes:
+  - systemd_locale - check a keyboard value sent after another request for
+    the characters ``systemd-localed`` refuses, a control character, a quote
+    or ``\`` and on systemd 261 and later a glob character, and a console
+    keymap that is not a valid file name or is too long, before any setting
+    is written, also in check mode, so such a value no longer fails after the
+    locale is written.

@@ -633,10 +633,13 @@ def storage_mismatch(module, status):
     connected = status["storage"]
     expected = STORAGE_TYPES.get(storage, storage)
 
+    # kopia reports a storage type only for a repository it reaches directly, not through a kopia repository server
+    if not connected["type"]:
+        return "it is connected to a kopia repository server, which this module does not manage"
+
     if connected["type"] != expected:
         return f"storage type is {connected['type']}, not {expected}"
 
-    # kopia reports no configuration for a connection to a kopia server
     config = connected["config"] or {}
     options = storage_options(module)
 

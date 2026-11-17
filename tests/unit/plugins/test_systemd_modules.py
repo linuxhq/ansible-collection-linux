@@ -646,6 +646,109 @@ def test_locale_keyboard_noncharacter_in_first_request_is_left_to_systemd(monkey
     assert calls == [method]
 
 
+def locale_keyboard_module(monkeypatch, current=None):
+    monkeypatch.setattr(systemd_locale, "HAS_DASBUS", True)
+    monkeypatch.setattr(systemd_locale, "systemd_proxy", Mock())
+    monkeypatch.setattr(systemd_locale, "locale_status", Mock(return_value=current or LOCALE))
+    mutate = Mock()
+    monkeypatch.setattr(systemd_locale, "systemd_call", mutate)
+    return mutate
+
+
+@pytest.mark.parametrize(
+    "params,option,version",
+    [
+        # systemd-localed refuses these on syntax alone, which for a request sent after another leaves that written
+        ({"locale": {"lang": "de_DE.UTF-8"}, "x11_options": 'grp:"alt"'}, "x11_options", 252),
+        ({"locale": {"lang": "de_DE.UTF-8"}, "x11_layout": "de'"}, "x11_layout", 239),
+        ({"locale": {"lang": "de_DE.UTF-8"}, "x11_variant": "back\\slash"}, "x11_variant", 257),
+        ({"locale": {"lang": "de_DE.UTF-8"}, "x11_model": "pc\t105"}, "x11_model", 252),
+        ({"locale": {"lang": "de_DE.UTF-8"}, "x11_model": "pc105\x7f"}, "x11_model", 252),
+        ({"locale": {"lang": "de_DE.UTF-8"}, "x11_options": "grp:*"}, "x11_options", 261),
+        ({"vconsole_keymap": "de", "x11_layout": 'de"'}, "x11_layout", 252),
+        ({"locale": {"lang": "de_DE.UTF-8"}, "vconsole_keymap": "de/latin1"}, "vconsole_keymap", 252),
+        ({"locale": {"lang": "de_DE.UTF-8"}, "vconsole_keymap": ".."}, "vconsole_keymap", 239),
+        ({"locale": {"lang": "de_DE.UTF-8"}, "vconsole_keymap": "de\\"}, "vconsole_keymap", 239),
+        ({"locale": {"lang": "de_DE.UTF-8"}, "vconsole_keymap": "x" * 128}, "vconsole_keymap", 248),
+        ({"locale": {"lang": "de_DE.UTF-8"}, "vconsole_keymap": "x" * 4097}, "vconsole_keymap", 247),
+        ({"locale": {"lang": "de_DE.UTF-8"}, "vconsole_keymap": "de?"}, "vconsole_keymap", 262),
+        ({"locale": {"lang": "de_DE.UTF-8"}, "vconsole_keymap_toggle": "ru'"}, "vconsole_keymap_toggle", 252),
+    ],
+)
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_locale_keyboard_syntax_after_another_request_fails_before_any_write(
+    monkeypatch, run_module, systemd_version, params, option, version, check_mode
+):
+    systemd_version.return_value = version
+    mutate = locale_keyboard_module(monkeypatch)
+    result = run_module(systemd_locale, params, check_mode)
+    assert result["failed"] and result["msg"].startswith(f"invalid {option} {params[option]!r}:")
+    mutate.assert_not_called()
+
+
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_locale_keyboard_syntax_checks_configured_values_sent_again(monkeypatch, run_module, check_mode):
+    # SetX11Keyboard sends every X11 setting, and systemd-localed refuses a configured one it would now refuse
+    mutate = locale_keyboard_module(monkeypatch, {**LOCALE, "x11_options": 'grp:"alt"'})
+    result = run_module(systemd_locale, {"locale": {"lang": "de_DE.UTF-8"}, "x11_layout": "de"}, check_mode)
+    assert result["failed"] and result["msg"].startswith("invalid x11_options 'grp:\"alt\"':")
+    mutate.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "params,version",
+    [
+        # accepted by the running systemd, or a configured value that is not sent again
+        ({"locale": {"lang": "de_DE.UTF-8"}, "x11_options": "grp:*"}, 260),
+        ({"locale": {"lang": "de_DE.UTF-8"}, "vconsole_keymap": "de?"}, 260),
+        ({"locale": {"lang": "de_DE.UTF-8"}, "vconsole_keymap": "x" * 127}, 248),
+        ({"locale": {"lang": "de_DE.UTF-8"}, "vconsole_keymap": "x" * 4096}, 247),
+        ({"locale": {"lang": "de_DE.UTF-8"}, "x11_layout": "us,de", "x11_options": "grp:alt_shift_toggle"}, 257),
+        ({"locale": {"lang": "de_DE.UTF-8"}, "x11_options": ""}, 252),
+    ],
+)
+def test_locale_keyboard_syntax_accepted_after_another_request(
+    monkeypatch, run_module, systemd_version, params, version
+):
+    systemd_version.return_value = version
+    mutate = locale_keyboard_module(monkeypatch, {**LOCALE, "x11_options": "grp:alt"})
+    result = run_module(systemd_locale, params)
+    assert result["changed"] and not result.get("failed")
+    assert mutate.call_args_list[0].args[2] == "SetLocale"
+
+
+def test_locale_keyboard_syntax_skips_x11_settings_replaced_by_conversion(monkeypatch, run_module):
+    # the console keymap is converted first, so the configured X11 options are replaced rather than sent again
+    current = {**LOCALE, "x11_options": 'grp:"alt"'}
+    mutate = locale_keyboard_module(monkeypatch, current)
+    result = run_module(systemd_locale, {"vconsole_keymap": "de", "x11_layout": "de"})
+    assert result["changed"] and not result.get("failed")
+    assert mutate.call_args_list[0].args[2] == "SetVConsoleKeyboard"
+
+
+@pytest.mark.parametrize(
+    "params,method",
+    [
+        ({"x11_options": 'grp:"alt"'}, "SetX11Keyboard"),
+        ({"vconsole_keymap": "de/latin1"}, "SetVConsoleKeyboard"),
+        # the configured locale matches, so the keyboard request is the first one sent
+        ({"locale": {"lang": "en_US.UTF-8"}, "x11_layout": "de'"}, "SetX11Keyboard"),
+    ],
+)
+def test_locale_keyboard_syntax_in_first_request_is_left_to_systemd(monkeypatch, run_module, params, method):
+    locale_keyboard_module(monkeypatch)
+    calls = []
+
+    def refuse(module, proxy, name, *args):
+        calls.append(name)
+        module.fail_json(msg=f"unable to call {name}: Received invalid keyboard data")
+
+    monkeypatch.setattr(systemd_locale, "systemd_call", refuse)
+    result = run_module(systemd_locale, params)
+    assert result["failed"] and result["msg"] == f"unable to call {method}: Received invalid keyboard data"
+    assert calls == [method]
+
+
 def test_locale_noncharacter_is_left_to_systemd(monkeypatch, run_module):
     # SetLocale is sent first, and sd-bus refuses the message, so nothing is written
     monkeypatch.setattr(systemd_locale, "HAS_DASBUS", True)
@@ -1635,6 +1738,59 @@ def test_hostname_icon_name_refused_by_running_systemd_fails_before_any_write(
     result = run_module(systemd_hostname, {"static_hostname": "new", "icon_name": value}, check_mode)
     assert result["failed"] and result["msg"].startswith(f"invalid icon_name {value!r}:")
     mutate.assert_not_called()
+
+
+@pytest.mark.parametrize("param", ["icon_name", "location", "pretty_hostname"])
+@pytest.mark.parametrize("value", ["cost$5", "back`tick", "back\\slash"])
+@pytest.mark.parametrize("version", [241, 246])
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_hostname_shell_escaped_setting_refused_on_241_to_246(
+    monkeypatch, tmp_path, run_module, systemd_version, param, value, version, check_mode
+):
+    # systemd-hostnamed writes "cost\$5", which these versions read back as cost\$5, so it would never converge
+    systemd_version.return_value = version
+    mutate = hostname_module(monkeypatch, tmp_path, HOSTNAME)
+    result = run_module(systemd_hostname, {param: value}, check_mode)
+    assert result["failed"] and result["msg"].startswith(f"invalid {param} {value!r}: systemd {version} reads")
+    mutate.assert_not_called()
+
+
+@pytest.mark.parametrize("version", [241, 246])
+def test_hostname_shell_escaped_setting_refused_after_another_request(
+    monkeypatch, tmp_path, run_module, systemd_version, version
+):
+    systemd_version.return_value = version
+    mutate = hostname_module(monkeypatch, tmp_path, HOSTNAME)
+    result = run_module(systemd_hostname, {"chassis": "vm", "pretty_hostname": "cost$5"})
+    assert result["failed"] and "pretty_hostname" in result["msg"]
+    mutate.assert_not_called()
+
+
+@pytest.mark.parametrize("value", ["cost$5", "back`tick", "back\\slash", 'say "hi"'])
+@pytest.mark.parametrize("version", [239, 240, 241, 246, 247, 252])
+def test_hostname_written_setting_is_read_back(value, version):
+    # as systemd-hostnamed writes it, quoted with '"', '\\', '`' and '$' escaped
+    escaped = "".join("\\" + character if character in '"\\`$' else character for character in value)
+    entries, _error = systemd_hostname.load_env_file(f'KEY="{escaped}"\n'.encode(), version)
+    refused = 241 <= version < 247 and any(character in value for character in "\\`$")
+    assert (entries["KEY"] == value) is not refused
+
+
+@pytest.mark.parametrize("param", ["icon_name", "location", "pretty_hostname"])
+@pytest.mark.parametrize("value", ["cost$5", "back`tick", "back\\slash"])
+@pytest.mark.parametrize("version", [240, 247, 252, 257])
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_hostname_shell_escaped_setting_accepted_outside_241_to_246(
+    monkeypatch, tmp_path, run_module, systemd_version, param, value, version, check_mode
+):
+    systemd_version.return_value = version
+    mutate = hostname_module(monkeypatch, tmp_path, HOSTNAME)
+    result = run_module(systemd_hostname, {param: value}, check_mode)
+    assert result["changed"] and not result.get("failed")
+    if not check_mode:
+        assert [entry.args[2:] for entry in mutate.call_args_list] == [
+            (dict(systemd_hostname.SETTINGS)[param], value, False)
+        ]
 
 
 @pytest.mark.parametrize("value", ["a/b", "..", "back\\slash", "x" * 5000])
