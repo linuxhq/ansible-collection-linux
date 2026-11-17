@@ -1,9 +1,6 @@
 ---
-breaking_changes:
-  - kopia_snapshot - fail before running kopia when a ``tags`` value is null,
-    a Boolean, a list or a dictionary. Such values were recorded on the
-    snapshot as Python text, such as ``None`` or ``True``, rather than the
-    value written. Quote a Boolean, such as ``"true"``, to record it as text.
-    Numbers are still accepted and recorded as Python writes them, so quote a
-    value that YAML reads as a number whose text differs, such as ``1.10`` or
-    ``12:30``, to record it as written.
+bugfixes:
+  - kopia_snapshot - document that a ``tags`` value is recorded as Python
+    writes it, so a value that YAML reads as a number, a Boolean or null whose
+    text differs, such as ``1.10``, ``12:30`` or ``true``, should be quoted to
+    record it as written.

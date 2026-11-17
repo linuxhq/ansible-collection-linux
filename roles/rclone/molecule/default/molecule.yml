@@ -36,6 +36,8 @@ provisioner:
           - name: molecule
             type: http
             url: https://downloads.rclone.org
+            molecule_float: 0.5
+            molecule_int: 3
         rclone_config_pass: molecule-config-pass
         rclone_user: vagrant
 

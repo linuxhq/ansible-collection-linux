@@ -83,50 +83,15 @@ def test_check_utf8_accepts_nul(module_factory, value, errors):
     kopia.check_utf8(module_factory(), [("name", value)], errors, {"key": {}})
 
 
-@pytest.mark.parametrize("password", [None, "secret"])
-def test_check_connection_rejects_nul_in_config_file(module_factory, invoke, password):
-    # os.stat fails with a traceback for a path with a NUL
-    module = module_factory({"config_file": "/etc/kopia\x00.config", "password": password})
-    result = invoke(kopia.check_connection, module, {"key": {}})
-    assert result == {"failed": True, "msg": "invalid config_file: it must not contain a NUL character", "key": {}}
-
-
-@pytest.mark.parametrize("kind", ["fifo", "device"])
 @pytest.mark.parametrize("password", [None, ""])
-def test_check_connection_rejects_password_file_kopia_waits_reading(module_factory, invoke, tmp_path, kind, password):
-    # kopia reads the persisted password when none is given, and waits reading a FIFO or a terminal
+def test_check_connection_leaves_files_to_kopia(module_factory, tmp_path, password):
+    # kopia reports a configuration or password file it cannot read
     config = tmp_path / "repository.config"
-    config.write_text("{}")
-    password_file = tmp_path / "repository.config.kopia-password"
-    if kind == "fifo":
-        os.mkfifo(password_file)
-    else:
-        password_file.symlink_to(os.devnull)
-
-    module = module_factory({"config_file": str(config), "password": password})
-    result = invoke(kopia.check_connection, module, {"key": {}})
-    reason = "it is a FIFO or a character device, which kopia can wait reading forever"
-    assert result == {"failed": True, "msg": f"invalid kopia password file {password_file}: {reason}", "key": {}}
-
-
-def test_check_connection_ignores_password_file_when_password_is_given(module_factory, tmp_path):
-    config = tmp_path / "repository.config"
-    config.write_text("{}")
+    os.mkfifo(config)
     os.mkfifo(tmp_path / "repository.config.kopia-password")
-    kopia.check_connection(module_factory({"config_file": str(config), "password": "secret"}))
-
-
-@pytest.mark.parametrize("kind", ["directory", "missing", "regular"])
-def test_check_connection_leaves_other_files_to_kopia(module_factory, tmp_path, kind):
-    # kopia fails reading a directory, which it reports itself
-    config = tmp_path / "repository.config"
-    if kind == "directory":
-        config.mkdir()
-        (tmp_path / "repository.config.kopia-password").mkdir()
-    elif kind == "regular":
-        config.write_text("{}")
-
-    kopia.check_connection(module_factory({"config_file": str(config), "password": None}))
+    module = module_factory({"config_file": str(config), "password": password})
+    kopia.check_connection(module)
+    module.fail_json.assert_not_called()
 
 
 @pytest.mark.parametrize(

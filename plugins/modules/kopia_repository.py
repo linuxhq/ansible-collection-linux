@@ -79,15 +79,10 @@ options:
         configuration directory, C($XDG_CONFIG_HOME/kopia) or
         C(~/.config/kopia), not in the working directory, so write V(./name)
         for a file in the working directory.
-      - The module fails before kopia runs, also in check mode, when the file,
-        or kopia's default one when this is unset, is a FIFO or a character
-        device, on which kopia can wait forever. kopia reports any
-        other file it cannot read, such as a directory.
-      - A path with a NUL character, which the module cannot look up, or a
-        lone surrogate code point from U+D800 to U+DC7F, which cannot be passed
-        to kopia, is rejected before kopia runs, also in check mode. U+DC80 to
-        U+DCFF, which Ansible uses for bytes that are not valid UTF-8, are
-        passed as those bytes.
+      - A path with a lone surrogate code point from U+D800 to U+DC7F, which
+        cannot be passed to kopia, is rejected before kopia runs, also in
+        check mode. U+DC80 to U+DCFF, which Ansible uses for bytes that are
+        not valid UTF-8, are passed as those bytes.
     type: path
   options:
     description:
@@ -97,10 +92,10 @@ options:
         C(--bucket) and V(storage_account) becomes C(--storage-account).
       - Booleans toggle the flag, V(true) emits C(--flag) and V(false) emits
         C(--no-flag), and a list repeats the flag once per element.
-      - A dictionary value is rejected before kopia runs, as kopia would store
-        its Python text rather than the value, and so is a list for one of the
-        options that identify the repository, listed in the description, such
-        as C(bucket) or C(path), which kopia takes once.
+      - A dictionary value is passed as Python writes it. A list for one of
+        the options that identify the repository, listed in the description,
+        such as C(bucket) or C(path), which kopia takes once, is rejected
+        before kopia runs.
         kopia rejects a Boolean for these options, which take a text value, so
         quote a value such as V(no) that YAML reads as a Boolean.
       - Values must be valid UTF-8, without a lone surrogate code point, or the
@@ -375,7 +370,7 @@ def kingpin_int(value):
 
     try:
         return str(int(float(value)))
-    except (OverflowError, ValueError):
+    except (OverflowError, TypeError, ValueError):
         return str(value)
 
 
@@ -402,13 +397,6 @@ def check_option_values(module):
 
     for param in ("options", "secrets"):
         for option, value in sorted(module.params[param].items()):
-            # kopia would silently store the Python text of the dictionary that kopia_flags sends, not its value
-            if isinstance(value, dict):
-                module.fail_json(
-                    msg=f"invalid {param} value for {text_label(option)}: a dictionary cannot be passed to kopia",
-                    repository={},
-                )
-
             # kopia_flags sends a list as one flag per element, and kopia takes these flags once, so a list of one
             # value would connect to a repository that never matches the list, and an empty list would send none
             if option in keys and isinstance(value, (list, tuple)):

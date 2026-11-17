@@ -1,6 +1,5 @@
 import os
 import signal
-import unicodedata
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -78,19 +77,10 @@ def test_missing_file_without_content_fails(tmp_path, run_module):
     assert "does not exist" in result["msg"]
 
 
-@pytest.mark.parametrize(
-    "params, message",
-    [
-        ({}, "password"),
-        ({"password": " "}, "no characters"),
-        ({"password": "\u00a0\u3000"}, "no characters"),
-        ({"password": "\x85\u2028"}, "no characters"),
-    ],
-)
-def test_password_validation(tmp_path, run_module, params, message):
-    result = run_module(plugin, {"path": str(tmp_path / "config"), **params})
+def test_password_required_when_present(tmp_path, run_module):
+    result = run_module(plugin, {"path": str(tmp_path / "config")})
     assert result["failed"]
-    assert message in result["msg"]
+    assert "password" in result["msg"]
 
 
 @pytest.mark.parametrize("check_mode", [False, True])
@@ -112,7 +102,6 @@ def test_missing_crypto(monkeypatch, tmp_path, run_module, check_mode):
     "params, message",
     [
         ({"password": "secret"}, "configuration file does not exist"),
-        ({"password": " ", "content": "config"}, "invalid password for configuration file"),
         ({"password": "pw\ud800", "state": "absent", "content": "config"}, "invalid password for configuration file"),
     ],
 )
@@ -125,80 +114,7 @@ def test_missing_crypto_fails_like_a_real_run(monkeypatch, tmp_path, run_module,
     assert result["failed"] and message in result["msg"]
 
 
-def test_invalid_password_names_path(tmp_path, run_module):
-    path = tmp_path / "config"
-    result = run_module(plugin, {"path": str(path), "password": " ", "content": "config"})
-    assert result["msg"] == f"invalid password for configuration file {path}: no characters in password"
-
-
 UNASSIGNED = "\U0001ccf0"
-
-
-@pytest.mark.skipif(unicodedata.category(UNASSIGNED) != "Cn", reason="assigned in this Python's Unicode tables")
-@pytest.mark.parametrize("crypto", [True, False])
-@pytest.mark.parametrize("check_mode", [False, True])
-def test_unassigned_password_character_is_rejected(monkeypatch, tmp_path, run_module, crypto, check_mode):
-    monkeypatch.setattr(plugin, "HAS_PYCRYPTODOME", crypto)
-    path = tmp_path / "config"
-    params = {"path": str(path), "password": "pw" + UNASSIGNED, "content": "config"}
-    result = run_module(plugin, params, check_mode)
-    assert not path.exists()
-    message = f"character U+1CCF0 is unassigned in this Python's Unicode {unicodedata.unidata_version}, so rclone may normalize it differently"
-    assert result["failed"] and result["msg"] == f"invalid password for configuration file {path}: {message}"
-
-
-@pytest.mark.parametrize(
-    "password",
-    [
-        "a" + "\u0301" * 31,
-        "\u00e9" + "\u0301" * 30,
-        "a" + "\u0344" * 16,
-        "a" + "\u0301" * 30 + "b" + "\u0301" * 31,
-        "\uac00" + "\u0301" * 30,
-        "\uac01" + "\u0301" * 29,
-        "a" + "\u0b3e" * 31,
-        "a" + "\u1161" * 31,
-        "a" + "\u11a8" * 31,
-    ],
-)
-@pytest.mark.parametrize("crypto", [True, False])
-@pytest.mark.parametrize("check_mode", [False, True])
-def test_long_combining_run_password_is_rejected(monkeypatch, tmp_path, run_module, password, crypto, check_mode):
-    monkeypatch.setattr(plugin, "HAS_PYCRYPTODOME", crypto)
-    path = tmp_path / "config"
-    params = {"path": str(path), "password": password, "content": "config"}
-    result = run_module(plugin, params, check_mode)
-    assert not path.exists()
-    message = "password has more than 30 consecutive combining characters, marks or Hangul jamo, which rclone normalizes differently"
-    assert result["failed"] and result["msg"] == f"invalid password for configuration file {path}: {message}"
-
-
-@pytest.mark.skipif(
-    int(unicodedata.unidata_version.split(".", maxsplit=1)[0]) < 16, reason="U+16D67 is unassigned before Unicode 16"
-)
-@pytest.mark.parametrize("password", ["a" + "\U00016d67" * 31, "a" + "\U00016d68" * 16])
-@pytest.mark.parametrize("check_mode", [False, True])
-def test_backward_combining_letter_run_password_is_rejected(tmp_path, run_module, password, check_mode):
-    path = tmp_path / "config"
-    result = run_module(plugin, {"path": str(path), "password": password, "content": "config"}, check_mode)
-    assert not path.exists()
-    assert result["failed"] and "more than 30 consecutive" in result["msg"]
-
-
-def test_every_second_element_of_a_composition_is_a_non_starter():
-    # Go counts the second element of every canonical composition as a non-starter, so a Unicode upgrade that
-    # adds one of class 0 outside the marks and Hangul jamo must be added to rclone.BACKWARD_COMBINING
-    missing = []
-    for codepoint in range(0x110000):
-        decomposition = unicodedata.decomposition(chr(codepoint)).split()
-        if len(decomposition) != 2 or decomposition[0].startswith("<"):
-            continue
-
-        first, second = (chr(int(part, 16)) for part in decomposition)
-        if unicodedata.normalize("NFC", first + second) == chr(codepoint) and not rclone.is_non_starter(second):
-            missing.append(f"U+{ord(second):04X}")
-
-    assert not missing
 
 
 @pytest.mark.parametrize("state", ["present", "absent"])
@@ -242,11 +158,6 @@ def test_escaped_content_bytes_are_written(tmp_path, run_module, state):
     assert (decrypt(written, "secret") if state == "present" else written) == b"a\xff\x80"
 
 
-def test_backward_combining_letter_is_a_non_starter():
-    # U+16D67 is unassigned on Pythons before Unicode 16, so it must be counted without the Unicode tables
-    assert rclone.is_non_starter("\U00016d67")
-
-
 @pytest.mark.parametrize(
     "password",
     [
@@ -261,6 +172,13 @@ def test_backward_combining_letter_is_a_non_starter():
         "pw\uffff",
         "pw\ufdd0",
         "pw\U0010fffe",
+        # rclone itself refuses an empty or blank password, which still encrypts and decrypts consistently
+        "",
+        " ",
+        "\u00a0\u3000",
+        "pw" + UNASSIGNED,
+        "a" + "\u0301" * 31,
+        "a" + "\u1161" * 31,
     ],
 )
 def test_non_ascii_password_is_accepted(tmp_path, run_module, password):
@@ -560,8 +478,7 @@ def test_unsupported_encryption_header_is_replaced_by_content(
 )
 @pytest.mark.parametrize("content", [None, "config"])
 def test_absent_decrypts_with_a_password_rclone_could_not_have_used(tmp_path, run_module, password, content):
-    # the rclone compatibility checks apply only when encrypting, so a file encrypted by an earlier release with
-    # such a password can still be decrypted
+    # a file encrypted with a password rclone itself refuses or may normalize differently can be decrypted
     path = tmp_path / "rclone.conf"
     path.write_text(rclone.encrypt_config(b"original", password))
     params = {"path": str(path), "password": password, "state": "absent"}

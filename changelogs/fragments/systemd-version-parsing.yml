@@ -15,8 +15,9 @@ bugfixes:
     ``systemctl daemon-reexec`` can be older than the running
     ``systemd-hostnamed`` or ``systemd-localed``.
   - systemd_timedate - read the current time for ``time=now`` right before
-    setting the clock, after the other settings and the wait for the
-    ``ntp`` change, so the clock is no longer set back by the time they took.
+    setting the clock, after the settings written before it and after the
+    wait for the ``ntp`` change when ``ntp`` changes, so the clock is no
+    longer set back by the time they took.
   - systemd_locale - document the files ``systemd-localed`` writes on EL and
     Debian, and that on Debian it generates a missing locale during the
     request instead of refusing it.

@@ -103,12 +103,6 @@ def test_base64_newlines_and_binary():
     assert rclone.base64_urlsafe_decode("\r\n" + rclone.base64_urlsafe_encode(value) + "\n") == value
 
 
-@pytest.mark.parametrize("password", ["", " ", "\t\n", "\v\f\r", "\x85\u00a0", "\u1680\u2000\u200a\u202f\u205f\u3000"])
-def test_empty_config_password(password):
-    with pytest.raises(ValueError, match="no characters"):
-        rclone.check_config_password(password)
-
-
 @pytest.mark.parametrize("password", ["\x1f", "\x1c\x1d\x1e", " \x1f ", "\u180e", "\u200b"])
 def test_config_password_trims_go_whitespace_only(password):
     assert decrypt(rclone.encrypt_config(b"config", password), password) == b"config"

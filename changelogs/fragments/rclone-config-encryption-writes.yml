@@ -8,9 +8,7 @@ bugfixes:
     configuration file, including when no temporary file can be created in
     its directory, where the file is then written in place.
   - rclone_config_encryption - treat only the whitespace Go trims, as rclone
-    does, as whitespace when checking the password and reading the encryption
-    header, so a password of control characters such as ``\x1f`` is no longer
-    rejected.
+    does, as whitespace when reading the encryption header.
   - rclone_config_encryption, rclone_obscure, rclone_deobscure - document the
     minimum pycryptodome or pycryptodomex version, 3.7.0.
   - rclone_config_encryption - read the lines before the encryption header in

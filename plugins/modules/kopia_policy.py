@@ -33,17 +33,10 @@ options:
         configuration directory, C($XDG_CONFIG_HOME/kopia) or
         C(~/.config/kopia), not in the working directory, so write V(./name)
         for a file in the working directory.
-      - The module fails before kopia runs, also in check mode, when the file,
-        or kopia's default one when this is unset, is a FIFO or a character
-        device, on which kopia can wait forever. So is the password file kopia
-        reads, named after the file with
-        C(.kopia-password) added. kopia reports any other file it cannot read,
-        such as a directory.
-      - A path with a NUL character, which the module cannot look up, or a
-        lone surrogate code point from U+D800 to U+DC7F, which cannot be passed
-        to kopia, is rejected before kopia runs, also in check mode. U+DC80 to
-        U+DCFF, which Ansible uses for bytes that are not valid UTF-8, are
-        passed as those bytes.
+      - A path with a lone surrogate code point from U+D800 to U+DC7F, which
+        cannot be passed to kopia, is rejected before kopia runs, also in
+        check mode. U+DC80 to U+DCFF, which Ansible uses for bytes that are
+        not valid UTF-8, are passed as those bytes.
     type: path
   policy:
     description:
@@ -59,9 +52,8 @@ options:
         case once converted, such as V(keeplatest), V(Retention) or
         V(KEEP_LATEST), is rejected before kopia runs, also in check mode,
         naming the field.
-      - Two keys that convert to the same key, such as V(keep_latest) and
-        V(keepLatest), are rejected before kopia runs, also in check mode, as
-        one of the values would be dropped without notice.
+      - Of two keys that convert to the same key, such as V(keep_latest) and
+        V(keepLatest), only the last one given is used.
       - kopia rejects a key that matches none of its policy fields when it
         imports the policy, before it changes the policy. Check mode does not
         predict that refusal.
@@ -259,21 +251,9 @@ def check_policy_keys(module, value, name, fields=None):
     fields holds kopia's field names for value, see POLICY_FIELDS, or None when they are unknown.
     """
     if isinstance(value, dict):
-        converted = {}
-
         for key, item in value.items():
             child = f"{name}.{text_label(key)}"
             camel = camel_key(key)
-
-            # snake_dict_to_camel_dict keeps only the last of two keys that convert to the same key, so kopia would
-            # silently store one value without the other
-            if camel in converted:
-                module.fail_json(
-                    msg=f"invalid policy keys {converted[camel]} and {child}: both convert to {text_label(camel)}; give only one",
-                    policy={},
-                )
-
-            converted[camel] = child
 
             # kopia matches field names ignoring case, so it accepts such a key, then reports the field in camelCase
             field = policy_field_mismatch(camel, fields)

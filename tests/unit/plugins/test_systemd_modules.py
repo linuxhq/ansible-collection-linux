@@ -1,7 +1,4 @@
 import errno
-import os
-import signal
-from contextlib import contextmanager
 from copy import deepcopy
 from unittest.mock import Mock
 
@@ -96,27 +93,6 @@ def keyboard_files(monkeypatch, tmp_path):
     monkeypatch.setattr(systemd_locale, "LANGUAGE_FALLBACK_MAP", str(files["language_fallback_map"]))
     monkeypatch.setattr(systemd_locale, "debian_family", Mock(return_value=False))
     return files
-
-
-class Expired(BaseException):
-    """Raised by time_limit, outside Exception so that no handler for OSError, such as TimeoutError, catches it."""
-
-
-@contextmanager
-def time_limit(seconds=5):
-    """Fail a read that would block or never end, such as of a FIFO or /dev/zero, instead of hanging the tests."""
-
-    def expire(signum, frame):
-        raise Expired(f"still running after {seconds} seconds")
-
-    previous = signal.signal(signal.SIGALRM, expire)
-    signal.alarm(seconds)
-
-    try:
-        yield
-    finally:
-        signal.alarm(0)
-        signal.signal(signal.SIGALRM, previous)
 
 
 def analyze_output(seconds, original="2026-07-26 14:30"):
@@ -460,42 +436,14 @@ def test_language_fallback_parses_map_as_systemd_239(keyboard_files, content, la
     assert systemd_locale.language_fallback(Mock(), lang, 239) == language
 
 
-@pytest.mark.parametrize("kind", ["device", "fifo"])
-def test_language_fallback_reads_only_a_regular_file(keyboard_files, kind):
-    # reading /dev/zero would never end and opening a FIFO without a writer would block, so neither is read
-    if kind == "device":
-        keyboard_files["language_fallback_map"].symlink_to("/dev/zero")
-    else:
-        os.mkfifo(keyboard_files["language_fallback_map"])
-
-    with time_limit():
-        assert systemd_locale.language_fallback(Mock(), "en_AU", 262) is None
-
-
 def test_language_fallback_map_denied_access_fails(monkeypatch, module_factory, invoke, keyboard_files):
     # systemd-localed runs as root and reads a map the module may not, so a denied access is not read as no fallback
     keyboard_files["language_fallback_map"].write_bytes(b"en_AU en_AU:en_GB\n")
-    monkeypatch.setattr(systemd_locale, "open_regular", Mock(side_effect=PermissionError(errno.EACCES, "denied")))
+    monkeypatch.setattr(
+        systemd_locale, "open", Mock(side_effect=PermissionError(errno.EACCES, "denied")), raising=False
+    )
     result = invoke(systemd_locale.language_fallback, module_factory(), "en_AU", 262)
     assert result["failed"] and result["msg"].startswith(f"unable to read {keyboard_files['language_fallback_map']}:")
-
-
-@pytest.mark.parametrize("check_mode", [False, True])
-def test_locale_check_mode_with_fifo_language_fallback_map_keeps_language(
-    monkeypatch, run_module, keyboard_files, check_mode
-):
-    os.mkfifo(keyboard_files["language_fallback_map"])
-    monkeypatch.setattr(systemd_locale, "HAS_DASBUS", True)
-    monkeypatch.setattr(systemd_locale, "systemd_proxy", Mock())
-    configured = {**LOCALE, "locale": {"lang": "en_US.UTF-8", "language": "en_US"}}
-    updated = {**LOCALE, "locale": {"lang": "en_AU", "language": "en_US"}}
-    monkeypatch.setattr(systemd_locale, "locale_status", Mock(side_effect=[configured, updated]))
-    monkeypatch.setattr(systemd_locale, "systemd_call", Mock())
-
-    with time_limit():
-        result = run_module(systemd_locale, {"locale": {"lang": "en_AU"}}, check_mode)
-
-    assert result["changed"] and result["locale"]["locale"]["language"] == "en_US"
 
 
 @pytest.mark.parametrize("check_mode", [False, True])
@@ -1280,23 +1228,6 @@ def test_hostname_static_hostname_read_line_by_line(monkeypatch, tmp_path, run_m
     mutate.assert_not_called()
 
 
-@pytest.mark.parametrize("kind", ["directory", "fifo"])
-def test_hostname_static_hostname_not_a_regular_file_reads_as_unset(monkeypatch, tmp_path, run_module, kind):
-    path = tmp_path / "hostname"
-    if kind == "directory":
-        path.mkdir()
-    else:
-        os.mkfifo(path)
-
-    mutate = hostname_module(monkeypatch, tmp_path, {**HOSTNAME, "hostname": "localhost", "static_hostname": ""})
-
-    with time_limit():
-        assert run_module(systemd_hostname, {"static_hostname": ""}, True)["changed"] is False
-        assert run_module(systemd_hostname, {"static_hostname": "web"}, True)["changed"] is True
-
-    mutate.assert_not_called()
-
-
 @pytest.mark.parametrize(
     "error",
     [
@@ -1309,7 +1240,7 @@ def test_hostname_static_hostname_unreadable_reads_as_unset(monkeypatch, tmp_pat
     # systemd-hostnamed 246 and later log a file they cannot read and ignore it
     (tmp_path / "hostname").write_text("web\n")
     mutate = hostname_module(monkeypatch, tmp_path, {**HOSTNAME, "hostname": "localhost", "static_hostname": ""})
-    monkeypatch.setattr(systemd_hostname, "open_regular", Mock(side_effect=error))
+    monkeypatch.setattr(systemd_hostname, "open", Mock(side_effect=error), raising=False)
     assert run_module(systemd_hostname, {"static_hostname": ""}, True)["changed"] is False
     assert run_module(systemd_hostname, {"static_hostname": "web"}, True)["changed"] is True
     mutate.assert_not_called()
@@ -1321,20 +1252,9 @@ def test_hostname_static_hostname_denied_access_fails(monkeypatch, tmp_path, run
     # systemd-hostnamed runs as root and reads a file the module may not, so it is not read as unset
     (tmp_path / "hostname").write_text("web\n")
     mutate = hostname_module(monkeypatch, tmp_path, {**HOSTNAME, "hostname": "web", "static_hostname": "web"})
-    monkeypatch.setattr(systemd_hostname, "open_regular", Mock(side_effect=error))
+    monkeypatch.setattr(systemd_hostname, "open", Mock(side_effect=error), raising=False)
     result = run_module(systemd_hostname, {"static_hostname": "web"}, check_mode)
     assert result["failed"] and result["msg"].startswith(f"unable to read {tmp_path / 'hostname'}:")
-    mutate.assert_not_called()
-
-
-def test_hostname_static_hostname_from_device_reads_as_unset(monkeypatch, tmp_path, run_module):
-    # /dev/zero is not a regular file, so it is not read; reading it would never end
-    (tmp_path / "hostname").symlink_to("/dev/zero")
-    mutate = hostname_module(monkeypatch, tmp_path, {**HOSTNAME, "hostname": "localhost", "static_hostname": ""})
-
-    with time_limit():
-        assert run_module(systemd_hostname, {"static_hostname": ""}, True)["changed"] is False
-
     mutate.assert_not_called()
 
 
@@ -1666,6 +1586,40 @@ def test_hostname_static_hostname_written_first(monkeypatch, tmp_path, run_modul
         "SetChassis",
         "SetPrettyHostname",
     ]
+
+
+@pytest.mark.parametrize(
+    "status,etc_hostname,params,methods",
+    [
+        # SetStaticHostname applies the static hostname, else the default, in place of the transient one
+        (HOSTNAME, "old\n", {"static_hostname": "", "transient_hostname": ""}, ["SetStaticHostname"]),
+        (
+            {**HOSTNAME, "hostname": "dhcp", "hostname_source": "transient", "static_hostname": ""},
+            "",
+            {"static_hostname": "new", "transient_hostname": ""},
+            ["SetStaticHostname"],
+        ),
+        (
+            {**HOSTNAME, "hostname": "dhcp", "hostname_source": "transient", "static_hostname": ""},
+            "",
+            {"static_hostname": "", "transient_hostname": ""},
+            ["SetHostname"],
+        ),
+        # systemd-hostnamed keeps the hostname source it determined, so it can lag behind /etc/hostname
+        (
+            {**HOSTNAME, "hostname": "dhcp", "hostname_source": "transient"},
+            None,
+            {"transient_hostname": ""},
+            ["SetHostname"],
+        ),
+    ],
+)
+def test_hostname_resets_transient_only_when_static_change_does_not(
+    monkeypatch, tmp_path, run_module, status, etc_hostname, params, methods
+):
+    mutate = hostname_module(monkeypatch, tmp_path, status, etc_hostname=etc_hostname)
+    assert run_module(systemd_hostname, params)["changed"]
+    assert [entry.args[2] for entry in mutate.call_args_list] == methods
 
 
 def test_hostname_check_mode_predicts_static_over_reset_transient(monkeypatch, tmp_path, run_module):

@@ -7,8 +7,6 @@
 {{ key }} = false
 {%     elif value is string %}
 {{ key }} = {{ value | string }}
-{%     elif value is number %}
-{{ key }} = {{ value | int }}
 {%     else %}
 {{ key }} = {{ value }}
 {%     endif %}

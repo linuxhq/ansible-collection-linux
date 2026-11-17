@@ -1,7 +1,7 @@
 ---
 bugfixes:
-  - kopia_snapshot - fail before running kopia when a ``tags`` key contains
-    ``:``, which kopia would split into a different key and value.
+  - kopia_snapshot - document that kopia splits a ``tags`` key containing
+    ``:`` into a different key and value.
   - kopia_snapshot_info - document that snapshots of the parent directories of
     ``path`` are included, as ``kopia snapshot list`` reports them.
   - kopia_policy - document that policy manifest IDs are not accepted as

@@ -8,10 +8,6 @@ bugfixes:
     systemd-localed refuses to rewrite such a file, so the module applied
     ``locale`` and then failed, or reported a console keymap or a converted
     keyboard setting as changed although systemd-localed did not store it.
-  - systemd_hostname, systemd_locale - read ``/etc/machine-info``,
-    ``/etc/vconsole.conf`` and ``/etc/default/keyboard`` only when they are
-    regular files, and otherwise as missing. Reading a FIFO there blocked the
-    module, and a device such as ``/dev/zero`` never ended.
   - systemd_locale - document that systemd 253 and later also keep the X11
     keyboard settings in ``/etc/vconsole.conf`` and ignore a failure to write
     ``/etc/X11/xorg.conf.d/00-keyboard.conf``, which Debian 13 makes

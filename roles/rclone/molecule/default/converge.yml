@@ -1,12 +1,47 @@
 ---
-- name: Converge
+- name: Converge without a configuration password
   hosts: all
+  tags:
+    - molecule-idempotence-notest
   roles:
     - role: rclone
       rclone_config: []
       rclone_config_pass: null
-      tags:
-        - molecule-idempotence-notest
 
+  tasks:
+    - name: Ensure unencrypted rclone configuration file is gathered
+      tags:
+        - rclone
+      become: true
+      ansible.builtin.slurp:
+        src: /home/vagrant/.config/rclone/rclone.conf
+      register: __rclone_plain_file
+      when:
+        - not ansible_check_mode
+
+    - name: Ensure unencrypted rclone configuration file ownership is gathered
+      tags:
+        - rclone
+      become: true
+      ansible.builtin.stat:
+        path: /home/vagrant/.config/rclone/rclone.conf
+      register: __rclone_plain_stat
+      when:
+        - not ansible_check_mode
+
+    - name: Ensure unencrypted rclone configuration file is verified
+      tags:
+        - rclone
+      ansible.builtin.assert:
+        that:
+          - __rclone_plain_file.content | b64decode == ''
+          - __rclone_plain_stat.stat.pw_name == 'vagrant'
+          - __rclone_plain_stat.stat.mode == '0600'
+      when:
+        - not ansible_check_mode
+
+- name: Converge
+  hosts: all
+  roles:
     - rclone
 ...

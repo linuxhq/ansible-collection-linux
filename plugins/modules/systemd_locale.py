@@ -38,11 +38,9 @@ notes:
     line feed, a carriage return or a NUL and cannot read a line of 1 MiB or
     more, while systemd 239 ends a line only at a line feed, reads a long
     line in pieces of up to 2047 bytes and ignores the rest of a piece after
-    a NUL. The module reads the map
-    only when it is a regular file, and otherwise predicts no fallback. A
-    different map set by E(SYSTEMD_LANGUAGE_FALLBACK_MAP) in the environment
-    of C(systemd-localed) is not read, so the C(language) field check mode
-    reports can then differ from the one a real run produces.
+    a NUL. A different map set by E(SYSTEMD_LANGUAGE_FALLBACK_MAP) in the
+    environment of C(systemd-localed) is not read, so the C(language) field
+    check mode reports can then differ from the one a real run produces.
   - C(systemd-localed) writes that fallback without the validation it applies
     to the requested values, so C(LANGUAGE) can become a list such as
     V(en_AU:en_GB), which O(locale.language) cannot set again where
@@ -113,9 +111,7 @@ notes:
     file, then fails before any setting is written, also in check mode, as
     C(systemd-localed) only logs a refused conversion. When the first request
     sent would rewrite such a file as its own, C(systemd-localed) refuses it
-    before anything is changed. The module
-    reads these files only when they are regular files, and otherwise reads
-    them as missing.
+    before anything is changed.
   - The console settings rewrite C(/etc/vconsole.conf), and so do the X11
     keyboard settings when they are converted into the console keymap and, on
     systemd 253 and later, always. On Debian 12 the X11 keyboard settings, and
@@ -314,7 +310,6 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.systemd import (
     locale_setting,
     locale_simplify,
     locale_status,
-    open_regular,
     read_bytes,
     read_map_lines,
     systemd_call,
@@ -416,13 +411,7 @@ def language_fallback(module, lang, version):
     are read as the given systemd version reads them. Bytes that are not valid UTF-8 are kept as surrogates.
     """
     try:
-        # reading a FIFO could block and a device such as /dev/zero never end, so the module reads only a regular
-        # file and otherwise predicts no fallback
-        handle = open_regular(LANGUAGE_FALLBACK_MAP)
-        if handle is None:
-            return None
-
-        with handle:
+        with open(LANGUAGE_FALLBACK_MAP, "rb") as handle:
             for line in read_map_lines(handle, version):
                 if line is None:
                     return None

@@ -20,8 +20,7 @@ description:
     stores them in, rather than the properties it reports, because it reports a
     computed fallback for a setting that is not stored, such as a chassis
     detected from the firmware or an icon name derived from the chassis. A
-    missing file means no setting is stored, and so does a file that is not a
-    regular file, such as a FIFO, which the module does not read. The file is
+    missing file means no setting is stored. The file is
     parsed as the running systemd version parses it, which ignores everything
     from the first setting that is not valid UTF-8, and a whole file
     containing a NUL byte, except systemd 239, which parses the file up to the
@@ -51,9 +50,6 @@ description:
     only when C(systemd-hostnamed) starts, so a change made outside it is not
     reported until it restarts, as it does after exiting when idle, while
     the module reads the file on every run.
-  - The module reads C(/etc/hostname) only when it is a regular file, and
-    otherwise reads no static hostname. C(systemd-hostnamed) may block
-    reading a file that is not a regular file, such as a FIFO.
   - Only the settings that differ from their stored values are written, in
     the order O(static_hostname), O(chassis), O(deployment), O(icon_name),
     O(location), O(pretty_hostname) and O(transient_hostname). The first of
@@ -264,7 +260,6 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.systemd import (
     HOSTNAME_PROPERTIES,
     check_utf8,
     load_env_file,
-    open_regular,
     read_bytes,
     read_lines,
     systemd_call,
@@ -435,12 +430,8 @@ def read_static_hostname(module, version):
     """Read the static hostname as systemd's read_etc_hostname() does, an unusable one reading as unset."""
     try:
         # systemd-hostnamed 246 and later ignore a file they cannot read, such as one with a line too long, and earlier
-        # ones fail to start; a file that is not regular can make it block, so the module reads only a regular file
-        handle = open_regular(HOSTNAME_FILE)
-        if handle is None:
-            return ""
-
-        with handle:
+        # ones fail to start
+        with open(HOSTNAME_FILE, "rb") as handle:
             for line in read_lines(handle, version):
                 if line is None:
                     return ""
@@ -546,11 +537,15 @@ def ensure_present(module):
             )
 
         cleared = current["static_hostname"] and not predicted["static_hostname"]
+        # SetStaticHostname already applies the static hostname, else the default, in place of a transient one
+        static_pending = any(param == "static_hostname" for param, _method, _args in pending)
 
         if current["hostname_source"] == "transient" or cleared:
             predicted["hostname"] = predicted["static_hostname"] or default or current["hostname"]
             predicted["hostname_source"] = "static" if predicted["static_hostname"] else "default"
-            pending.append(("transient_hostname", "SetHostname", ("", False)))
+
+            if not static_pending:
+                pending.append(("transient_hostname", "SetHostname", ("", False)))
 
     # the first request is validated by systemd-hostnamed before anything is written, a later one only after the
     # earlier requests are applied; a later request follows a setting compared against its file, so version is known

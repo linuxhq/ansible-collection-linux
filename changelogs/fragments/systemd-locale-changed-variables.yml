@@ -13,8 +13,7 @@ bugfixes:
     ``LANGUAGE`` instead. The map is read line by line as ``systemd-localed``
     reads it, with quotes removed, backslash escapes, a NUL ending a line,
     and no fallback after a line it cannot read or split, such as one of
-    1 MiB or more or one with an unbalanced quote. The module reads the map
-    only when it is a regular file and otherwise predicts no fallback.
+    1 MiB or more or one with an unbalanced quote.
   - systemd_locale - fail before any setting is written, also in check mode,
     when ``lang`` changes without a set ``language`` and the language
     fallback map lists a fallback for it that is not valid UTF-8 or contains

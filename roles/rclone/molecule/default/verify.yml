@@ -53,4 +53,6 @@
           - __rclone_config_content is not search('downloads.rclone.org')
           - __rclone_config_show.stdout is search('\[molecule\]')
           - __rclone_config_show.stdout is search('downloads.rclone.org')
+          - __rclone_config_show.stdout is search('(?m)^molecule_float = 0.5$')
+          - __rclone_config_show.stdout is search('(?m)^molecule_int = 3$')
 ...

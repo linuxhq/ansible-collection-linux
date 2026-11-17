@@ -1,9 +1,7 @@
 # Copyright: Ansible Project
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
-import os
 import re
-import stat
 import traceback
 
 from ansible.module_utils.basic import missing_required_lib
@@ -409,43 +407,14 @@ def parse_env_file(text, version):
 
 
 def read_bytes(module, path):
-    """Return the content of path, or None when it is missing or not a regular file, which could block or never end."""
+    """Return the content of path, or None when it is missing."""
     try:
-        handle = open_regular(path)
-        if handle is None:
-            return None
-
-        with handle:
+        with open(path, "rb") as handle:
             return handle.read()
     except FileNotFoundError:
         return None
     except OSError as error:
         module.fail_json(msg=f"unable to read {path}: {to_native(error)}")
-
-
-def open_regular(path):
-    """Open path for reading as bytes, or return None when it is not a regular file, which the module does not read.
-
-    The path is checked before it is opened, so a device is never opened, and checked again once open in case it was
-    replaced in between. The file is opened without blocking, so a FIFO is detected rather than waited on, and without
-    making a terminal the controlling terminal. Raise OSError when it cannot be checked or opened.
-    """
-    if not stat.S_ISREG(os.stat(path).st_mode):
-        return None
-
-    fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_NOCTTY | os.O_CLOEXEC)
-
-    try:
-        regular = stat.S_ISREG(os.fstat(fd).st_mode)
-    except OSError:
-        os.close(fd)
-        raise
-
-    if not regular:
-        os.close(fd)
-        return None
-
-    return os.fdopen(fd, "rb")
 
 
 def read_lines(handle, version):

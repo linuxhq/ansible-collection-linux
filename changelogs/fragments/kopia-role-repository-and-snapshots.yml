@@ -1,0 +1,9 @@
+---
+security_fixes:
+  - kopia role - fetch the kopia RPM repository over HTTPS instead of HTTP.
+bugfixes:
+  - kopia role - with ``kopia_snapshot`` enabled, snapshot only the
+    ``kopia_policies`` entries whose ``target`` is a local absolute path and
+    whose ``state`` is ``present``. A ``(global)`` or ``user@host`` target and
+    an entry with ``state=absent`` were snapshotted too, and ``(global)`` made
+    the role fail.

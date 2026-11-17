@@ -16,10 +16,8 @@ bugfixes:
     as a symbolic link loop or one that fails with an I/O error, as no static
     hostname, as ``systemd-hostnamed`` 246 and later do, instead of failing.
     One the module may not access still fails the task, as
-    ``systemd-hostnamed`` runs as root and reads it. Document that
-    ``systemd-hostnamed`` may block on a file that is not a regular file, such
-    as a FIFO, which the module does not read, rather than saying it ignores
-    such a file, and that systemd 239 to 245 fail to start
+    ``systemd-hostnamed`` runs as root and reads it. Document that systemd
+    239 to 245 fail to start
     ``systemd-hostnamed`` on any error reading ``/etc/hostname`` other than a
     missing file, including a first hostname line left empty once invalid
     characters are removed, and read the file only when
@@ -27,10 +25,6 @@ bugfixes:
   - systemd_locale - fail when the language fallback map may not be read,
     as ``systemd-localed`` runs as root and reads it, instead of predicting
     no fallback.
-  - systemd_hostname, systemd_locale - check that ``/etc/hostname`` and the
-    language fallback map are regular files before opening them, so a device
-    at that path is never opened, and open them with ``O_NOCTTY``, so a
-    terminal there never becomes the controlling terminal of the module.
   - systemd_locale - say that the language fallback map refusal covers a
     fallback with a Unicode noncharacter, and document that it fails in check
     mode only when dasbus is available.

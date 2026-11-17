@@ -12,7 +12,7 @@
     - kopia
   become: true
   ansible.builtin.yum_repository:
-    baseurl: http://packages.kopia.io/rpm/stable/$basearch/
+    baseurl: https://packages.kopia.io/rpm/stable/$basearch/
     description: Kopia
     enabled: true
     gpgcheck: true
@@ -105,6 +105,8 @@
   when:
     - kopia_snapshot | bool
     - _snapshot.target is defined
+    - _snapshot.state | d('present') == 'present'
+    - _snapshot.target is match('/')
 
 - name: Ensure kopia systemd configuration is managed
   tags:
