@@ -1668,6 +1668,40 @@ def test_hostname_static_hostname_written_first(monkeypatch, tmp_path, run_modul
     ]
 
 
+@pytest.mark.parametrize(
+    "status,etc_hostname,params,methods",
+    [
+        # SetStaticHostname applies the static hostname, else the default, in place of the transient one
+        (HOSTNAME, "old\n", {"static_hostname": "", "transient_hostname": ""}, ["SetStaticHostname"]),
+        (
+            {**HOSTNAME, "hostname": "dhcp", "hostname_source": "transient", "static_hostname": ""},
+            "",
+            {"static_hostname": "new", "transient_hostname": ""},
+            ["SetStaticHostname"],
+        ),
+        (
+            {**HOSTNAME, "hostname": "dhcp", "hostname_source": "transient", "static_hostname": ""},
+            "",
+            {"static_hostname": "", "transient_hostname": ""},
+            ["SetHostname"],
+        ),
+        # systemd-hostnamed keeps the hostname source it determined, so it can lag behind /etc/hostname
+        (
+            {**HOSTNAME, "hostname": "dhcp", "hostname_source": "transient"},
+            None,
+            {"transient_hostname": ""},
+            ["SetHostname"],
+        ),
+    ],
+)
+def test_hostname_resets_transient_only_when_static_change_does_not(
+    monkeypatch, tmp_path, run_module, status, etc_hostname, params, methods
+):
+    mutate = hostname_module(monkeypatch, tmp_path, status, etc_hostname=etc_hostname)
+    assert run_module(systemd_hostname, params)["changed"]
+    assert [entry.args[2] for entry in mutate.call_args_list] == methods
+
+
 def test_hostname_check_mode_predicts_static_over_reset_transient(monkeypatch, tmp_path, run_module):
     status = {**HOSTNAME, "hostname": "transient", "hostname_source": "transient", "static_hostname": ""}
     mutate = hostname_module(monkeypatch, tmp_path, status)

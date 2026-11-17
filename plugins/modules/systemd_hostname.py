@@ -546,11 +546,15 @@ def ensure_present(module):
             )
 
         cleared = current["static_hostname"] and not predicted["static_hostname"]
+        # SetStaticHostname already applies the static hostname, else the default, in place of a transient one
+        static_pending = any(param == "static_hostname" for param, _method, _args in pending)
 
         if current["hostname_source"] == "transient" or cleared:
             predicted["hostname"] = predicted["static_hostname"] or default or current["hostname"]
             predicted["hostname_source"] = "static" if predicted["static_hostname"] else "default"
-            pending.append(("transient_hostname", "SetHostname", ("", False)))
+
+            if not static_pending:
+                pending.append(("transient_hostname", "SetHostname", ("", False)))
 
     # the first request is validated by systemd-hostnamed before anything is written, a later one only after the
     # earlier requests are applied; a later request follows a setting compared against its file, so version is known
