@@ -5,8 +5,6 @@
 {{ key }} = true
 {%     elif value is sameas false %}
 {{ key }} = false
-{%     elif value is string %}
-{{ key }} = {{ value | string }}
 {%     else %}
 {{ key }} = {{ value }}
 {%     endif %}

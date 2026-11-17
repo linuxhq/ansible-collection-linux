@@ -57,8 +57,10 @@ def kopia_client(monkeypatch):
     """Report the client user and host that kopia_snapshot and kopia_snapshot_info qualify a path with."""
     status = Mock(return_value=CLIENT_STATUS)
     monkeypatch.setattr(kopia_utils, "repository_status", status)
-    # kopia_snapshot reads the status itself in check mode
+    # kopia_maintenance, kopia_snapshot and kopia_snapshot_info read the status themselves in check mode
+    monkeypatch.setattr(kopia_maintenance, "repository_status", status)
     monkeypatch.setattr(kopia_snapshot, "repository_status", status)
+    monkeypatch.setattr(kopia_snapshot_info, "repository_status", status)
     return status
 
 
@@ -1534,8 +1536,9 @@ def test_surrogate_run_command_cannot_encode_is_rejected(monkeypatch, run_module
         # nothing is compared with what kopia records for these, so the bytes Ansible stands for reach kopia
         (kopia_policy, {"target": "/srv/\udce9", "state": "absent"}, ["policy", "export", "--", "/srv/\udce9"]),
         (kopia_policy_info, {"target": "/srv/\udce9"}, ["policy", "export", "--", "/srv/\udce9"]),
-        (kopia_snapshot_info, {"path": "/srv/\udce9"}, ["snapshot", "list", "--json", "--", "/srv/\udce9"]),
         (kopia_snapshot, {"path": "/srv/\udce9"}, ["snapshot", "create", "/srv/\udce9", "--json"]),
+        # kopia lists a source by the path it recorded, with U+FFFD in place of those bytes
+        (kopia_snapshot_info, {"path": "/srv/\udce9"}, ["snapshot", "list", "--json", "--", "/srv/\ufffd"]),
     ],
 )
 def test_escaped_bytes_reach_kopia_and_messages_stay_utf8(monkeypatch, run_module, plugin, params, args):
@@ -1546,6 +1549,25 @@ def test_escaped_bytes_reach_kopia_and_messages_stay_utf8(monkeypatch, run_modul
     assert result["failed"] and not result.get("changed") and "/srv/\\udce9" in result["msg"]
     result["msg"].encode("utf-8")
     assert command.call_args_list[0].args[1] == args
+
+
+@pytest.mark.parametrize("path,source", [("/srv/a\udcffb", "/srv/a\ufffdb"), ("/a@b\udcff", "root@host:/a@b\ufffd")])
+@pytest.mark.parametrize("rc,stdout", [(0, "manifest"), (1, "manifest"), (0, "")])
+def test_snapshot_with_escaped_bytes_is_listed_as_kopia_records_it(monkeypatch, run_module, path, source, rc, stdout):
+    # kopia records each byte that is not valid UTF-8 as U+FFFD and lists the source only by that path, so the snapshot
+    # is found after a run that succeeds, one that fails once the manifest is printed, and one kopia skips
+    recorded = source.split(":", 1)[-1]
+    manifest = {"id": "new", "source": {"host": "host", "userName": "root", "path": recorded}}
+    listed = [{"id": "new", "source": manifest["source"]}]
+    printed = json.dumps(manifest) if stdout else ""
+    command = Mock(side_effect=[(rc, printed, "maintenance failed" if rc else ""), (0, json.dumps(listed), "")])
+    monkeypatch.setattr(kopia_snapshot, "kopia_command", command)
+    # Ansible cannot return the module arguments with those code points, so they are left out
+    result = run_module(kopia_snapshot, {"path": path, "_ansible_no_log": True})
+    assert command.call_args_list[0].args[1] == ["snapshot", "create", path, "--json"]
+    assert command.call_args_list[1].args[1] == ["snapshot", "list", "--json", "--", source]
+    assert result["changed"] is bool(stdout) and result["snapshot"]["id"] == "new"
+    assert bool(result.get("failed")) is bool(rc)
 
 
 def test_snapshot_description_and_tags_with_escaped_bytes_reach_kopia(monkeypatch, run_module):
@@ -2086,6 +2108,38 @@ def test_repository_create_failure_after_writing_shards_reports_change(
         assert result["msg"] == f"{created} but failed to create the repository in filesystem path={tmp_path}: {stderr}"
 
 
+@pytest.mark.parametrize("error", ["repository not initialized", "permission denied"])
+@pytest.mark.parametrize("existed,changed", [(False, True), (True, False)])
+def test_repository_connect_failure_after_writing_shards_reports_change(
+    monkeypatch, run_module, tmp_path, error, existed, changed
+):
+    # kopia repository create refuses storage with any .f file, which kopia repository connect then reads through its
+    # sharded storage, writing .shards when there is none, before it finds no repository there
+    (tmp_path / "x.f").write_text("")
+    shards = tmp_path / ".shards"
+    if existed:
+        shards.write_text("{}")
+
+    replies = iter([NOT_CONNECTED, NOT_CONNECTED])
+
+    def kopia(module, args, password=None):
+        if args[:2] == ["repository", "create"]:
+            return EXISTING_DATA
+
+        if args[:2] == ["repository", "connect"]:
+            shards.write_text("{}")
+            return 1, "", f"kopia: error: {error}"
+
+        return next(replies)
+
+    monkeypatch.setattr(kopia_repository, "kopia_command", kopia)
+    monkeypatch.setattr(kopia_utils, "kopia_command", kopia)
+    monkeypatch.setattr(kopia_repository, "repository_status", REPOSITORY_STATUS)
+    result = run_module(kopia_repository, repository_mkdir_params(tmp_path))
+    assert result["failed"] and bool(result.get("changed")) is changed and result["repository"] == {}
+    assert result["msg"].endswith(f"{', and kopia wrote its .shards file' if changed else ''}: kopia: error: {error}")
+
+
 @pytest.mark.parametrize("storage", ["sftp", "webdav"])
 def test_repository_create_failure_on_other_storage_reports_no_change(monkeypatch, run_module, tmp_path, storage):
     # the module cannot inspect remote storage, where kopia can leave the path or .shards, as documented
@@ -2567,6 +2621,33 @@ def test_maintenance_owner_me_is_the_client_user_and_host(monkeypatch, run_modul
         assert command.call_args.args[1] == ["maintenance", "set", "--owner=root@server"]
     else:
         command.assert_not_called()
+
+
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_maintenance_owner_me_reads_status_once(monkeypatch, run_module, check_mode):
+    # check mode reads the status to tell whether a repository is connected, which also gives the client
+    status = Mock(return_value={"clientOptions": {"username": "root", "hostname": "server"}})
+    monkeypatch.setattr(kopia_utils, "repository_status", status)
+    monkeypatch.setattr(kopia_maintenance, "repository_status", status)
+    monkeypatch.setattr(kopia_maintenance, "kopia_available", lambda module: True)
+    current = {"owner": "root@server", "logRetention": ZERO_RETENTION}
+    monkeypatch.setattr(kopia_maintenance, "maintenance_info", Mock(return_value=current))
+    monkeypatch.setattr(kopia_maintenance, "kopia_command", Mock(side_effect=AssertionError("must not run kopia")))
+    result = run_module(kopia_maintenance, {"owner": "me"}, check_mode)
+    assert result["changed"] is False and not result.get("failed")
+    assert status.call_count == 1
+
+
+@pytest.mark.parametrize("check_mode", [False, True])
+@pytest.mark.parametrize("path,source", [("/home/a@b", "root@host:/home/a@b"), ("/data", "/data")])
+def test_snapshot_info_reads_status_once(monkeypatch, run_module, kopia_client, check_mode, path, source):
+    # check mode reads the status to tell whether a repository is connected, which also qualifies a user@host path
+    monkeypatch.setattr(kopia_snapshot_info, "kopia_available", lambda module: True)
+    command = Mock(return_value=(0, "[]", ""))
+    monkeypatch.setattr(kopia_snapshot_info, "kopia_command", command)
+    assert run_module(kopia_snapshot_info, {"path": path}, check_mode) == {"changed": False, "snapshots": []}
+    assert command.call_args.args[1] == ["snapshot", "list", "--json", "--", source]
+    assert kopia_client.call_count == (check_mode or "@" in path)
 
 
 def test_maintenance_owner_me_without_connection_fails(monkeypatch, run_module):

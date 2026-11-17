@@ -1,0 +1,7 @@
+---
+bugfixes:
+  - kopia_snapshot, kopia_snapshot_info - list the snapshots of a ``path``
+    with bytes that are not valid UTF-8 by the path kopia records, with
+    U+FFFD in their place. kopia_snapshot returned an empty ``snapshot``, and
+    failed without reporting a change when kopia reported an error after
+    saving the snapshot, and kopia_snapshot_info listed no snapshots.

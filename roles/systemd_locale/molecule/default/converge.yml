@@ -14,4 +14,33 @@
         - molecule-idempotence-notest
 
     - systemd_locale
+
+- name: Converge X11 keyboard options
+  hosts: all
+  tags:
+    - molecule-idempotence-notest
+  roles:
+    - role: systemd_locale
+      systemd_locale_x11_options: terminate:ctrl_alt_bksp
+
+  post_tasks:
+    - name: Ensure systemd locale information is gathered
+      ansible.builtin.include_role:
+        name: systemd_locale_info
+      when:
+        - not ansible_check_mode
+
+    - name: Ensure systemd X11 keyboard options are verified
+      ansible.builtin.assert:
+        that:
+          - _systemd_locale_info_dict.x11_layout == 'us'
+          - _systemd_locale_info_dict.x11_options == 'terminate:ctrl_alt_bksp'
+      when:
+        - not ansible_check_mode
+
+- name: Converge
+  hosts: all
+  roles:
+    - role: systemd_locale
+      systemd_locale_x11_options: ""
 ...

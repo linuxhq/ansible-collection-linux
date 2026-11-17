@@ -101,7 +101,8 @@ options:
         cannot be passed to kopia, is rejected before kopia runs, also in check
         mode. U+DC80 to U+DCFF, which Ansible uses for bytes that are not valid
         UTF-8, are passed as those bytes, which kopia records with U+FFFD in
-        their place.
+        their place. The module lists the snapshot by the path kopia records,
+        which every path that differs only in such bytes shares.
     type: path
     required: true
   tags:
@@ -187,7 +188,6 @@ snapshot:
 """
 
 import json
-import re
 
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.common.dict_transformations import camel_dict_to_snake_dict
@@ -200,6 +200,7 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
     kopia_available,
     kopia_command,
     reads_as_user_host,
+    recorded_text,
     repository_status,
     snapshot_source,
     text_label,
@@ -252,8 +253,7 @@ def recorded_path(manifest, path):
     if recorded:
         return recorded["path"]
 
-    # kopia records each byte that is not valid UTF-8, which Ansible passes as U+DC80 to U+DCFF, as U+FFFD
-    return re.sub("[\udc80-\udcff]", "\ufffd", absolute_path(path))
+    return recorded_text(absolute_path(path))
 
 
 def latest_snapshot(module, source, path, snapshot_id=None):

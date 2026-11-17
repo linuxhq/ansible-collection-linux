@@ -342,23 +342,31 @@ def reads_as_user_host(path):
     return 0 < at < colon or (at >= 0 and colon < 0)
 
 
-def snapshot_source(module, path, operation, failed_result=None):
+def recorded_text(text):
+    """Return text as kopia records it, with U+FFFD for each byte that is not valid UTF-8, passed as U+DC80 to U+DCFF."""
+    return re.sub("[\udc80-\udcff]", "\ufffd", text)
+
+
+def snapshot_source(module, path, operation, failed_result=None, status=None):
+    """Return the source kopia snapshot list lists the snapshots of path by."""
     # the path is passed absolute, so a name such as "--all" or "(global)" stays a path, and kopia adds its own client
     # user and host; kopia reads an absolute path in which an "@" comes before any ":" as user@host or
     # user@host:path, so only such a path is qualified with the client user and host, whose user can start with "-",
-    # so callers pass the source after "--"
+    # so callers pass the source after "--"; a caller that has read the repository status passes it as status.
+    # kopia lists a source by the path it recorded, so a byte that is not valid UTF-8 is passed as U+FFFD
     failed_result = failed_result or {}
     absolute = absolute_path(path)
 
     if not reads_as_user_host(absolute):
-        return absolute
+        return recorded_text(absolute)
 
-    status = repository_status(module, password=module.params["password"], failed_result=failed_result)
+    if status is None:
+        status = repository_status(module, password=module.params["password"], failed_result=failed_result)
 
     if status is None:
         module.fail_json(msg=f"unable to {operation} of {text_label(path)}: {NOT_CONNECTED_ERROR}", **failed_result)
 
-    return client_source(module, absolute, status, operation, failed_result)
+    return recorded_text(client_source(module, absolute, status, operation, failed_result))
 
 
 def client_source(module, absolute, status, operation, failed_result=None):

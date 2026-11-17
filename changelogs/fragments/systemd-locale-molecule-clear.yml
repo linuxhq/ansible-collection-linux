@@ -1,0 +1,4 @@
+---
+trivial:
+  - systemd_locale role - test clearing ``x11_options`` with an empty string
+    in Molecule.

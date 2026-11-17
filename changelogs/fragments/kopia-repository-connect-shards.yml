@@ -1,0 +1,7 @@
+---
+bugfixes:
+  - kopia_repository - report a change when ``kopia repository connect``
+    fails after it wrote the ``.shards`` file of ``filesystem`` storage that
+    holds data but no repository, such as a stray file ending in ``.f``, and
+    correct the documentation, which said the module never connects to
+    storage without a repository.
