@@ -24,13 +24,6 @@ None
     _kopia_policy_info_list
     _kopia_policy_info_policy
 
-With `kopia_policy_info_target` set, `_kopia_policy_info_defined` tells
-whether a policy is defined for the target, `_kopia_policy_info_policy` holds
-that defined policy and `_kopia_policy_info_effective_policy` the effective
-policy, with inherited values resolved, and `_kopia_policy_info_list` is `[]`.
-Without it, `_kopia_policy_info_list` holds every policy defined in the
-repository, `_kopia_policy_info_defined` is `false`, and the policies are `{}`.
-
 ## Example Playbook
 
     - hosts: server

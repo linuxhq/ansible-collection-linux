@@ -24,19 +24,6 @@ None
       - --without-password
     kopia_snapshot: false
 
-Each `kopia_policies` item manages the policy of one target with
-`linuxhq.linux.kopia_policy`:
-
-    kopia_policies:
-      - target: /home/vagrant   # required, a path, user@host, user@host:/path or (global)
-        policy: {}              # the complete policy, required when state is present
-        state: present          # present (default) or absent
-
-With `kopia_snapshot: true`, the role takes a new snapshot of each target
-that starts with `/` and whose `state` is `present` on every run, which is not
-idempotent. Targets such as `(global)` or `user@host:/path`, and targets with
-`state: absent`, are not snapshotted.
-
 ## Dependencies
 
 None
