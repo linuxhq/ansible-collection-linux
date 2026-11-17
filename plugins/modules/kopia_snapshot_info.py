@@ -82,7 +82,7 @@ attributes:
   check_mode:
     description: This module only retrieves information and does not modify state.
     support: full
-    details: Returns empty result data when Kopia is unavailable.
+    details: Returns empty result data when kopia is unavailable or no repository is connected.
   diff_mode:
     description: Diff mode is not supported.
     support: none
@@ -108,7 +108,8 @@ snapshots:
       well, each under its own C(source).
     - Keys under C(tags) are returned as kopia reports them, such as
       C(tag:role).
-    - Empty when the module fails, and when kopia is unavailable in check mode.
+    - Empty when the module fails, and when kopia is unavailable or no
+      repository is connected in check mode.
       Not returned when Ansible rejects the arguments, such as a missing
       required option, a value of the wrong type or an invalid choice, or fails
       to log them, such as for a lone surrogate code point in an option that is
@@ -138,6 +139,7 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
     check_utf8,
     kopia_available,
     kopia_command,
+    repository_connected,
     snapshot_source,
     text_label,
 )
@@ -150,7 +152,11 @@ def list_snapshots(module):
     # run_command cannot pass U+D800 to U+DC7F to kopia
     check_utf8(module, [("path", module.params["path"])], errors="surrogateescape", failed_result=failed_result)
 
-    if module.check_mode and not kopia_available(module):
+    # an earlier task in check mode, such as kopia_repository, may only have predicted the connection
+    if module.check_mode and not (
+        kopia_available(module)
+        and repository_connected(module, password=module.params["password"], failed_result=failed_result)
+    ):
         module.exit_json(changed=False, snapshots=[])
 
     command = ["snapshot", "list", "--json"]

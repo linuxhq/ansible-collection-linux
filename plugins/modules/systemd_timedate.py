@@ -53,6 +53,14 @@ options:
       - C(systemd-timedated) starts or stops the service in the background, so
         after changing it the module waits up to 30 seconds for the change to
         be reported before applying O(time), and fails when it is not.
+      - C(systemd-timedated) reports network time synchronization enabled
+        while it starts the service, even when the service then fails to
+        start, so the module waits until systemd has no job left for the
+        network time services named in the C(ntp-units.d/*.list) files of
+        C(systemd-timedated) before it takes the change as reported, and fails
+        when one is still queued after the 30 seconds. Services named only in
+        E(SYSTEMD_TIMEDATED_NTP_SERVICES) in the environment of
+        C(systemd-timedated) are not waited for.
     type: bool
   time:
     description:
@@ -86,8 +94,10 @@ options:
         another setting is written before the clock, the module fails before
         writing any setting when network time synchronization would still be
         enabled.
-      - A value C(systemd-analyze) cannot parse, or a time at or before the
-        epoch, is rejected before any setting is written.
+      - A value C(systemd-analyze) cannot parse, a time at or before the
+        epoch, or a time the kernel refuses to set, at or after
+        V(@8277292036), 2232-04-18 23:47:16 UTC, is rejected before any
+        setting is written.
       - systemd 258 and later also refuse a time before the date systemd was
         built. Only C(systemd-timedated) knows that date, so the refusal is
         reported after the settings written before the clock are applied.
@@ -99,7 +109,7 @@ options:
     type: str
 requirements:
   - dasbus
-  - systemd-analyze, when O(time) is set
+  - systemd-analyze from systemd >= 243, when O(time) is set
 attributes:
   check_mode:
     description: Predicts changes without modifying the target.
@@ -147,6 +157,7 @@ timedate:
     timezone: America/Los_Angeles
 """
 
+import glob
 import re
 from time import monotonic, sleep
 
@@ -159,11 +170,24 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.systemd import (
     systemd_call,
     systemd_properties,
     systemd_proxy,
+    systemd_result,
 )
 
 MICROSECONDS = 1000000
 
+# the kernel refuses to set the clock at or after TIME_SETTOD_SEC_MAX, KTIME_SEC_MAX less 30 years of uptime, in 2232
+SETTOD_SEC_MAX = (2**63 - 1) // 1000000000 - 30 * 365 * 24 * 3600
+
 NTP_TIMEOUT = 30
+
+# systemd-timedated reads the network time services it starts and stops from *.list files in these directories
+NTP_UNIT_DIRS = (
+    "/etc/systemd/ntp-units.d",
+    "/run/systemd/ntp-units.d",
+    "/usr/local/lib/systemd/ntp-units.d",
+    "/usr/lib/systemd/ntp-units.d",
+    "/lib/systemd/ntp-units.d",
+)
 
 SECONDS = re.compile(r"^[ \t]*UNIX seconds: @([0-9]+)(?:\.([0-9]{6}))?[ \t]*$", re.MULTILINE)
 
@@ -189,18 +213,58 @@ def parse_time(module, analyze, value, zone):
     seconds, fraction = SECONDS.findall(stdout)[-1]
     usec = int(seconds) * MICROSECONDS + int(fraction or 0)
 
-    if usec <= 0:
+    if usec <= 0 or usec // MICROSECONDS >= SETTOD_SEC_MAX:
         module.fail_json(msg=f"unable to set time: invalid time {value}")
 
     return usec
 
 
-def wait_for_ntp(module, proxy, ntp):
-    # SetNTP returns once the time service job is queued, and systemd-timedated
-    # refuses other requests until that job finishes and NTP reports the change.
-    deadline = monotonic() + NTP_TIMEOUT
+def ntp_units(module):
+    """Return the network time services systemd-timedated starts and stops, named in its ntp-units.d/*.list files.
 
-    while systemd_properties(module, proxy, [("ntp", "NTP")])["ntp"] != ntp:
+    A file overrides any file of the same name in a later directory, and one linked to /dev/null names nothing.
+    """
+    files = {}
+
+    for directory in NTP_UNIT_DIRS:
+        for path in glob.glob(f"{directory}/*.list"):
+            files.setdefault(path.rsplit("/", 1)[1], path)
+
+    units = set()
+
+    for _name, path in sorted(files.items()):
+        try:
+            with open(path) as handle:
+                lines = handle.read().splitlines()
+        except (OSError, UnicodeDecodeError) as error:
+            module.fail_json(msg=f"unable to read the network time services in {path}: {error}")
+
+        units.update(line.strip() for line in lines if line.strip() and not line.strip().startswith(("#", ";")))
+
+    return units
+
+
+def ntp_jobs(module, manager, units):
+    """Return the IDs of the jobs systemd has queued for the unit object paths units, as ListJobs reports them."""
+    # each job is its ID, unit name, type, state, job object path and unit object path
+    return {job[0] for job in systemd_result(module, manager, "ListJobs") if job[5] in units}
+
+
+def wait_for_ntp(module, proxy, ntp):
+    # SetNTP returns once the jobs starting or stopping the time services are
+    # queued, and systemd-timedated refuses other requests until they finish
+    # and NTP reports the change. While they run, it reports NTP enabled,
+    # whatever their result, so NTP is taken as reported only once no job of a
+    # time service is left, whether SetNTP queued it or joined an earlier one.
+    deadline = monotonic() + NTP_TIMEOUT
+    manager = systemd_proxy(module, "systemd1")
+    # systemd reports a job under the unit's own name, which LoadUnit resolves an alias to
+    units = {systemd_result(module, manager, "LoadUnit", name) for name in ntp_units(module)}
+
+    while True:
+        if not ntp_jobs(module, manager, units) and systemd_properties(module, proxy, [("ntp", "NTP")])["ntp"] == ntp:
+            return
+
         if monotonic() >= deadline:
             module.fail_json(
                 msg=f"unable to set ntp to {ntp}: network time synchronization did not change within {NTP_TIMEOUT} seconds"

@@ -1,0 +1,41 @@
+---
+bugfixes:
+  - kopia_snapshot - return the newest snapshot of ``path`` only, or an empty
+    ``snapshot`` when it has none, when the snapshot kopia printed is not
+    listed, such as when another client deleted it before the module listed
+    it, or when kopia skipped an identical snapshot. ``kopia snapshot list``
+    also reports the snapshots of every parent directory, so the module
+    returned the snapshot of a parent directory when the path had none.
+  - kopia_policy, kopia_policy_info, kopia_maintenance,
+    kopia_maintenance_info, kopia_snapshot, kopia_snapshot_info - in check mode
+    with kopia installed but no repository connected, such as before
+    kopia_repository connects in the same play, report the result they report
+    without kopia, a change for kopia_policy with ``state=present``,
+    kopia_maintenance and kopia_snapshot, no change and empty results
+    otherwise, instead of failing with ``repository is not connected``.
+  - kopia_policy, kopia_policy_info - return ``policy`` and ``policies`` as
+    kopia reports them, including the empty sections kopia always writes, such
+    as ``files`` or ``logging.directories``, instead of removing them. In
+    check mode, kopia_policy predicts those sections too.
+  - kopia_repository - report a change when ``kopia repository create`` fails
+    after it wrote the ``.shards`` file in an existing ``path`` of
+    ``filesystem`` storage, and document that with ``sftp``, ``webdav`` or
+    ``rclone`` storage, a failed create may leave the remote ``path`` or the
+    ``.shards`` file, which the module cannot inspect.
+  - kopia_maintenance - document that ``extend_object_locks`` requires kopia
+    0.14.0 or later.
+  - kopia_repository_info role - omit ``config_file`` when
+    ``kopia_repository_info_config_file`` is ``null``, the default, instead of
+    passing an empty string on ansible-core 2.18.
+  - kopia role - document the ``kopia_policies`` item schema, which targets
+    are snapshotted, and that ``kopia_snapshot`` takes a new snapshot on every
+    run.
+breaking_changes:
+  - kopia_policy_info role - name the published facts after the module's
+    return values. Publish ``_kopia_policy_info_defined``,
+    ``_kopia_policy_info_policy`` and ``_kopia_policy_info_effective_policy``
+    with ``kopia_policy_info_target`` set, in place of
+    ``_kopia_policy_info_dict``, which held the effective policy, and
+    ``_kopia_policy_info_policies`` in place of ``_kopia_policy_info_list``.
+    ``_kopia_policy_info_dict`` and ``_kopia_policy_info_list`` are no longer
+    published.

@@ -133,7 +133,10 @@ attributes:
   check_mode:
     description: Predicts changes without modifying the target.
     support: full
-    details: When Kopia is unavailable, reports changed for present policies and unchanged for absent policies.
+    details:
+      - When kopia is unavailable or no repository is connected, reports
+        changed for present policies and unchanged for absent policies, as a
+        real run after earlier tasks install kopia and connect the repository.
   diff_mode:
     description: Diff mode is not supported.
     support: none
@@ -173,12 +176,15 @@ EXAMPLES = r"""
 RETURN = r"""
 policy:
   description:
-    - Defined policy reported by C(kopia policy export).
+    - Defined policy reported by C(kopia policy export), as kopia reports it,
+      including the empty sections it always writes, such as C(files).
     - In check mode, when a change would be made, the desired policy from
-      O(policy), without the values kopia does not store. A key that is not
-      valid UTF-8, which kopia would refuse, is returned with escapes, such as
-      C(\udc80), in place of the characters it cannot encode.
-    - Empty when kopia is unavailable in check mode.
+      O(policy), without the values kopia does not store, and with the empty
+      sections kopia always writes. A key that is not valid UTF-8, which kopia
+      would refuse, is returned with escapes, such as C(\udc80), in place of
+      the characters it cannot encode.
+    - Empty when kopia is unavailable or no repository is connected in check
+      mode.
     - Empty when the module fails, also for an option value the module rejects
       before kopia runs. Not returned when Ansible rejects the arguments, such
       as a missing required option, a value of the wrong type or an invalid
@@ -188,13 +194,24 @@ policy:
   returned: when O(state=present)
   type: dict
   sample:
+    actions: {}
     compression:
       compressor_name: gzip
+    error_handling: {}
+    files: {}
+    logging:
+      directories: {}
+      entries: {}
+    metadata_compression: {}
+    os_snapshots:
+      volume_shadow_copy: {}
     retention:
       keep_hourly: 24
       keep_latest: 2
     scheduling:
       interval_seconds: 3600
+    splitter: {}
+    upload: {}
 """
 
 import json
@@ -203,10 +220,12 @@ import os
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.common.dict_transformations import (
     camel_dict_to_snake_dict,
+    dict_merge,
     snake_dict_to_camel_dict,
 )
 
 from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
+    POLICY_EXPORT_SECTIONS,
     POLICY_FIELDS,
     check_connection,
     check_policy_target,
@@ -216,7 +235,7 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
     policy_export,
     policy_field_mismatch,
     policy_normalize,
-    prune_empty,
+    repository_connected,
     same_value,
     text_label,
     text_labels,
@@ -285,18 +304,23 @@ def ensure_present(module):
     check_policy_target(module, target, failed_result={"policy": {}})
     check_policy_keys(module, module.params["policy"], "policy", POLICY_FIELDS)
 
-    if module.check_mode and not kopia_available(module):
+    # an earlier task in check mode, such as kopia_repository, may only have predicted the connection
+    if module.check_mode and not (
+        kopia_available(module) and repository_connected(module, failed_result={"policy": {}})
+    ):
         module.exit_json(changed=True, policy={})
 
     desired = policy_normalize(snake_dict_to_camel_dict(module.params["policy"]))
     current = policy_export(module, target, failed_result={"policy": {}})
 
     if current is not None and same_value(policy_normalize(current), desired):
-        module.exit_json(changed=False, policy=camel_dict_to_snake_dict(prune_empty(current)))
+        module.exit_json(changed=False, policy=camel_dict_to_snake_dict(current))
 
-    # a key that is not valid UTF-8, which kopia refuses as an unknown field when it imports the policy, is escaped
+    # kopia exports the sections it always writes, and a key that is not valid UTF-8, which kopia refuses as an
+    # unknown field when it imports the policy, is escaped
     if module.check_mode:
-        module.exit_json(changed=True, policy=text_labels(camel_dict_to_snake_dict(desired)))
+        predicted = dict_merge(POLICY_EXPORT_SECTIONS, desired)
+        module.exit_json(changed=True, policy=text_labels(camel_dict_to_snake_dict(predicted)))
 
     source = os.path.join(module.tmpdir, "policy.json")
     with open(source, "w") as handle:
@@ -309,7 +333,7 @@ def ensure_present(module):
 
     current = policy_export(module, target, failed_result={"changed": True, "policy": {}})
 
-    module.exit_json(changed=True, policy=camel_dict_to_snake_dict(prune_empty(current or {})))
+    module.exit_json(changed=True, policy=camel_dict_to_snake_dict(current or {}))
 
 
 def ensure_absent(module):
@@ -320,7 +344,7 @@ def ensure_absent(module):
     check_utf8(module, [("target", target)], errors="surrogateescape")
     check_policy_target(module, target)
 
-    if module.check_mode and not kopia_available(module):
+    if module.check_mode and not (kopia_available(module) and repository_connected(module)):
         module.exit_json(changed=False)
 
     current = policy_export(module, target)

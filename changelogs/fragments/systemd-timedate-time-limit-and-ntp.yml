@@ -1,0 +1,18 @@
+---
+bugfixes:
+  - systemd_timedate - fail before writing any setting when ``time`` is at or
+    after ``@8277292036``, 2232-04-18 23:47:16 UTC, which the kernel refuses
+    to set, instead of failing after ``timezone`` or another setting written
+    before the clock was applied.
+  - systemd_timedate - fail when ``ntp=true`` and the network time service,
+    such as ``chronyd``, fails to start, instead of reporting a change with
+    ``ntp`` enabled and changing again on every run. ``systemd-timedated``
+    reports network time synchronization enabled while the start job runs,
+    so the module now waits until systemd has no job left for the network
+    time services named in the ``ntp-units.d/*.list`` files of
+    ``systemd-timedated`` before it takes the change as reported, and fails
+    when one is still queued after 30 seconds.
+  - systemd_timedate - document that ``time`` requires ``systemd-analyze``
+    from systemd 243 or later in ``requirements``.
+  - systemd_hostname - document that an empty ``transient_hostname`` requires
+    systemd 248 or later, which added the ``HostnameSource`` property.
