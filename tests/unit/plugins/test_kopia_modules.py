@@ -1515,11 +1515,9 @@ UNENCODABLE = "it must not contain a lone surrogate code point from U+D800 to U+
         (kopia_repository, repository_params(options={"path": "/srv", "\ud800": "x"}), "options.\\ud800"),
         (kopia_policy, {"target": "/srv/\ud800", "state": "absent"}, "target"),
         (kopia_policy_info, {"target": "/srv/\ud800"}, "target"),
-        (kopia_snapshot, {"path": "/srv/\ud800"}, "path"),
         (kopia_snapshot, {"path": "/srv", "description": "\ud800"}, "description"),
         (kopia_snapshot, {"path": "/srv", "tags": {"env": "\ud800"}}, "tags.env"),
         (kopia_snapshot, {"path": "/srv", "tags": {"\udc7f": "prod"}}, "tags.\\udc7f"),
-        (kopia_snapshot_info, {"path": "/srv/\ud800"}, "path"),
     ],
 )
 def test_surrogate_run_command_cannot_encode_is_rejected(monkeypatch, run_module, plugin, params, name, check_mode):
@@ -1536,9 +1534,6 @@ def test_surrogate_run_command_cannot_encode_is_rejected(monkeypatch, run_module
         # nothing is compared with what kopia records for these, so the bytes Ansible stands for reach kopia
         (kopia_policy, {"target": "/srv/\udce9", "state": "absent"}, ["policy", "export", "--", "/srv/\udce9"]),
         (kopia_policy_info, {"target": "/srv/\udce9"}, ["policy", "export", "--", "/srv/\udce9"]),
-        (kopia_snapshot, {"path": "/srv/\udce9"}, ["snapshot", "create", "/srv/\udce9", "--json"]),
-        # kopia lists a source by the path it recorded, with U+FFFD in place of those bytes
-        (kopia_snapshot_info, {"path": "/srv/\udce9"}, ["snapshot", "list", "--json", "--", "/srv/\ufffd"]),
     ],
 )
 def test_escaped_bytes_reach_kopia_and_messages_stay_utf8(monkeypatch, run_module, plugin, params, args):
@@ -1551,23 +1546,17 @@ def test_escaped_bytes_reach_kopia_and_messages_stay_utf8(monkeypatch, run_modul
     assert command.call_args_list[0].args[1] == args
 
 
-@pytest.mark.parametrize("path,source", [("/srv/a\udcffb", "/srv/a\ufffdb"), ("/a@b\udcff", "root@host:/a@b\ufffd")])
-@pytest.mark.parametrize("rc,stdout", [(0, "manifest"), (1, "manifest"), (0, "")])
-def test_snapshot_with_escaped_bytes_is_listed_as_kopia_records_it(monkeypatch, run_module, path, source, rc, stdout):
-    # kopia records each byte that is not valid UTF-8 as U+FFFD and lists the source only by that path, so the snapshot
-    # is found after a run that succeeds, one that fails once the manifest is printed, and one kopia skips
-    recorded = source.split(":", 1)[-1]
-    manifest = {"id": "new", "source": {"host": "host", "userName": "root", "path": recorded}}
-    listed = [{"id": "new", "source": manifest["source"]}]
-    printed = json.dumps(manifest) if stdout else ""
-    command = Mock(side_effect=[(rc, printed, "maintenance failed" if rc else ""), (0, json.dumps(listed), "")])
-    monkeypatch.setattr(kopia_snapshot, "kopia_command", command)
-    # Ansible cannot return the module arguments with those code points, so they are left out
-    result = run_module(kopia_snapshot, {"path": path, "_ansible_no_log": True})
-    assert command.call_args_list[0].args[1] == ["snapshot", "create", path, "--json"]
-    assert command.call_args_list[1].args[1] == ["snapshot", "list", "--json", "--", source]
-    assert result["changed"] is bool(stdout) and result["snapshot"]["id"] == "new"
-    assert bool(result.get("failed")) is bool(rc)
+@pytest.mark.parametrize("check_mode", [False, True])
+@pytest.mark.parametrize("plugin", [kopia_snapshot, kopia_snapshot_info])
+@pytest.mark.parametrize("path", [f"/srv/a{chr(code)}b" for code in (0xDC80, 0xDCFF, 0xD800)] + [f"/a@b{chr(0xDCE9)}"])
+def test_snapshot_path_not_valid_utf8_is_rejected(monkeypatch, run_module, plugin, path, check_mode):
+    # Ansible cannot pass such a path through a task, failing to log it, or with no_log rejecting the reply after
+    # kopia saved the snapshot, so it is refused before kopia runs
+    must_not_run_kopia(monkeypatch, plugin)
+    monkeypatch.setattr(kopia_utils, "repository_status", Mock(side_effect=AssertionError("must not run kopia")))
+    result = run_module(plugin, {"path": path, "_ansible_no_log": True}, check_mode)
+    assert result["failed"] and not result.get("changed")
+    assert result["msg"].startswith("invalid path: it must be valid UTF-8")
 
 
 def test_snapshot_description_and_tags_with_escaped_bytes_reach_kopia(monkeypatch, run_module):

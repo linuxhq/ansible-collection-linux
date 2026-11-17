@@ -97,12 +97,12 @@ options:
       - Local path to snapshot.
       - Ansible expands a leading V(~) and environment variables in it, as for
         any C(path) option, before it is passed to kopia.
-      - A path with a lone surrogate code point from U+D800 to U+DC7F, which
-        cannot be passed to kopia, is rejected before kopia runs, also in check
-        mode. U+DC80 to U+DCFF, which Ansible uses for bytes that are not valid
-        UTF-8, are passed as those bytes, which kopia records with U+FFFD in
-        their place. The module lists the snapshot by the path kopia records,
-        which every path that differs only in such bytes shares.
+      - A path that is not valid UTF-8, with a lone surrogate code point,
+        including U+DC80 to U+DCFF, which Ansible uses for bytes that are not
+        valid UTF-8, is rejected before kopia runs, also in check mode. Ansible
+        cannot run a task with such a path, as it fails while logging the
+        arguments, or with C(no_log) rejects the module result after kopia
+        saved the snapshot.
     type: path
     required: true
   tags:
@@ -200,7 +200,6 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.kopia import (
     kopia_available,
     kopia_command,
     reads_as_user_host,
-    recorded_text,
     repository_status,
     snapshot_source,
     text_label,
@@ -250,10 +249,7 @@ def recorded_path(manifest, path):
     """Return the path of the source kopia recorded, as it printed it or, when it printed none, as it records path."""
     recorded = manifest.get("source")
 
-    if recorded:
-        return recorded["path"]
-
-    return recorded_text(absolute_path(path))
+    return recorded["path"] if recorded else absolute_path(path)
 
 
 def latest_snapshot(module, source, path, snapshot_id=None):
@@ -275,10 +271,13 @@ def ensure_present(module):
     path = module.params["path"]
 
     check_connection(module, failed_result={"snapshot": {}})
+    # Ansible cannot pass a path that is not valid UTF-8 through a task, failing to log it, or with no_log rejecting
+    # the reply after kopia saved the snapshot, which kopia lists by its path with U+FFFD in place of those bytes
+    check_utf8(module, [("path", path)], failed_result={"snapshot": {}})
     # run_command cannot pass U+D800 to U+DC7F to kopia
     check_utf8(
         module,
-        [(name, module.params[name]) for name in ("path", "description", "tags")],
+        [(name, module.params[name]) for name in ("description", "tags")],
         errors="surrogateescape",
         failed_result={"snapshot": {}},
     )
