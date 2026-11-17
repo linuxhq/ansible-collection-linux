@@ -17,7 +17,7 @@
     - molecule-idempotence-notest
   vars:
     # the controller's time when the clock is set, so the clock stays put
-    __systemd_timedate_epoch: "{{ now(utc=true).timestamp() | int }}"
+    __systemd_timedate_epoch: "{{ now().timestamp() | int }}"
   roles:
     - role: systemd_timedate
       systemd_timedate_adjust_system_clock: true
@@ -39,6 +39,7 @@
             name: systemd_timedate_info
 
         # the clock is set after the RTC adjusts it, so it ends near the time
+        # requested and the time the host reported before the play
         - name: Ensure systemd system clock settings are verified
           ansible.builtin.assert:
             that:
@@ -46,6 +47,8 @@
               - _systemd_timedate_info_dict.ntp is false
               - (_systemd_timedate_info_dict.time_usec // 1000000
                  - __systemd_timedate_time | int) | abs < 300
+              - (_systemd_timedate_info_dict.time_usec // 1000000
+                 - ansible_facts.date_time.epoch | int) | abs < 600
 
         - name: Ensure systemd system clock change is predicted again
           become: true
