@@ -55,9 +55,9 @@ options:
         be reported before applying O(time), and fails when it is not.
       - C(systemd-timedated) reports network time synchronization enabled
         while it starts the service, even when the service then fails to
-        start, so the module waits until systemd has no job left before it
-        takes the change as reported, and also fails when other jobs keep
-        systemd busy for the 30 seconds.
+        start, so the module waits until the jobs queued while it changed the
+        setting are gone before it takes the change as reported, and fails
+        when they are still queued after the 30 seconds.
     type: bool
   time:
     description:
@@ -166,6 +166,7 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.systemd import (
     systemd_call,
     systemd_properties,
     systemd_proxy,
+    systemd_result,
 )
 
 MICROSECONDS = 1000000
@@ -205,18 +206,23 @@ def parse_time(module, analyze, value, zone):
     return usec
 
 
-def wait_for_ntp(module, proxy, ntp):
-    # SetNTP returns once the time service job is queued, and systemd-timedated
-    # refuses other requests until that job finishes and NTP reports the change.
-    # While the job runs, it reports NTP enabled, whatever the job's result, so
-    # NTP is taken as reported only once systemd has no job left.
+def queued_jobs(module, manager):
+    """Return the IDs of the jobs systemd has queued, the first field of each job ListJobs reports."""
+    return {job[0] for job in systemd_result(module, manager, "ListJobs")}
+
+
+def wait_for_ntp(module, proxy, manager, ntp, jobs):
+    # SetNTP returns once the time service jobs, the ones queued during the call,
+    # are queued, and systemd-timedated refuses other requests until those jobs
+    # finish and NTP reports the change. While they run, it reports NTP enabled,
+    # whatever their result, so NTP is taken as reported only once they are gone.
     deadline = monotonic() + NTP_TIMEOUT
-    manager = systemd_proxy(module, "systemd1")
 
     while True:
-        idle = systemd_properties(module, manager, [("jobs", "NJobs")])["jobs"] == 0
-
-        if idle and systemd_properties(module, proxy, [("ntp", "NTP")])["ntp"] == ntp:
+        if (
+            not jobs & queued_jobs(module, manager)
+            and systemd_properties(module, proxy, [("ntp", "NTP")])["ntp"] == ntp
+        ):
             return
 
         if monotonic() >= deadline:
@@ -303,10 +309,14 @@ def ensure_present(module):
             # parse again so a time relative to now does not lag behind the earlier changes and the NTP wait
             args = (parse_time(module, analyze, value, predicted["timezone"]), False, False)
 
-        systemd_call(module, proxy, method, *args)
+        if method != "SetNTP":
+            systemd_call(module, proxy, method, *args)
+            continue
 
-        if method == "SetNTP":
-            wait_for_ntp(module, proxy, args[0])
+        manager = systemd_proxy(module, "systemd1")
+        before = queued_jobs(module, manager)
+        systemd_call(module, proxy, method, *args)
+        wait_for_ntp(module, proxy, manager, args[0], queued_jobs(module, manager) - before)
 
     current = systemd_properties(module, proxy, TIMEDATE_PROPERTIES)
 
