@@ -1146,7 +1146,7 @@ def test_ntp_change_wait_times_out(monkeypatch, run_module, analyze):
 
 def test_ntp_enabled_while_the_service_fails_to_start_fails(monkeypatch, run_module):
     # systemd-timedated reports NTP enabled while the start job runs, then disabled once the service failed to start
-    mutate = ntp_wait_module(monkeypatch, False, [True, False], [1, 0])
+    mutate = ntp_wait_module(monkeypatch, False, [False], [1, 1, 0])
     result = run_module(systemd_timedate, {"ntp": True})
     assert result["failed"] and result["msg"] == (
         "unable to set ntp to True: network time synchronization did not change within 30 seconds"
@@ -1154,10 +1154,12 @@ def test_ntp_enabled_while_the_service_fails_to_start_fails(monkeypatch, run_mod
     assert [entry.args[2] for entry in mutate.call_args_list] == ["SetNTP"]
 
 
-def test_ntp_enabled_while_other_jobs_run_is_taken_at_the_deadline(monkeypatch, run_module):
-    ntp_wait_module(monkeypatch, False, [True], [1])
+def test_ntp_enabled_while_jobs_stay_queued_fails(monkeypatch, run_module):
+    # the start job, or another one, still runs at the deadline, so the reported NTP cannot be trusted
+    mutate = ntp_wait_module(monkeypatch, False, [True], [1])
     result = run_module(systemd_timedate, {"ntp": True})
-    assert result["changed"] and not result.get("failed")
+    assert result["failed"] and "30 seconds" in result["msg"]
+    assert [entry.args[2] for entry in mutate.call_args_list] == ["SetNTP"]
 
 
 def hostname_module(monkeypatch, tmp_path, current, machine_info=None, etc_hostname=None):

@@ -1,0 +1,30 @@
+---
+- name: Prepare
+  hosts: all
+  tasks:
+    # systemd-localed refuses a console keymap that is not installed
+    - name: Ensure console keymaps are present
+      tags:
+        - systemd_locale
+      become: true
+      ansible.builtin.apt:
+        cache_valid_time: 3600
+        name:
+          - console-data
+          - libxkbcommon0
+        state: present
+        update_cache: true
+      when:
+        - ansible_facts.os_family == 'Debian'
+
+    # systemd-localed checks X11 layouts with libxkbcommon and refuses them without it
+    - name: Ensure XKB packages are present
+      tags:
+        - systemd_locale
+      become: true
+      ansible.builtin.dnf:
+        name: libxkbcommon
+        state: present
+      when:
+        - ansible_facts.os_family == 'RedHat'
+...

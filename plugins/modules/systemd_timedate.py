@@ -56,8 +56,8 @@ options:
       - C(systemd-timedated) reports network time synchronization enabled
         while it starts the service, even when the service then fails to
         start, so the module waits until systemd has no job left before it
-        takes the change as reported. When other jobs keep systemd busy for
-        the 30 seconds, it takes the change as reported then.
+        takes the change as reported, and also fails when other jobs keep
+        systemd busy for the 30 seconds.
     type: bool
   time:
     description:
@@ -209,15 +209,14 @@ def wait_for_ntp(module, proxy, ntp):
     # SetNTP returns once the time service job is queued, and systemd-timedated
     # refuses other requests until that job finishes and NTP reports the change.
     # While the job runs, it reports NTP enabled, whatever the job's result, so
-    # NTP is read again once systemd has no job left, or at the deadline.
+    # NTP is taken as reported only once systemd has no job left.
     deadline = monotonic() + NTP_TIMEOUT
     manager = systemd_proxy(module, "systemd1")
 
     while True:
         idle = systemd_properties(module, manager, [("jobs", "NJobs")])["jobs"] == 0
-        reported = systemd_properties(module, proxy, [("ntp", "NTP")])["ntp"]
 
-        if reported == ntp and (idle or monotonic() >= deadline):
+        if idle and systemd_properties(module, proxy, [("ntp", "NTP")])["ntp"] == ntp:
             return
 
         if monotonic() >= deadline:
