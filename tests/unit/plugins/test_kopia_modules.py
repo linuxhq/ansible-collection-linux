@@ -687,6 +687,33 @@ def test_maintenance_accepts_log_size_at_kopia_limit(monkeypatch, run_module, si
     assert result["maintenance"]["log_retention"]["max_total_size"] == size << 20
 
 
+@pytest.mark.parametrize("param", ["list_parallelism", "max_retained_log_count"])
+@pytest.mark.parametrize("value", [2**53 + 1, -(2**53) - 1])
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_maintenance_rejects_values_kopia_parses_as_rounded_float(monkeypatch, run_module, param, value, check_mode):
+    # kopia parses these with strconv.ParseFloat before converting to int, which rounds beyond 2**53
+    monkeypatch.setattr(kopia_maintenance, "kopia_available", lambda module: True)
+    monkeypatch.setattr(kopia_maintenance, "maintenance_info", Mock(side_effect=AssertionError("must not query")))
+    command = Mock(side_effect=AssertionError("must not run kopia"))
+    monkeypatch.setattr(kopia_maintenance, "kopia_command", command)
+    result = run_module(kopia_maintenance, {param: value}, check_mode)
+    assert result == {
+        "failed": True,
+        "msg": f"invalid {param} {value}: it must be from -9007199254740992 to 9007199254740992",
+        "maintenance": {},
+    }
+
+
+@pytest.mark.parametrize("param,key", [("list_parallelism", "listParallelism"), ("max_retained_log_count", "maxCount")])
+@pytest.mark.parametrize("value", [2**53, -(2**53)])
+def test_maintenance_accepts_values_kopia_parses_exactly(monkeypatch, run_module, param, key, value):
+    monkeypatch.setattr(kopia_maintenance, "kopia_available", lambda module: True)
+    current = {"listParallelism": 0, "logRetention": ZERO_RETENTION}
+    monkeypatch.setattr(kopia_maintenance, "maintenance_info", lambda module, **kwargs: current)
+    result = run_module(kopia_maintenance, {param: value}, True)
+    assert result["changed"]
+
+
 def repository_params(**params):
     return {"storage": "filesystem", "password": "secret", "options": {"path": "/backup"}, **params}
 

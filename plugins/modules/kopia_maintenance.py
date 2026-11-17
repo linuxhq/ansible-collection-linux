@@ -68,6 +68,9 @@ options:
       - Override the list parallelism.
       - V(-1) is rejected before kopia runs, also in check mode, as kopia reads
         it as leaving the setting unchanged.
+      - Must be from V(-9007199254740992) to V(9007199254740992), the values
+        kopia parses without rounding, or the module fails before kopia runs,
+        also in check mode.
       - Requires kopia 0.18.0 or later.
     type: int
   max_retained_log_age:
@@ -83,6 +86,9 @@ options:
       - Maximum number of log sessions to retain.
       - V(-1) is rejected before kopia runs, also in check mode, as kopia reads
         it as leaving the setting unchanged.
+      - Must be from V(-9007199254740992) to V(9007199254740992), the values
+        kopia parses without rounding, or the module fails before kopia runs,
+        also in check mode.
       - V(0) means no count limit. When O(max_retained_log_age),
         O(max_retained_log_count) and O(max_retained_log_size_mb) are all
         V(0), kopia applies its default log retention instead, 30 days, 10000
@@ -199,6 +205,9 @@ UNSET_SENTINEL = ("list_parallelism", "max_retained_log_count", "max_retained_lo
 # kopia stores max_retained_log_size_mb in bytes, shifting it left by 20 bits in an int64, which wraps outside these
 MAX_LOG_SIZE_MB = (2**63 - 1) // 1048576
 MIN_LOG_SIZE_MB = -(2**63) // 1048576
+# kopia parses these as a float64 before converting them to an int, which rounds or wraps beyond 2**53
+FLOAT_PARSED = ("list_parallelism", "max_retained_log_count")
+MAX_FLOAT_INT = 2**53
 MEGABYTES = 1048576
 NANOSECONDS = 1000000000
 
@@ -313,6 +322,14 @@ def validate_settings(module):
             msg=f"invalid max_retained_log_size_mb {size}: it must be from {MIN_LOG_SIZE_MB} to {MAX_LOG_SIZE_MB}",
             maintenance={},
         )
+
+    for param in FLOAT_PARSED:
+        value = module.params[param]
+        if value is not None and not -MAX_FLOAT_INT <= value <= MAX_FLOAT_INT:
+            module.fail_json(
+                msg=f"invalid {param} {value}: it must be from {-MAX_FLOAT_INT} to {MAX_FLOAT_INT}",
+                maintenance={},
+            )
 
     # kopia ignores an empty --owner, so the owner would never be set
     if module.params["owner"] == "":
