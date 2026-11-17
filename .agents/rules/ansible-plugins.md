@@ -98,10 +98,9 @@ Standards for Python modules, lookup plugins, and filter plugins under
 - Keep nested relationship constraints beside the nested schema.
 - Use `mutually_exclusive`, `required_by`, `required_if`,
   `required_one_of`, and `required_together` for static relationships.
-- Validate input only to prevent a crash, a hang, a partial change, a run
-  that never converges (including output the provider cannot read), an
-  action on the wrong resource, or the provider silently storing something
-  other than what was requested; let the provider reject everything else.
+- Validate input only to prevent a crash, a partial change, a run that
+  never converges, or an action on the wrong resource; let the provider
+  reject everything else.
 - Model each valid alternate identifier with relationship validators.
 
 #### State and check mode
