@@ -54,7 +54,7 @@ options:
       - C(kopia snapshot list) also includes the snapshots of every parent
         directory of the path, since they contain it, so the result can hold
         more than one source.
-      - All sources are listed when unset.
+      - All sources are listed when unset or empty.
       - Made absolute and cleaned, as kopia does, and listed by that path, to
         which kopia adds the client user and host. kopia reads a bare path in
         which an V(@) comes before any V(:) as C(user@host) or

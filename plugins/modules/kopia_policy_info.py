@@ -62,7 +62,9 @@ options:
         no target can name a directory whose path is one in which an V(@) comes
         before any V(:), as kopia would store a different source.
       - kopia makes a bare directory path absolute and cleans it into the
-        policy target.
+        policy target. An empty target names the working directory of the
+        module, such as the home directory of the remote user, as kopia reads
+        it.
       - When set, RV(policy) and RV(effective_policy) are returned for the
         single target instead of RV(policies).
       - A target of 32 lowercase hexadecimal digits is rejected before kopia
