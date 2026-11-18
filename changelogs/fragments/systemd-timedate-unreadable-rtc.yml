@@ -1,0 +1,5 @@
+---
+bugfixes:
+  - systemd_timedate, systemd_timedate_info - return ``rtc_time_usec`` as
+    ``null`` when systemd-timedated fails to read the hardware clock, instead
+    of failing before reading or changing any other setting.
