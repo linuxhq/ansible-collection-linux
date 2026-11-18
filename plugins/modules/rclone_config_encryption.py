@@ -229,23 +229,25 @@ def label(text):
 
 
 def stat_config(module, path):
-    """Return the status of path, or None when it does not exist; os.path.exists reads any error as a missing file."""
+    """Return the status of the regular file at path, or None when it does not exist; os.path.exists reads any error
+    as a missing file."""
     try:
-        return os.stat(path)
+        status = os.stat(path)
     except (FileNotFoundError, NotADirectoryError):
         return None
     except OSError as error:
         module.fail_json(msg=f"unable to access configuration file {label(path)}: {label(to_native(error))}")
 
-
-def read_config(module, path):
-    status = stat_config(module, path)
-    if status is None:
-        return None
-
     # reading a FIFO would block and a device such as /dev/zero never end, and writing would replace the device
     if not stat.S_ISREG(status.st_mode):
         module.fail_json(msg=f"unable to manage configuration file {label(path)}: it is not a regular file")
+
+    return status
+
+
+def read_config(module, path):
+    if stat_config(module, path) is None:
+        return None
 
     try:
         with open(path, "rb") as handle:
