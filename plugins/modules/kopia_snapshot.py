@@ -219,36 +219,42 @@ snapshot:
       elements: str
     root_entry:
       description:
-        - Root directory entry of the snapshot.
+        - Root entry of the snapshot, the directory or the file at the
+          snapshotted path.
         - Other fields kopia reports are passed through.
       returned: always
       type: dict
       contains:
         mode:
           description:
-            - Permissions of the directory in octal, such as C(0755).
-          returned: unless the directory has no permission bits set
+            - Permissions of the entry in octal, such as C(0755).
+          returned: unless the entry has no permission bits set
           type: str
         mtime:
           description:
-            - Modification time of the directory, in UTC with nanoseconds.
+            - Modification time of the entry, in UTC with nanoseconds.
           returned: always
           type: str
         name:
           description:
-            - Name of the directory.
+            - Name of the entry.
           returned: always
           type: str
         obj:
           description:
-            - Object ID of the directory listing.
+            - Object ID of the directory listing or of the file contents.
           returned: always
           type: str
+        size:
+          description:
+            - Size of the entry in bytes, as the file system reports it.
+          returned: unless the size is zero, such as for an empty file
+          type: int
         summ:
           description:
             - Summary of the directory tree.
             - Other fields kopia reports are passed through.
-          returned: always
+          returned: for a directory
           type: dict
           contains:
             dirs:
@@ -284,7 +290,7 @@ snapshot:
               type: int
         type:
           description:
-            - Entry type, C(d) for a directory.
+            - Entry type, C(d) for a directory or C(f) for a file.
           returned: always
           type: str
     source:

@@ -1,0 +1,11 @@
+---
+bugfixes:
+  - kopia_snapshot, kopia_snapshot_info - document that ``root_entry`` is a
+    file entry, of type ``f`` with ``size`` and without ``summ``, when
+    ``path`` is a file.
+  - kopia_repository - document that flags only ``kopia repository create``
+    accepts, such as ``encryption``, make the connection fail when the
+    storage already holds a repository.
+  - systemd_hostname - document that on systemd before 246 a setting edited
+    outside ``systemd-hostnamed`` while it runs is reported as changed on
+    every run until it exits when idle.

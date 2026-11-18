@@ -105,6 +105,11 @@ options:
     description:
       - Storage provider flags passed to C(kopia repository create) and
         C(kopia repository connect), given as snake_case keys.
+      - Flags that only C(kopia repository create) accepts, such as
+        C(encryption), C(block_hash), C(object_splitter), C(format_version),
+        C(retention_mode), C(retention_period), C(ecc) and C(create_only), in
+        O(options) or O(secrets) make the connection fail as an unknown flag
+        when the storage already holds a repository.
       - Each key becomes the matching kebab-case CLI flag, so V(bucket) becomes
         C(--bucket) and V(storage_account) becomes C(--storage-account).
       - Booleans toggle the flag, V(true) emits C(--flag) and V(false) emits

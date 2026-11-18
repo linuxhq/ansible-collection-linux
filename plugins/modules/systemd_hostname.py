@@ -47,9 +47,14 @@ description:
     to 245 instead fail to start C(systemd-hostnamed) on any such error other
     than a missing file, including a first hostname line that is left empty
     once invalid characters are removed. They also read C(/etc/hostname)
-    only when C(systemd-hostnamed) starts, so a change made outside it is not
-    reported until it restarts, as it does after exiting when idle, while
-    the module reads the file on every run.
+    and C(/etc/machine-info) only when C(systemd-hostnamed) starts, so a
+    change made outside it is not reported until it restarts, as it does
+    after exiting when idle, while the module reads the files on every run.
+    When either file is edited outside C(systemd-hostnamed) while it runs,
+    it drops a request for the value it still holds, leaving the edit in
+    place, so the module reports a change on every run until
+    C(systemd-hostnamed) exits, about 30 seconds after its last request.
+    systemd 246 and later read the files again before each request.
   - Only the settings that differ from their stored values are written, in
     the order O(static_hostname), O(chassis), O(deployment), O(icon_name),
     O(location), O(pretty_hostname) and O(transient_hostname). The first of
