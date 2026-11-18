@@ -1,3 +1,4 @@
+import errno
 import os
 import signal
 from pathlib import Path
@@ -99,8 +100,7 @@ def test_unsearchable_directory_is_reported_as_a_permission_error(
         directory.chmod(0o700)
 
     assert result["failed"]
-    assert result["msg"].startswith(f"unable to access configuration file {path}: ")
-    assert "Permission denied" in result["msg"]
+    assert result["msg"].startswith(f"unable to access configuration file {path}: [Errno {errno.EACCES}] ")
     assert path.read_text() == "config"
 
 

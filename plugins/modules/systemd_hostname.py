@@ -56,6 +56,8 @@ description:
     C(systemd-hostnamed) exits, about 30 seconds after its last request.
     systemd 246 and later check the files before each request and read
     them again when their size, modification time or inode has changed.
+    systemd 246 compares the modification time in whole seconds, so it
+    misses an edit that keeps the size within the same second.
   - Only the settings that differ from their stored values are written, in
     the order O(static_hostname), O(chassis), O(deployment), O(icon_name),
     O(location), O(pretty_hostname) and O(transient_hostname). The first of
