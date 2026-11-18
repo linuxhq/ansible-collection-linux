@@ -1346,6 +1346,13 @@ def test_ntp_units_split_and_strip_lines_as_systemd_timedated_does(monkeypatch, 
     assert NTP_UNITS() == {"chronyd.service", "ntpd.service", "systemd-timesyncd.service", "tab.service"}
 
 
+def test_ntp_units_read_on_after_a_long_line(monkeypatch, tmp_path):
+    # systemd-timedated keeps reading the file after a line read_line() refuses as too long
+    (tmp_path / "50-other.list").write_bytes(b"#" * (1024 * 1024) + b"\nchronyd.service\n")
+    monkeypatch.setattr(systemd_timedate, "NTP_UNIT_DIRS", (str(tmp_path),))
+    assert NTP_UNITS() == {"chronyd.service"}
+
+
 def test_ntp_units_skip_files_systemd_timedated_cannot_read(monkeypatch, tmp_path):
     (tmp_path / "etc").mkdir()
     (tmp_path / "usr").mkdir()
