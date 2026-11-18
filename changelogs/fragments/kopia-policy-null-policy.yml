@@ -4,6 +4,8 @@ bugfixes:
     as the kopia role passes for a ``kopia_policies`` item written
     ``policy:``, as the empty policy ``{}``, which replaces the defined
     policy. The module failed with a traceback, also in check mode.
-  - kopia_policy, kopia_snapshot - document that an empty ``target`` or
-    ``path``, which Ansible can pass for ``null``, names the working
-    directory of the module, such as the home directory of the remote user.
+  - kopia_policy, kopia_policy_info, kopia_snapshot - document that an empty
+    ``target`` or ``path``, which Ansible can pass for ``null``, names the
+    working directory of the module, such as the home directory of the remote
+    user.
+  - kopia_snapshot_info - document that an empty ``path`` lists all sources.

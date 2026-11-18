@@ -53,14 +53,18 @@ options:
       - C(systemd-timedated) starts or stops the service in the background, so
         after changing it the module waits up to 30 seconds for the change to
         be reported before applying O(time), and fails when it is not.
-      - C(systemd-timedated) reports network time synchronization enabled
-        while it starts the service, even when the service then fails to
-        start, so the module waits until systemd has no job left for the
-        network time services named in the C(ntp-units.d/*.list) files of
-        C(systemd-timedated) before it takes the change as reported, and fails
-        when one is still queued after the 30 seconds. Services named only in
-        E(SYSTEMD_TIMEDATED_NTP_SERVICES) in the environment of
-        C(systemd-timedated) are not waited for.
+      - From systemd 241, C(systemd-timedated) reports network time
+        synchronization enabled while it starts the service, even when the
+        service then fails to start, so the module waits until systemd has no
+        job left for the network time services of C(systemd-timedated) before
+        it takes the change as reported, and fails when one is still queued
+        after the 30 seconds.
+      - On systemd 243 and later these are the services named in the
+        C(ntp-units.d/*.list) files of C(systemd-timedated). Earlier releases
+        do not read those files, so on systemd 239 to 242 it is
+        C(systemd-timesyncd.service), which C(systemd-timedated) manages by
+        default. Services named only in E(SYSTEMD_TIMEDATED_NTP_SERVICES) in
+        the environment of C(systemd-timedated) are not waited for.
     type: bool
   time:
     description:
@@ -211,6 +215,7 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.systemd import (
     systemd_properties,
     systemd_proxy,
     systemd_result,
+    systemd_version,
 )
 
 MICROSECONDS = 1000000
@@ -220,7 +225,10 @@ SETTOD_SEC_MAX = (2**63 - 1) // 1000000000 - 30 * 365 * 24 * 3600
 
 NTP_TIMEOUT = 30
 
-# systemd-timedated reads the network time services it starts and stops from *.list files in these directories
+# systemd-timedated reads the network time services it starts and stops from *.list files in these directories from
+# systemd 243, and before it manages only systemd-timesyncd.service unless SYSTEMD_TIMEDATED_NTP_SERVICES is set
+NTP_UNIT_LISTS_VERSION = 243
+NTP_DEFAULT_UNIT = "systemd-timesyncd.service"
 NTP_UNIT_DIRS = (
     "/etc/systemd/ntp-units.d",
     "/run/systemd/ntp-units.d",
@@ -323,13 +331,15 @@ def ntp_jobs(module, manager, units):
 def wait_for_ntp(module, proxy, ntp):
     # SetNTP returns once the jobs starting or stopping the time services are
     # queued, and systemd-timedated refuses other requests until they finish
-    # and NTP reports the change. While they run, it reports NTP enabled,
-    # whatever their result, so NTP is taken as reported only once no job of a
-    # time service is left, whether SetNTP queued it or joined an earlier one.
+    # and NTP reports the change. From systemd 241, while they run, it reports
+    # NTP enabled, whatever their result, so NTP is taken as reported only once
+    # no job of a time service is left, whether SetNTP queued it or joined an
+    # earlier one.
     deadline = monotonic() + NTP_TIMEOUT
     manager = systemd_proxy(module, "systemd1")
     # systemd reports a job under the unit's own name, which LoadUnit resolves an alias to
-    units = {systemd_result(module, manager, "LoadUnit", name) for name in ntp_units()}
+    names = ntp_units() if systemd_version(module) >= NTP_UNIT_LISTS_VERSION else {NTP_DEFAULT_UNIT}
+    units = {systemd_result(module, manager, "LoadUnit", name) for name in names}
 
     while True:
         if not ntp_jobs(module, manager, units) and systemd_properties(module, proxy, [("ntp", "NTP")])["ntp"] == ntp:
