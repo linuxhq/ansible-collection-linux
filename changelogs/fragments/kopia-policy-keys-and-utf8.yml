@@ -21,8 +21,9 @@ bugfixes:
     value is not valid UTF-8, such as text with a lone surrogate code point.
     kopia recorded such text with U+FFFD in its place, so a policy was
     imported again on every run, the maintenance owner was set on every run,
-    and the next run failed against the module's own repository connection. Some such values made the module fail with a traceback. A
-    failure names the option or key, never a value. For kopia_repository,
+    and the next run failed against the module's own repository connection.
+    Some such values made the module fail with a traceback. A failure names
+    the option or key, never a value. For kopia_repository,
     kopia saves the storage options and secrets in its configuration and
     connects again from that copy, so a value such as an sftp ``keyfile``
     with such text could create a repository that never connected. Only the

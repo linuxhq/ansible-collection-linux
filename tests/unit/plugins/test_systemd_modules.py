@@ -1312,7 +1312,7 @@ def test_ntp_enabled_while_its_job_stays_queued_fails(monkeypatch, run_module, q
     assert [entry.args[2] for entry in mutate.call_args_list] == ["SetNTP"]
 
 
-def test_ntp_units_are_read_as_systemd_timedated_reads_them(monkeypatch, tmp_path, module_factory):
+def test_ntp_units_are_read_as_systemd_timedated_reads_them(monkeypatch, tmp_path):
     (tmp_path / "etc").mkdir()
     (tmp_path / "usr").mkdir()
     (tmp_path / "etc" / "50-chrony.list").write_text("# comment\n; comment\n\n  chronyd.service  \n")
@@ -1325,15 +1325,34 @@ def test_ntp_units_are_read_as_systemd_timedated_reads_them(monkeypatch, tmp_pat
     monkeypatch.setattr(
         systemd_timedate, "NTP_UNIT_DIRS", (str(tmp_path / "etc"), str(tmp_path / "missing"), str(tmp_path / "usr"))
     )
-    assert NTP_UNITS(module_factory()) == {"chronyd.service", "systemd-timesyncd.service"}
+    assert NTP_UNITS() == {"chronyd.service", "systemd-timesyncd.service"}
 
 
-def test_ntp_units_skip_names_systemd_timedated_ignores(monkeypatch, tmp_path, module_factory):
+def test_ntp_units_skip_names_systemd_timedated_ignores(monkeypatch, tmp_path):
     # systemd-timedated ignores a line that is not a valid plain unit name, which PID 1 would refuse to load
     lines = ["chronyd", "foo@.service", "foo@bar.service", "chronyd.unknown", ".service", "x" * 248 + ".service"]
     (tmp_path / "50-other.list").write_bytes("\n".join(lines + ["chronyd.service"]).encode() + b"\n\xff.service\n")
     monkeypatch.setattr(systemd_timedate, "NTP_UNIT_DIRS", (str(tmp_path),))
-    assert NTP_UNITS(module_factory()) == {"chronyd.service"}
+    assert NTP_UNITS() == {"chronyd.service"}
+
+
+def test_ntp_units_skip_files_systemd_timedated_cannot_read(monkeypatch, tmp_path):
+    (tmp_path / "etc").mkdir()
+    (tmp_path / "usr").mkdir()
+    (tmp_path / "etc" / "50-chrony.list").write_text("chronyd.service\n")
+    # a file systemd-timedated cannot stat, such as a dangling symlink or a symlink loop, is skipped and overrides
+    # nothing, while one it cannot open or read, such as a directory, overrides a file of the same name and names nothing
+    (tmp_path / "etc" / "60-dangling.list").symlink_to(tmp_path / "missing.list")
+    (tmp_path / "usr" / "60-dangling.list").write_text("systemd-timesyncd.service\n")
+    (tmp_path / "etc" / "70-loop.list").symlink_to(tmp_path / "etc" / "70-loop.list")
+    (tmp_path / "usr" / "70-loop.list").write_text("ntpd.service\n")
+    (tmp_path / "etc" / "80-directory.list").mkdir()
+    (tmp_path / "usr" / "80-directory.list").write_text("overridden.service\n")
+    # an empty file masks one of the same name
+    (tmp_path / "etc" / "90-empty.list").write_text("")
+    (tmp_path / "usr" / "90-empty.list").write_text("masked.service\n")
+    monkeypatch.setattr(systemd_timedate, "NTP_UNIT_DIRS", (str(tmp_path / "etc"), str(tmp_path / "usr")))
+    assert NTP_UNITS() == {"chronyd.service", "systemd-timesyncd.service", "ntpd.service"}
 
 
 def hostname_module(monkeypatch, tmp_path, current, machine_info=None, etc_hostname=None):

@@ -38,6 +38,47 @@
       when:
         - not ansible_check_mode
 
+# Debian ships no console keymaps that systemd-localed finds, so only EL sets one to clear
+- name: Converge console keymap removal
+  hosts: all
+  tags:
+    - molecule-idempotence-notest
+  roles:
+    - role: systemd_locale
+      systemd_locale_vconsole_keymap: ""
+      systemd_locale_vconsole_keymap_toggle: ""
+      when:
+        - ansible_facts.os_family == 'RedHat'
+
+  post_tasks:
+    - name: Ensure systemd locale information is gathered
+      ansible.builtin.include_role:
+        name: systemd_locale_info
+      when:
+        - ansible_facts.os_family == 'RedHat'
+        - not ansible_check_mode
+
+    - name: Ensure systemd console keymap removal is repeated
+      become: true
+      linuxhq.linux.systemd_locale:
+        vconsole_keymap: ""
+        vconsole_keymap_toggle: ""
+      register: __systemd_locale_keymap_result
+      when:
+        - ansible_facts.os_family == 'RedHat'
+        - not ansible_check_mode
+
+    - name: Ensure systemd console keymap removal is verified
+      ansible.builtin.assert:
+        that:
+          - _systemd_locale_info_dict.vconsole_keymap == ''
+          - _systemd_locale_info_dict.vconsole_keymap_toggle == ''
+          - _systemd_locale_info_dict.x11_layout == 'us'
+          - not __systemd_locale_keymap_result.changed
+      when:
+        - ansible_facts.os_family == 'RedHat'
+        - not ansible_check_mode
+
 - name: Converge
   hosts: all
   roles:

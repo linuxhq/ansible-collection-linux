@@ -49,6 +49,54 @@
       when:
         - not ansible_check_mode
 
+- name: Converge transient hostname and chassis reset
+  hosts: all
+  tags:
+    - molecule-idempotence-notest
+  roles:
+    - role: systemd_hostname
+      systemd_hostname_chassis: ""
+      systemd_hostname_static_hostname: ""
+      systemd_hostname_transient_hostname: ""
+
+  post_tasks:
+    - name: Ensure systemd hostname information is gathered
+      ansible.builtin.include_role:
+        name: systemd_hostname_info
+      when:
+        - not ansible_check_mode
+
+    - name: Ensure systemd machine information file is read
+      become: true
+      ansible.builtin.slurp:
+        src: /etc/machine-info
+      register: __systemd_hostname_machine_info
+      when:
+        - not ansible_check_mode
+
+    - name: Ensure systemd hostname reset is repeated
+      become: true
+      linuxhq.linux.systemd_hostname:
+        chassis: ""
+        static_hostname: ""
+        transient_hostname: ""
+      register: __systemd_hostname_reset_result
+      when:
+        - not ansible_check_mode
+
+    - name: Ensure systemd hostname reset settings are verified
+      ansible.builtin.assert:
+        that:
+          - _systemd_hostname_info_dict.hostname !=
+            inventory_hostname ~ '-transient'
+          - _systemd_hostname_info_dict.hostname_source == 'default'
+          - _systemd_hostname_info_dict.static_hostname == ''
+          - (__systemd_hostname_machine_info.content | b64decode).splitlines()
+            | select('match', 'CHASSIS=') | list | length == 0
+          - not __systemd_hostname_reset_result.changed
+      when:
+        - not ansible_check_mode
+
 - name: Converge
   hosts: all
   roles:
