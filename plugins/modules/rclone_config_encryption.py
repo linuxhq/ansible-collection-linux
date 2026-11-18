@@ -520,7 +520,10 @@ def main():
         if module.params["state"] == "absent":
             check_plain_text(module, path, module.params["content"])
 
-    if module.params["content"] is None and stat_config(module, path) is None:
+    # checked before the check-mode result without a crypto library, as stat needs none
+    exists = stat_config(module, path) is not None
+
+    if module.params["content"] is None and not exists:
         module.fail_json(msg=f"configuration file does not exist: {label(path)}")
 
     if not HAS_PYCRYPTODOME:

@@ -80,8 +80,12 @@ def test_missing_file_without_content_fails(tmp_path, run_module):
 @pytest.mark.skipif(os.geteuid() == 0, reason="root searches any directory")
 @pytest.mark.parametrize("content", [None, "config"])
 @pytest.mark.parametrize("state", ["present", "absent"])
+@pytest.mark.parametrize("crypto", [True, False])
 @pytest.mark.parametrize("check_mode", [False, True])
-def test_unsearchable_directory_is_reported_as_a_permission_error(tmp_path, run_module, content, state, check_mode):
+def test_unsearchable_directory_is_reported_as_a_permission_error(
+    monkeypatch, tmp_path, run_module, content, state, crypto, check_mode
+):
+    monkeypatch.setattr(plugin, "HAS_PYCRYPTODOME", crypto)
     # os.path.exists reads a permission error as a missing file, which hid the reason behind "does not exist"
     directory = tmp_path / "locked"
     directory.mkdir()

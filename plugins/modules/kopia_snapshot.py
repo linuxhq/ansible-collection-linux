@@ -252,9 +252,10 @@ snapshot:
           type: int
         summ:
           description:
-            - Summary of the directory tree.
+            - Summary of the directory tree, or for a file, of that one
+              file.
             - Other fields kopia reports are passed through.
-          returned: for a directory
+          returned: always
           type: dict
           contains:
             dirs:
