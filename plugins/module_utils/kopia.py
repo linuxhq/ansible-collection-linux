@@ -7,13 +7,8 @@ import re
 
 ACTION_COMMAND_OMITEMPTY = {"args": [], "mode": "", "path": "", "script": "", "timeout": 0}
 
+# policy_normalize rebuilds actions from the policy it is given
 POLICY_OMITEMPTY = {
-    "actions": {
-        "afterFolder": ACTION_COMMAND_OMITEMPTY,
-        "afterSnapshotRoot": ACTION_COMMAND_OMITEMPTY,
-        "beforeFolder": ACTION_COMMAND_OMITEMPTY,
-        "beforeSnapshotRoot": ACTION_COMMAND_OMITEMPTY,
-    },
     "compression": {
         "compressorName": "",
         "maxSize": 0,
