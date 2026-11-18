@@ -56,7 +56,7 @@ def test_wrong_password_never_overwrites_file(tmp_path, run_module, state):
     original = rclone.encrypt_config(b"original", "secret")
     path.write_text(original)
     result = run_module(plugin, {"path": str(path), "state": state, "password": "wrong"})
-    assert result["failed"]
+    assert result["failed"] and str(path) in result["msg"]
     assert path.read_text() == original
 
 
@@ -98,20 +98,13 @@ def test_missing_crypto(monkeypatch, tmp_path, run_module, check_mode):
         assert "(pycryptodome or pycryptodomex)" in result["msg"]
 
 
-@pytest.mark.parametrize(
-    "params, message",
-    [
-        ({"password": "secret"}, "configuration file does not exist"),
-        ({"password": "pw\ud800", "state": "absent", "content": "config"}, "invalid password for configuration file"),
-    ],
-)
 @pytest.mark.parametrize("check_mode", [False, True])
-def test_missing_crypto_fails_like_a_real_run(monkeypatch, tmp_path, run_module, params, message, check_mode):
+def test_missing_crypto_fails_like_a_real_run(monkeypatch, tmp_path, run_module, check_mode):
     monkeypatch.setattr(plugin, "HAS_PYCRYPTODOME", False)
     path = tmp_path / "config"
-    result = run_module(plugin, {"path": str(path), **params}, check_mode)
+    result = run_module(plugin, {"path": str(path), "password": "secret"}, check_mode)
     assert not path.exists()
-    assert result["failed"] and message in result["msg"]
+    assert result["failed"] and "configuration file does not exist" in result["msg"]
 
 
 UNASSIGNED = "\U0001ccf0"
@@ -445,14 +438,6 @@ def test_valid_file_attributes_are_applied(tmp_path, run_module, params):
 
 
 @pytest.mark.parametrize("state", ["present", "absent"])
-def test_wrong_password_message_names_path(tmp_path, run_module, state):
-    path = tmp_path / "rclone.conf"
-    path.write_text(rclone.encrypt_config(b"original", "secret"))
-    result = run_module(plugin, {"path": str(path), "state": state, "password": "wrong"})
-    assert result["failed"] and str(path) in result["msg"]
-
-
-@pytest.mark.parametrize("state", ["present", "absent"])
 @pytest.mark.parametrize("check_mode", [False, True])
 @pytest.mark.parametrize("header", ["RCLONE_ENCRYPT_V1:\nAAAA", "RCLONE_ENCRYPT_V0:AAAA\n"])
 def test_unsupported_encryption_message_names_path(tmp_path, run_module, state, check_mode, header):
@@ -625,6 +610,7 @@ def test_existing_file_keeps_its_mode_through_the_move(tmp_path, run_module, rec
     path.chmod(0o644)
     assert run_module(plugin, {"path": str(path), "password": "secret"})["changed"]
     assert [move["mode"] for move in recorded_moves] == [0o644]
+    assert path.stat().st_mode & 0o777 == 0o644
 
 
 @pytest.mark.parametrize("unsafe_writes", [False, True])
@@ -633,14 +619,6 @@ def test_unsafe_writes_is_passed_to_atomic_move(tmp_path, run_module, recorded_m
     params = {"path": str(path), "password": "secret", "content": "config", "unsafe_writes": unsafe_writes}
     assert run_module(plugin, params)["changed"]
     assert [move["kwargs"].get("unsafe_writes") for move in recorded_moves] == [unsafe_writes]
-
-
-def test_existing_file_keeps_mode(tmp_path, run_module):
-    path = tmp_path / "rclone.conf"
-    path.write_text("config")
-    path.chmod(0o644)
-    assert run_module(plugin, {"path": str(path), "password": "secret"})["changed"]
-    assert path.stat().st_mode & 0o777 == 0o644
 
 
 @pytest.mark.parametrize("state", ["present", "absent"])

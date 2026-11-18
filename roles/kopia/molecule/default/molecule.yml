@@ -58,6 +58,7 @@ provisioner:
                   - '*.tmp'
                   - .cache/
               retention:
+                ignore_identical_snapshots: true
                 keep_annual: 0
                 keep_hourly: 24
                 keep_latest: 2

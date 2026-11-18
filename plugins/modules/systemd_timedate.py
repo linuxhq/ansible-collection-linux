@@ -202,9 +202,12 @@ from time import monotonic, sleep
 from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.linux.plugins.module_utils.systemd import (
+    ENV_WHITESPACE,
     HAS_DASBUS,
+    READ_LINE_FULL_VERSION,
     TIMEDATE_PROPERTIES,
     check_utf8,
+    read_lines,
     systemd_call,
     systemd_properties,
     systemd_proxy,
@@ -296,13 +299,15 @@ def ntp_units():
             continue
 
         try:
-            # a line that is not valid UTF-8 is no valid unit name either
-            with open(path, encoding="utf-8", errors="surrogateescape") as handle:
-                lines = handle.read().splitlines()
+            # systemd-timedated reads these files from systemd 243, with read_line() ending a line at a line feed, a
+            # carriage return or a NUL, and strips only its own whitespace; a line that is not valid UTF-8 is no valid
+            # unit name either
+            with open(path, "rb") as handle:
+                lines = list(read_lines(handle, READ_LINE_FULL_VERSION))
         except OSError:
             continue
 
-        names = (line.strip() for line in lines)
+        names = (line.strip(ENV_WHITESPACE) for line in lines if line is not None)
         units.update(name for name in names if len(name) < UNIT_NAME_MAX and UNIT_NAME.fullmatch(name))
 
     return units

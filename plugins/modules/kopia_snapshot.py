@@ -104,6 +104,9 @@ options:
         cannot run a task with such a path, as it fails while logging the
         arguments, or with C(no_log) rejects the module result after kopia
         saved the snapshot.
+      - An empty path, which Ansible can pass for V(null), is made absolute
+        as the working directory of the module, such as the home directory of
+        the remote user, and that directory is snapshotted, as kopia does.
     type: path
     required: true
   tags:

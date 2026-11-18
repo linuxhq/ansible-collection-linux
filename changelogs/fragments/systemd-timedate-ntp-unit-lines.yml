@@ -1,0 +1,9 @@
+---
+bugfixes:
+  - systemd_timedate - with ``ntp=true``, read the lines of an
+    ``ntp-units.d/*.list`` file as ``systemd-timedated`` does, ending a line
+    at a NUL as well as a line feed or carriage return, and removing only
+    spaces, tabs, line feeds and carriage returns around a name. The module
+    did not wait for services listed after a NUL, and waited for names
+    surrounded by other whitespace, such as a vertical tab or U+00A0, which
+    ``systemd-timedated`` ignores.

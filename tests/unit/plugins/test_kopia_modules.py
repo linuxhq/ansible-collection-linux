@@ -508,6 +508,23 @@ def test_policy_delete(monkeypatch, run_module, current, check_mode, changed):
     assert command.call_count == int(changed and not check_mode)
 
 
+def test_null_policy_defines_the_empty_policy(monkeypatch, run_module, tmp_path):
+    """required_if accepts policy: null, as the kopia role passes for an item written policy:, the same as {}."""
+    fake_kopia(monkeypatch, tmp_path, {"/data": {"retention": {"keepLatest": 10}}})
+    params = {"target": "/data", "policy": None}
+
+    result = run_module(kopia_policy, params, check_mode=True)
+    assert result == {"changed": True, "policy": EXPORT_SECTIONS}
+    assert "import" not in (tmp_path / "argv").read_text().splitlines()
+
+    result = run_module(kopia_policy, params)
+    assert result == {"changed": True, "policy": {}}
+    assert json.loads((tmp_path / "policy.json").read_text()) == {"/data": {}}
+
+    for check_mode in (True, False):
+        assert run_module(kopia_policy, params, check_mode) == {"changed": False, "policy": {}}
+
+
 def test_policy_info_distinguishes_inherited_policy(monkeypatch, run_module):
     monkeypatch.setattr(kopia_policy_info, "policy_export", lambda *args, **kwargs: None)
     monkeypatch.setattr(kopia_policy_info, "kopia_command", Mock(return_value=(0, '{"keepLatest":2}', "")))
