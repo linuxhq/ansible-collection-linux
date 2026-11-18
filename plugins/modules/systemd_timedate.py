@@ -35,6 +35,9 @@ options:
       - Update the system clock from the hardware clock when O(local_rtc)
         changes, rather than the other way around.
       - Only used when O(local_rtc) is set.
+      - When C(systemd-timedated) cannot read the hardware clock, it changes
+        O(local_rtc) without updating the system clock, and the module
+        reports success.
     type: bool
     default: false
   local_rtc:

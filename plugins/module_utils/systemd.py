@@ -133,9 +133,9 @@ TIMEDATE_PROPERTIES = [
     ("timezone", "Timezone"),
 ]
 
-# systemd-timedated fails the RTCTimeUSec read when it cannot read the hardware clock, which says nothing of the
-# other settings
-TIMEDATE_OPTIONAL = ("rtc_time_usec",)
+# systemd-timedated fails the RTCTimeUSec read with this error when it cannot read the hardware clock, which says
+# nothing of the other settings
+TIMEDATE_OPTIONAL = {"rtc_time_usec": "Failed to read RTC: "}
 
 
 def systemd_proxy(module, interface):
@@ -167,8 +167,10 @@ def systemd_value(value):
     return value
 
 
-def systemd_properties(module, proxy, properties, optional=()):
-    """Return the properties by name, None for one the service lacks or for one named in optional it cannot read."""
+def systemd_properties(module, proxy, properties, optional=None):
+    """Return the properties by name, None for one the service lacks, or for one in optional that the service fails to
+    read with an error beginning with the message optional maps its name to."""
+    optional = optional or {}
     values = {}
 
     for name, prop in properties:
@@ -178,7 +180,8 @@ def systemd_properties(module, proxy, properties, optional=()):
             values[name] = None
             continue
         except (DBusError, GLibError, TimeoutError) as error:
-            if name in optional:
+            # dasbus raises DBusError for an error the service returns, and GLibError for one of the bus
+            if isinstance(error, DBusError) and name in optional and str(error).startswith(optional[name]):
                 values[name] = None
                 continue
 
