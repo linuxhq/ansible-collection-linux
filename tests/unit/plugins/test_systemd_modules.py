@@ -1309,7 +1309,7 @@ def ntp_wait_module(monkeypatch, current, settled, done, queued_before=False, se
         readings[0] += 1
         return bool(started) and readings[0] < done
 
-    def properties(module, proxy, names):
+    def properties(module, proxy, names, optional=()):
         if len(names) > 1:
             return {**TIMEDATE, "ntp": current}
 
