@@ -54,7 +54,8 @@ description:
     it drops a request for the value it still holds, leaving the edit in
     place, so the module reports a change on every run until
     C(systemd-hostnamed) exits, about 30 seconds after its last request.
-    systemd 246 and later read the files again before each request.
+    systemd 246 and later check the files before each request and read
+    them again when they have changed.
   - Only the settings that differ from their stored values are written, in
     the order O(static_hostname), O(chassis), O(deployment), O(icon_name),
     O(location), O(pretty_hostname) and O(transient_hostname). The first of

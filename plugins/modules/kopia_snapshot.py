@@ -255,7 +255,7 @@ snapshot:
             - Summary of the directory tree, or for a file, of that one
               file.
             - Other fields kopia reports are passed through.
-          returned: always
+          returned: unless the snapshot is a checkpoint of a file
           type: dict
           contains:
             dirs:
