@@ -1,0 +1,5 @@
+---
+breaking_changes:
+  - linuxhq.linux - require ansible-core 2.19 or later. On ansible-core 2.18,
+    a role fact set to ``null``, such as ``_kopia_policy_info_defined`` or
+    ``_kopia_repository_info_connected``, was an empty string instead.

@@ -16,8 +16,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - ansible: '>=11,<12'
-            python: '3.11'
           - ansible: '>=12,<13'
             python: '3.12'
           - ansible: '>=13,<14'
@@ -50,8 +48,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - ansible: '>=11,<12'
-            python: '3.11'
           - ansible: '>=12,<13'
             python: '3.12'
           - ansible: '>=13,<14'

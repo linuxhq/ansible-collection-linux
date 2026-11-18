@@ -239,27 +239,6 @@ def test_config_marker_line_rest_is_payload():
     assert decrypt(f"{marker}{payload}", RCLONE_CONFIG_PASSWORD) == b"[vector]\ntype = local\n\n"
 
 
-@pytest.mark.parametrize(
-    "plugin, value, expected", [(rclone_obscure, "secret", None), (rclone_deobscure, None, "secret")]
-)
-def test_filter_accepts_vault_encrypted_value(monkeypatch, plugin, value, expected):
-    class VaultValue:
-        def __init__(self, data):
-            self.data = data
-
-        def __str__(self):
-            return self.data
-
-    monkeypatch.setattr(plugin, "AnsibleVaultEncryptedUnicode", VaultValue)
-    function = next(iter(plugin.FilterModule().filters().values()))
-    data = value if value is not None else rclone.obscure("secret")
-    result = function(VaultValue(data))
-    if expected is None:
-        assert rclone.deobscure(result) == "secret"
-    else:
-        assert result == expected
-
-
 @pytest.mark.parametrize("plugin", [rclone_obscure, rclone_deobscure])
 def test_filter_empty_string_passes_through(plugin):
     function = next(iter(plugin.FilterModule().filters().values()))

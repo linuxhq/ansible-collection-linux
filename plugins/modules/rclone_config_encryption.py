@@ -105,10 +105,8 @@ options:
         for bytes that are not valid UTF-8, stand for those bytes.
       - Unless the task sets C(no_log), Ansible fails before the module runs
         for a path with any lone surrogate code point, because it logs the
-        arguments as UTF-8. ansible-core 2.18 also returns the arguments with
-        the result, which then fails as not valid UTF-8 after the module has
-        run. Lone surrogates in the returned RV(path) and in failure messages
-        are backslash escaped, such as C(\udcff).
+        arguments as UTF-8. Lone surrogates in the returned RV(path) and in
+        failure messages are backslash escaped, such as C(\udcff).
     type: path
     required: true
   state:

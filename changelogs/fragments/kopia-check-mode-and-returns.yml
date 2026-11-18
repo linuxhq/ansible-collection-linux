@@ -24,9 +24,6 @@ bugfixes:
     ``.shards`` file, which the module cannot inspect.
   - kopia_maintenance - document that ``extend_object_locks`` requires kopia
     0.14.0 or later.
-  - kopia_repository_info role - omit ``config_file`` when
-    ``kopia_repository_info_config_file`` is ``null``, the default, instead of
-    passing an empty string on ansible-core 2.18.
 breaking_changes:
   - kopia_policy_info role - name the published facts after the module's
     return values. Publish ``_kopia_policy_info_defined``,
