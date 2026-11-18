@@ -76,7 +76,8 @@ options:
         V(null) item of a list of strings, such as C(files.ignore), is treated
         as an empty string, and a V(null) C(scheduling.time_of_day) entry, or a
         V(null) C(hour) or C(min) of one, as V(0).
-      - Required when O(state=present).
+      - Required when O(state=present). V(null) is treated as V({}), the empty
+        policy, which replaces the defined policy.
     type: dict
   state:
     description:
@@ -113,7 +114,9 @@ options:
         no target can name a directory whose path is one in which an V(@) comes
         before any V(:), as kopia would store a different source.
       - kopia makes a bare directory path absolute and cleans it into the
-        policy target.
+        policy target. An empty target, which Ansible can pass for V(null),
+        names the working directory of the module, such as the home directory
+        of the remote user, as kopia reads it.
       - A target of 32 lowercase hexadecimal digits is rejected before kopia
         runs, also in check mode, because C(kopia policy export),
         C(kopia policy show) and C(kopia policy delete) read it as a manifest
@@ -764,17 +767,19 @@ def check_policy_keys(module, value, name, fields=None):
 
 def ensure_present(module):
     target = module.params["target"]
+    # required_if accepts a null policy, which defines the empty policy, the same as {}
+    policy = module.params["policy"] or {}
 
     check_connection(module, failed_result={"policy": {}})
     # kopia policy export reads the target as an argument, and kopia policy import as JSON, with U+FFFD in place of a
     # lone surrogate, as it reads a value, so such a target or value would never match
     check_utf8(
         module,
-        [("target", target)] + list(policy_values(module.params["policy"], "policy")),
+        [("target", target)] + list(policy_values(policy, "policy")),
         failed_result={"policy": {}},
     )
     check_policy_target(module, target, failed_result={"policy": {}})
-    check_policy_keys(module, module.params["policy"], "policy", POLICY_FIELDS)
+    check_policy_keys(module, policy, "policy", POLICY_FIELDS)
 
     # an earlier task in check mode, such as kopia_repository, may only have predicted the connection
     if module.check_mode and not (
@@ -782,7 +787,7 @@ def ensure_present(module):
     ):
         module.exit_json(changed=True, policy={})
 
-    desired = policy_normalize(snake_dict_to_camel_dict(module.params["policy"]))
+    desired = policy_normalize(snake_dict_to_camel_dict(policy))
     current = policy_export(module, target, failed_result={"policy": {}})
 
     if current is not None and same_value(policy_normalize(current), desired):

@@ -103,6 +103,7 @@
           - "'*.log' in __kopia_policy.files.ignore"
           - "'*.tmp' in __kopia_policy.files.ignore"
           - "'.cache/' in __kopia_policy.files.ignore"
+          - __kopia_policy.retention.ignore_identical_snapshots
           - __kopia_policy.retention.keep_hourly == 24
           - __kopia_policy.retention.keep_latest == 2
           - __kopia_policy.retention.keep_monthly == 3
@@ -141,6 +142,29 @@
       ansible.builtin.assert:
         that:
           - __kopia_snapshot_result.changed
+          - __kopia_snapshot_result.snapshot.id | length == 32
+          - __kopia_snapshot_result.snapshot.source.path ==
+            kopia_policies[0].target
+
+    - name: Ensure identical kopia snapshot is skipped
+      tags:
+        - kopia
+      become: true
+      linuxhq.linux.kopia_snapshot:
+        password: "{{ kopia_password }}"
+        path: "{{ kopia_policies[0].target }}"
+      register: __kopia_identical_snapshot_result
+
+    - name: Ensure identical kopia snapshot skip is verified
+      tags:
+        - kopia
+      ansible.builtin.assert:
+        that:
+          - not __kopia_identical_snapshot_result.changed
+          - __kopia_identical_snapshot_result.snapshot.id ==
+            __kopia_snapshot_result.snapshot.id
+          - __kopia_identical_snapshot_result.snapshot.source.path ==
+            kopia_policies[0].target
 
     - name: Ensure kopia snapshot information is gathered
       tags:

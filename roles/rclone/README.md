@@ -12,7 +12,7 @@ None
 
     rclone_config: []
     rclone_config_pass: null
-    rclone_no_log: false
+    rclone_no_log: true
     rclone_user: root
 
 ## Dependencies
