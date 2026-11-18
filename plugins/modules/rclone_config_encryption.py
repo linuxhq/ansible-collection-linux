@@ -230,15 +230,26 @@ def label(text):
     return text.encode("utf-8", "backslashreplace").decode("utf-8").replace("\x00", "\\x00")
 
 
+def stat_config(module, path):
+    """Return the status of path, or None when it does not exist; os.path.exists reads any error as a missing file."""
+    try:
+        return os.stat(path)
+    except (FileNotFoundError, NotADirectoryError):
+        return None
+    except OSError as error:
+        module.fail_json(msg=f"unable to access configuration file {label(path)}: {label(to_native(error))}")
+
+
 def read_config(module, path):
-    if not os.path.exists(path):
+    status = stat_config(module, path)
+    if status is None:
         return None
 
-    try:
-        # reading a FIFO would block and a device such as /dev/zero never end, and writing would replace the device
-        if not stat.S_ISREG(os.stat(path).st_mode):
-            module.fail_json(msg=f"unable to manage configuration file {label(path)}: it is not a regular file")
+    # reading a FIFO would block and a device such as /dev/zero never end, and writing would replace the device
+    if not stat.S_ISREG(status.st_mode):
+        module.fail_json(msg=f"unable to manage configuration file {label(path)}: it is not a regular file")
 
+    try:
         with open(path, "rb") as handle:
             raw = handle.read()
     except OSError as error:
@@ -509,7 +520,10 @@ def main():
         if module.params["state"] == "absent":
             check_plain_text(module, path, module.params["content"])
 
-    if module.params["content"] is None and not os.path.exists(path):
+    # checked before the check-mode result without a crypto library, as stat needs none
+    exists = stat_config(module, path) is not None
+
+    if module.params["content"] is None and not exists:
         module.fail_json(msg=f"configuration file does not exist: {label(path)}")
 
     if not HAS_PYCRYPTODOME:

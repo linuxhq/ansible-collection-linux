@@ -1,3 +1,4 @@
+import errno
 import os
 import signal
 from pathlib import Path
@@ -75,6 +76,44 @@ def test_missing_file_without_content_fails(tmp_path, run_module):
     result = run_module(plugin, {"path": str(tmp_path / "missing"), "password": "secret"})
     assert result["failed"]
     assert "does not exist" in result["msg"]
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root searches any directory")
+@pytest.mark.parametrize("content", [None, "config"])
+@pytest.mark.parametrize("state", ["present", "absent"])
+@pytest.mark.parametrize("crypto", [True, False])
+@pytest.mark.parametrize("check_mode", [False, True])
+def test_unsearchable_directory_is_reported_as_a_permission_error(
+    monkeypatch, tmp_path, run_module, content, state, crypto, check_mode
+):
+    monkeypatch.setattr(plugin, "HAS_PYCRYPTODOME", crypto)
+    # os.path.exists reads a permission error as a missing file, which hid the reason behind "does not exist"
+    directory = tmp_path / "locked"
+    directory.mkdir()
+    path = directory / "rclone.conf"
+    path.write_text("config")
+    directory.chmod(0o600)
+    try:
+        params = {"path": str(path), "password": "secret", "state": state, "content": content}
+        result = run_module(plugin, params, check_mode)
+    finally:
+        directory.chmod(0o700)
+
+    assert result["failed"]
+    assert result["msg"].startswith(f"unable to access configuration file {path}: [Errno {errno.EACCES}] ")
+    assert path.read_text() == "config"
+
+
+@pytest.mark.parametrize("content", [None, "config"])
+def test_path_below_a_file_is_missing(tmp_path, run_module, content):
+    parent = tmp_path / "file"
+    parent.write_text("")
+    result = run_module(plugin, {"path": str(parent / "rclone.conf"), "password": "secret", "content": content})
+    assert result["failed"]
+    if content is None:
+        assert result["msg"] == f"configuration file does not exist: {parent}/rclone.conf"
+    else:
+        assert result["msg"].startswith(f"unable to write {parent}/rclone.conf: ")
 
 
 def test_password_required_when_present(tmp_path, run_module):
