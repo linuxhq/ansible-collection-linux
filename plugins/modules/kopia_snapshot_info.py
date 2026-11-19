@@ -77,7 +77,7 @@ options:
         arguments, or with C(no_log) rejects the module result.
     type: path
 requirements:
-  - kopia >= 0.10.7
+  - kopia >= 0.12.0
 attributes:
   check_mode:
     description: This module only retrieves information and does not modify state.
