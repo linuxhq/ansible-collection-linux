@@ -286,6 +286,16 @@ def test_locale_x11_request_alone_reports_change_only_once_applied(monkeypatch, 
         assert "changed" not in result and "locale" not in result
 
 
+def test_timedate_failed_method_lookup_in_ntp_wait_reports_change(monkeypatch, run_module):
+    # dasbus introspects the systemd manager when the wait first looks up LoadUnit, after SetNTP is applied
+    proxy = RequestProxy(REQUESTS[2][2], reads_fail=True)
+    monkeypatch.setattr(systemd_timedate, "systemd_proxy", Mock(return_value=proxy))
+    result = run_module(systemd_timedate, {"ntp": True})
+    assert result["failed"] and result["msg"] == "unable to call LoadUnit: Connection timed out"
+    assert result["changed"] is True and result["timedate"] == {}
+    assert proxy.calls == ["SetNTP"]
+
+
 def test_timedate_time_parse_failure_after_another_request_reports_change(monkeypatch, run_module, analyze):
     analyze.side_effect = [(0, analyze_output("@1784083200"), ""), (1, "", "Failed to parse timestamp")]
     proxy = RequestProxy(REQUESTS[2][2])

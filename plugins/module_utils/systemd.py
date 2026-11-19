@@ -216,11 +216,16 @@ def systemd_version(module, failed_result=None):
 def systemd_result(module, proxy, method, *args, failed_result=None):
     failed_result = failed_result or {}
 
-    if not hasattr(proxy, method):
+    # dasbus introspects the service on the first lookup, which can fail as a call does
+    try:
+        call = getattr(proxy, method)
+    except AttributeError:
         module.fail_json(msg=f"{method} is not supported by this version of systemd", **failed_result)
+    except (DBusError, GLibError, TimeoutError) as error:
+        module.fail_json(msg=f"unable to call {method}: {error}", **failed_result)
 
     try:
-        return getattr(proxy, method)(*args)
+        return call(*args)
     except (DBusError, GLibError, TimeoutError) as error:
         module.fail_json(msg=f"unable to call {method}: {error}", **failed_result)
 
