@@ -1,0 +1,15 @@
+---
+bugfixes:
+  - kopia_repository, kopia_repository_info - document that
+    ``repository.volume.capacity`` is returned only when the volume reports
+    a non-zero size, as kopia omits it otherwise.
+  - kopia_snapshot, kopia_snapshot_info - document that ``source.path`` is
+    the path of the snapshotted directory or file.
+  - systemd_hostname, systemd_hostname_info - document that ``vsock_cid`` is
+    ``4294967295`` when the host has no VSOCK context ID, and that
+    ``firmware_date`` and ``operating_system_support_end`` are
+    ``18446744073709551615`` when unknown, as ``systemd-hostnamed`` reports
+    them over D-Bus.
+  - systemd_hostname, systemd_hostname_info - replace the ``hostname`` sample,
+    which mixed properties of different systemd versions, with output captured
+    from systemd 257, with host-specific values replaced.

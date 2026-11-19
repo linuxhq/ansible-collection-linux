@@ -417,7 +417,7 @@ repository:
         capacity:
           description:
             - Bytes in all.
-          returned: always
+          returned: when the volume reports a non-zero size
           type: int
   sample:
     config_file: /root/.config/kopia/repository.config
