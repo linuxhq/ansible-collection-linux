@@ -14,4 +14,4 @@ bugfixes:
   - kopia_policy_info - document that each action in ``effective_policy`` is
     taken whole from the most specific policy that sets it.
   - kopia_policy_info - document which fields of ``effective_policy`` keep a
-    ``false``, ``0`` or empty value over a parent policy.
+    ``false`` or ``0`` value over a parent policy.
