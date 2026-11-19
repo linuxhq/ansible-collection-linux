@@ -122,7 +122,11 @@ effective_policy:
     - Effective policy for O(target) reported by C(kopia policy show).
     - Each value comes from the most specific policy that sets it, from the
       policy of O(target) up through its parent policies to the global policy,
-      and otherwise from kopia's built-in defaults.
+      and otherwise from the built-in defaults kopia merges into the policy.
+      Each field below states whether those defaults fill it. A value kopia
+      only falls back to when it takes a snapshot, such as the CPU count for
+      C(upload.max_parallel_file_reads), is not returned unless a policy sets
+      it.
     - C(compression.never_compress), C(compression.only_compress) and
       C(scheduling.time_of_day) instead combine the entries of each policy up
       to the first that sets C(compression.no_parent_never_compress),
