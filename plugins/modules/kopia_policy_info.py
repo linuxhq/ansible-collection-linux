@@ -145,6 +145,9 @@ effective_policy:
       description:
         - Actions run before and after snapshots. Always returned, empty when
           no action is set.
+        - Each action is taken whole from the most specific policy that sets
+          it, even as an empty dictionary, without filling its missing fields
+          from parent policies.
       returned: always
       type: dict
       contains:

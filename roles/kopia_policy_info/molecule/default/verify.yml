@@ -54,7 +54,7 @@
           - _kopia_policy_info_defined is true
           - _kopia_policy_info_policy.no_parent is true
           - _kopia_policy_info_effective_policy.no_parent is not defined
-          - _kopia_policy_info_effective_policy.retention == {'keep_latest': 1}
+          - "_kopia_policy_info_effective_policy.retention == {'keep_latest': 1}"
           - _kopia_policy_info_effective_policy.compression == {}
 
     - name: Ensure kopia policy information is gathered for every policy
@@ -84,5 +84,5 @@
           - _kopia_policy_info_effective_policy == {}
           - _kopia_policy_info_policies | length > 1
           - __kopia_policy_info_target.retention.keep_latest == 2
-          - __kopia_policy_info_global.retention == {'keep_latest': 10}
+          - "__kopia_policy_info_global.retention == {'keep_latest': 10}"
 ...

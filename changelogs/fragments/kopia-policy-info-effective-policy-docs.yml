@@ -8,3 +8,5 @@ bugfixes:
   - kopia_policy_info - document that ``effective_policy`` combines
     ``compression.never_compress``, ``compression.only_compress`` and
     ``scheduling.time_of_day`` from the policy and its parent policies.
+  - kopia_policy_info - document that each action in ``effective_policy`` is
+    taken whole from the most specific policy that sets it.
