@@ -1,0 +1,17 @@
+---
+bugfixes:
+  - kopia_policy_info - document that ``effective_policy`` also holds kopia's
+    built-in policy defaults for the values no policy sets, unless a policy
+    sets ``no_parent``, but not the values kopia only falls back to when it
+    takes a snapshot, such as ``upload.max_parallel_file_reads``.
+  - kopia_policy_info - document that ``no_parent`` is never returned in
+    ``effective_policy``, that its folder actions come only from the policy of
+    ``target`` itself, and replace its sample with real ``kopia policy show``
+    output.
+  - kopia_policy_info - document that ``effective_policy`` combines
+    ``compression.never_compress``, ``compression.only_compress`` and
+    ``scheduling.time_of_day`` from the policy and its parent policies.
+  - kopia_policy_info - document that each action in ``effective_policy`` is
+    taken whole from the most specific policy that sets it.
+  - kopia_policy_info - document which fields of ``effective_policy`` keep a
+    ``false`` or ``0`` value over a parent policy.

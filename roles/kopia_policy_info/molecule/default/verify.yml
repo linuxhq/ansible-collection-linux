@@ -16,6 +16,9 @@
           - _kopia_policy_info_defined is true
           - _kopia_policy_info_policy.retention.keep_latest == 2
           - _kopia_policy_info_effective_policy.retention.keep_latest == 2
+          - _kopia_policy_info_policy.retention.keep_daily is not defined
+          - _kopia_policy_info_effective_policy.retention.keep_daily is number
+          - _kopia_policy_info_effective_policy.no_parent is not defined
           - _kopia_policy_info_policies == []
 
     - name: Ensure kopia policy information is gathered for a target without a policy
@@ -33,7 +36,27 @@
         that:
           - _kopia_policy_info_defined is false
           - _kopia_policy_info_policy == {}
-          - _kopia_policy_info_effective_policy.retention.keep_latest is number
+          - _kopia_policy_info_effective_policy.retention.keep_latest == 11
+          - _kopia_policy_info_effective_policy.compression.max_size == 1048576
+
+    - name: Ensure kopia policy information is gathered for a target whose policy sets no_parent
+      tags:
+        - kopia_policy_info
+      ansible.builtin.include_role:
+        name: kopia_policy_info
+      vars:
+        kopia_policy_info_target: /srv/no-parent
+
+    - name: Ensure kopia policy information for a target whose policy sets no_parent is verified
+      tags:
+        - kopia_policy_info
+      ansible.builtin.assert:
+        that:
+          - _kopia_policy_info_defined is true
+          - _kopia_policy_info_policy.no_parent is true
+          - _kopia_policy_info_effective_policy.no_parent is not defined
+          - "_kopia_policy_info_effective_policy.retention == {'keep_latest': 1}"
+          - _kopia_policy_info_effective_policy.compression == {}
 
     - name: Ensure kopia policy information is gathered for every policy
       tags:
@@ -51,6 +74,10 @@
           {{ _kopia_policy_info_policies
              | selectattr('target.path', 'equalto', kopia_policy_info_target)
              | first }}
+        __kopia_policy_info_global: >-
+          {{ _kopia_policy_info_policies
+             | selectattr('target.host', 'equalto', '')
+             | first }}
       ansible.builtin.assert:
         that:
           - _kopia_policy_info_defined is none
@@ -58,4 +85,5 @@
           - _kopia_policy_info_effective_policy == {}
           - _kopia_policy_info_policies | length > 1
           - __kopia_policy_info_target.retention.keep_latest == 2
+          - "__kopia_policy_info_global.retention == {'keep_latest': 11}"
 ...

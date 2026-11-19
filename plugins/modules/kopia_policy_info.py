@@ -119,8 +119,31 @@ defined:
   sample: true
 effective_policy:
   description:
-    - Effective policy for O(target) reported by C(kopia policy show), with
-      inherited values resolved.
+    - Effective policy for O(target) reported by C(kopia policy show).
+    - Each value comes from the most specific policy that sets it, from the
+      policy of O(target) up through its parent policies to the global policy,
+      and otherwise from the built-in defaults kopia merges into the policy.
+      Each field below states whether those defaults fill it. A value kopia
+      only falls back to when it takes a snapshot, such as the CPU count for
+      C(upload.max_parallel_file_reads), is not returned unless a policy sets
+      it.
+    - V(false) and V(0) count as set, and so override parent policies, only in
+      C(error_handling), C(logging), C(retention), C(upload),
+      C(files.ignore_cache_dirs), C(files.one_file_system),
+      C(os_snapshots.volume_shadow_copy.enable) and C(scheduling.run_missed).
+      kopia does not store them, or an empty string or list, as the value of
+      other fields outside C(actions), such as C(scheduling.manual) or
+      C(compression.max_size), so there a parent value applies. Zeros inside a
+      list entry, such as a C(scheduling.time_of_day) entry for midnight, are
+      kept. An empty section, such as C(retention), sets nothing.
+    - C(compression.never_compress), C(compression.only_compress) and
+      C(scheduling.time_of_day) instead combine the entries of each policy up
+      to the first that sets C(compression.no_parent_never_compress),
+      C(compression.no_parent_only_compress) or
+      C(scheduling.no_parent_time_of_day) respectively.
+    - When a policy sets C(no_parent), the policies above it and kopia's
+      defaults are ignored, so only the values set from O(target) up to that
+      policy are returned. C(no_parent) itself is never returned.
     - Empty when the module fails, and when kopia is unavailable or no
       repository is connected in check mode.
       Not returned when Ansible rejects the arguments, such as a missing
@@ -135,6 +158,9 @@ effective_policy:
       description:
         - Actions run before and after snapshots. Always returned, empty when
           no action is set.
+        - Each action is taken whole from the most specific policy that sets
+          it, even as an empty dictionary, without filling its missing fields
+          from parent policies.
       returned: always
       type: dict
       contains:
@@ -142,7 +168,9 @@ effective_policy:
           description:
             - Action run after the directory of the policy is snapshotted. An
               empty dictionary is an action defined without a command.
-          returned: when set in the policy
+          returned: >-
+            when set in the policy of O(target) itself, unless a policy sets
+            C(no_parent)
           type: dict
           contains:
             path:
@@ -176,7 +204,7 @@ effective_policy:
           description:
             - Action run after each snapshot root. An empty dictionary is an
               action defined without a command.
-          returned: when set in the policy
+          returned: when set in the policy or a parent policy
           type: dict
           contains:
             path:
@@ -210,7 +238,9 @@ effective_policy:
           description:
             - Action run before the directory of the policy is snapshotted. An
               empty dictionary is an action defined without a command.
-          returned: when set in the policy
+          returned: >-
+            when set in the policy of O(target) itself, unless a policy sets
+            C(no_parent)
           type: dict
           contains:
             path:
@@ -244,7 +274,7 @@ effective_policy:
           description:
             - Action run before each snapshot root. An empty dictionary is an
               action defined without a command.
-          returned: when set in the policy
+          returned: when set in the policy or a parent policy
           type: dict
           contains:
             path:
@@ -276,15 +306,17 @@ effective_policy:
               type: str
     compression:
       description:
-        - Compression of file contents. Always returned, empty when nothing is
-          set.
+        - Compression of file contents. Always returned, empty only when a
+          policy sets C(no_parent) and no policy sets a value in it.
       returned: always
       type: dict
       contains:
         compressor_name:
           description:
             - Compressor kopia uses, such as C(zstd) or C(none).
-          returned: when set in the policy or a parent policy
+          returned: >-
+            when set in the policy or a parent policy, or by kopia's defaults
+            unless a policy sets C(no_parent)
           type: str
         max_size:
           description:
@@ -320,29 +352,36 @@ effective_policy:
           elements: str
     error_handling:
       description:
-        - Errors a snapshot ignores. Always returned, empty when nothing is
-          set.
+        - Errors a snapshot ignores. Always returned, empty only when a policy
+          sets C(no_parent) and no policy sets a value in it.
       returned: always
       type: dict
       contains:
         ignore_directory_errors:
           description:
             - Whether errors reading directories are ignored.
-          returned: when set in the policy or a parent policy
+          returned: >-
+            when set in the policy or a parent policy, or by kopia's defaults
+            unless a policy sets C(no_parent)
           type: bool
         ignore_file_errors:
           description:
             - Whether errors reading files are ignored.
-          returned: when set in the policy or a parent policy
+          returned: >-
+            when set in the policy or a parent policy, or by kopia's defaults
+            unless a policy sets C(no_parent)
           type: bool
         ignore_unknown_types:
           description:
             - Whether entries of unknown types are ignored.
-          returned: when set in the policy or a parent policy
+          returned: >-
+            when set in the policy or a parent policy, or by kopia's defaults
+            unless a policy sets C(no_parent)
           type: bool
     files:
       description:
-        - Files a snapshot ignores. Always returned, empty when nothing is set.
+        - Files a snapshot ignores. Always returned, empty only when a policy
+          sets C(no_parent) and no policy sets a value in it.
       returned: always
       type: dict
       contains:
@@ -360,7 +399,9 @@ effective_policy:
         ignore_dot_files:
           description:
             - Names of files in each directory holding further ignore rules.
-          returned: when set in the policy or a parent policy
+          returned: >-
+            when set in the policy or a parent policy, or by kopia's defaults
+            unless a policy sets C(no_parent)
           type: list
           elements: str
         max_file_size:
@@ -392,65 +433,74 @@ effective_policy:
       contains:
         directories:
           description:
-            - Log detail for directories. Always returned, empty when nothing
-              is set.
+            - Log detail for directories. Always returned, empty only when a
+              policy sets C(no_parent) and no policy sets a value in it.
           returned: always
           type: dict
           contains:
             ignored:
               description:
                 - Log detail for ignored directories.
-              returned: when set in the policy or a parent policy
+              returned: >-
+                when set in the policy or a parent policy, or by kopia's
+                defaults unless a policy sets C(no_parent)
               type: int
             snapshotted:
               description:
                 - Log detail for snapshotted directories.
-              returned: when set in the policy or a parent policy
+              returned: >-
+                when set in the policy or a parent policy, or by kopia's
+                defaults unless a policy sets C(no_parent)
               type: int
         entries:
           description:
-            - Log detail for entries. Always returned, empty when nothing is
-              set.
+            - Log detail for entries. Always returned, empty only when a policy
+              sets C(no_parent) and no policy sets a value in it.
           returned: always
           type: dict
           contains:
             cache_hit:
               description:
                 - Log detail for entries found in the cache.
-              returned: when set in the policy or a parent policy
+              returned: >-
+                when set in the policy or a parent policy, or by kopia's
+                defaults unless a policy sets C(no_parent)
               type: int
             cache_miss:
               description:
                 - Log detail for entries not found in the cache.
-              returned: when set in the policy or a parent policy
+              returned: >-
+                when set in the policy or a parent policy, or by kopia's
+                defaults unless a policy sets C(no_parent)
               type: int
             ignored:
               description:
                 - Log detail for ignored entries.
-              returned: when set in the policy or a parent policy
+              returned: >-
+                when set in the policy or a parent policy, or by kopia's
+                defaults unless a policy sets C(no_parent)
               type: int
             snapshotted:
               description:
                 - Log detail for snapshotted entries.
-              returned: when set in the policy or a parent policy
+              returned: >-
+                when set in the policy or a parent policy, or by kopia's
+                defaults unless a policy sets C(no_parent)
               type: int
     metadata_compression:
       description:
-        - Compression of directory metadata. Always returned, empty when
-          nothing is set.
+        - Compression of directory metadata. Always returned, empty only when a
+          policy sets C(no_parent) and no policy sets a value in it.
       returned: always
       type: dict
       contains:
         compressor_name:
           description:
             - Compressor kopia uses for metadata.
-          returned: when set in the policy or a parent policy
+          returned: >-
+            when set in the policy or a parent policy, or by kopia's defaults
+            unless a policy sets C(no_parent)
           type: str
-    no_parent:
-      description:
-        - Whether the policy inherits nothing from parent policies.
-      returned: when set in the policy or a parent policy
-      type: bool
     os_snapshots:
       description:
         - Operating system snapshots taken before a snapshot.
@@ -459,8 +509,8 @@ effective_policy:
       contains:
         volume_shadow_copy:
           description:
-            - Windows Volume Shadow Copy. Always returned, empty when nothing
-              is set.
+            - Windows Volume Shadow Copy. Always returned, empty only when a
+              policy sets C(no_parent) and no policy sets a value in it.
           returned: always
           type: dict
           contains:
@@ -468,53 +518,70 @@ effective_policy:
               description:
                 - Whether a snapshot is taken, C(0) never, C(1) always, failing
                   without one, or C(2) when available.
-              returned: when set in the policy or a parent policy
+              returned: >-
+                when set in the policy or a parent policy, or by kopia's
+                defaults unless a policy sets C(no_parent)
               type: int
     retention:
       description:
-        - Snapshots kept. Always returned, empty when nothing is set.
+        - Snapshots kept. Always returned, empty only when a policy sets
+          C(no_parent) and no policy sets a value in it.
       returned: always
       type: dict
       contains:
         ignore_identical_snapshots:
           description:
             - Whether a snapshot identical to the previous one is not saved.
-          returned: when set in the policy or a parent policy
+          returned: >-
+            when set in the policy or a parent policy, or by kopia's defaults
+            unless a policy sets C(no_parent)
           type: bool
         keep_annual:
           description:
             - Number of annual snapshots kept.
-          returned: when set in the policy or a parent policy
+          returned: >-
+            when set in the policy or a parent policy, or by kopia's defaults
+            unless a policy sets C(no_parent)
           type: int
         keep_daily:
           description:
             - Number of daily snapshots kept.
-          returned: when set in the policy or a parent policy
+          returned: >-
+            when set in the policy or a parent policy, or by kopia's defaults
+            unless a policy sets C(no_parent)
           type: int
         keep_hourly:
           description:
             - Number of hourly snapshots kept.
-          returned: when set in the policy or a parent policy
+          returned: >-
+            when set in the policy or a parent policy, or by kopia's defaults
+            unless a policy sets C(no_parent)
           type: int
         keep_latest:
           description:
             - Number of latest snapshots kept.
-          returned: when set in the policy or a parent policy
+          returned: >-
+            when set in the policy or a parent policy, or by kopia's defaults
+            unless a policy sets C(no_parent)
           type: int
         keep_monthly:
           description:
             - Number of monthly snapshots kept.
-          returned: when set in the policy or a parent policy
+          returned: >-
+            when set in the policy or a parent policy, or by kopia's defaults
+            unless a policy sets C(no_parent)
           type: int
         keep_weekly:
           description:
             - Number of weekly snapshots kept.
-          returned: when set in the policy or a parent policy
+          returned: >-
+            when set in the policy or a parent policy, or by kopia's defaults
+            unless a policy sets C(no_parent)
           type: int
     scheduling:
       description:
-        - When kopia takes snapshots. Always returned, empty when nothing is
-          set.
+        - When kopia takes snapshots. Always returned, empty only when a policy
+          sets C(no_parent) and no policy sets a value in it.
       returned: always
       type: dict
       contains:
@@ -542,7 +609,9 @@ effective_policy:
         run_missed:
           description:
             - Whether a missed snapshot is taken at once.
-          returned: when set in the policy or a parent policy
+          returned: >-
+            when set in the policy or a parent policy, or by kopia's defaults
+            unless a policy sets C(no_parent)
           type: bool
         time_of_day:
           description:
@@ -575,7 +644,8 @@ effective_policy:
           type: str
     upload:
       description:
-        - Upload parallelism. Always returned, empty when nothing is set.
+        - Upload parallelism. Always returned, empty only when a policy sets
+          C(no_parent) and no policy sets a value in it.
       returned: always
       type: dict
       contains:
@@ -587,19 +657,56 @@ effective_policy:
         max_parallel_snapshots:
           description:
             - Number of snapshots taken at the same time.
-          returned: when set in the policy or a parent policy
+          returned: >-
+            when set in the policy or a parent policy, or by kopia's defaults
+            unless a policy sets C(no_parent)
           type: int
         parallel_upload_above_size:
           description:
             - Size in bytes above which a file is uploaded in parallel parts.
-          returned: when set in the policy or a parent policy
+          returned: >-
+            when set in the policy or a parent policy, or by kopia's defaults
+            unless a policy sets C(no_parent)
           type: int
   sample:
+    actions: {}
     compression:
-      compressor_name: gzip
+      compressor_name: none
+    error_handling:
+      ignore_directory_errors: false
+      ignore_file_errors: false
+      ignore_unknown_types: true
+    files:
+      ignore_dot_files:
+        - .kopiaignore
+    logging:
+      directories:
+        ignored: 5
+        snapshotted: 5
+      entries:
+        cache_hit: 0
+        cache_miss: 0
+        ignored: 5
+        snapshotted: 0
+    metadata_compression:
+      compressor_name: zstd-fastest
+    os_snapshots:
+      volume_shadow_copy:
+        enable: 0
     retention:
+      ignore_identical_snapshots: false
+      keep_annual: 3
       keep_daily: 7
+      keep_hourly: 48
       keep_latest: 2
+      keep_monthly: 24
+      keep_weekly: 4
+    scheduling:
+      run_missed: true
+    splitter: {}
+    upload:
+      max_parallel_snapshots: 1
+      parallel_upload_above_size: 2147483648
 policies:
   description:
     - Policies defined in the repository from C(kopia policy list), as kopia
