@@ -1,0 +1,21 @@
+---
+bugfixes:
+  - kopia_maintenance, kopia_maintenance_info, kopia_repository,
+    kopia_repository_info, kopia_snapshot_info - document that they require
+    kopia 0.12.0 or later. Before 0.12.0, kopia ignores
+    ``KOPIA_REPO_UPGRADE_NO_BLOCK``, so the commands these modules run to read
+    the repository, such as ``kopia repository status``, wait without limit
+    while another client upgrades the repository format, instead of failing.
+    ``kopia repository connect`` still waits from 0.12.0, as kopia_repository
+    documents. Before 0.11.0, ``kopia snapshot list --json`` also leaves out
+    the ``stats`` and ``retentionReason`` of each snapshot, before 0.10.7,
+    ``kopia repository status`` has no ``--json``, and before 0.9.0,
+    ``kopia maintenance info --json`` prints only the schedule.
+  - kopia_snapshot - document that it requires kopia 0.14.0 or later. Before
+    0.14.0, ``kopia snapshot create --json`` exits successfully after
+    printing the snapshot, without failing on the fatal errors found while
+    snapshotting, so the module would report an incomplete snapshot as
+    created.
+  - kopia_repository - document that the ``root_ca_pem_path`` option of
+    ``s3`` storage requires kopia 0.13.0 or later, and the ``token_file``
+    option of ``from-config`` storage kopia 0.14.0 or later.

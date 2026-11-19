@@ -131,6 +131,8 @@ options:
         O(storage=from-config), C(root_ca_pem_path) with O(storage=s3), whose
         file contents kopia saves instead, and C(embed_rclone_config) with
         O(storage=rclone), whose contents kopia embeds instead.
+      - C(root_ca_pem_path) requires kopia 0.13.0 or later, and C(token_file)
+        requires kopia 0.14.0 or later.
       - kopia reads a Boolean flag given a value, such as
         C(--embed-credentials=true) for a string V("true"), as the flag
         followed by an unexpected argument, which it refuses before it changes
@@ -224,7 +226,7 @@ options:
     type: bool
     default: false
 requirements:
-  - kopia
+  - kopia >= 0.12.0
 attributes:
   check_mode:
     description: Predicts changes without modifying the target.

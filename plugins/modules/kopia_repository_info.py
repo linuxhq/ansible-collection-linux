@@ -38,7 +38,7 @@ options:
         not valid UTF-8, are passed as those bytes.
     type: path
 requirements:
-  - kopia
+  - kopia >= 0.12.0
 attributes:
   check_mode:
     description: This module only retrieves information and does not modify state.

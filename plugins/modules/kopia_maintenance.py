@@ -122,7 +122,7 @@ options:
       - Interval between quick maintenance runs, in seconds.
     type: int
 requirements:
-  - kopia
+  - kopia >= 0.12.0
 attributes:
   check_mode:
     description: Predicts changes without modifying the target.
