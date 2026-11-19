@@ -420,22 +420,43 @@ repository:
           returned: when the volume reports a non-zero size
           type: int
   sample:
-    config_file: /root/.config/kopia/repository.config
+    blob_retention: {}
     client_options:
       description: "Repository in Filesystem: /srv/backup/kopia"
       enable_actions: false
+      format_blob_cache_duration: 900000000000
       hostname: server
       username: root
+    config_file: /root/.config/kopia/repository.config
     content_format:
       enable_password_change: true
       encryption: AES256-GCM-HMAC-SHA256
+      epoch_parameters:
+        cleanup_safety_margin: 14400000000000
+        delete_parallelism: 4
+        enabled: true
+        epoch_advance_on_count_threshold: 20
+        epoch_advance_on_total_size_bytes_threshold: 10485760
+        epoch_refresh_frequency: 1200000000000
+        full_checkpoint_frequency: 7
+        min_epoch_duration: 86400000000000
       hash: BLAKE2B-256-128
+      index_version: 2
+      max_pack_size: 20971520
       version: 3
+    object_format:
+      splitter: DYNAMIC-4M-BUZHASH
     storage:
-      type: filesystem
       config:
+        dir_mode: 448
+        dir_shards: null
+        file_mode: 384
         path: /srv/backup/kopia
+      type: filesystem
     unique_id_hex: 0f5b8a29110e21bf6bd1e81e7a807933b0c40f3478064e63f63f7d253c785a9b
+    volume:
+      available: 61924470784
+      capacity: 63928532992
 """
 
 import os
@@ -470,7 +491,8 @@ STORAGE_KEYS = {
     "url": "url",
 }
 
-# webdav also takes a username, which only authenticates there, so it identifies only an sftp repository
+# an sftp username names the account on the host, and so the files its path reaches, so it identifies the repository;
+# webdav takes its login as webdav_username, which only authenticates to the url, so it is not compared
 STORAGE_TYPE_KEYS = {"sftp": {"username": "username"}}
 
 # kingpin reads an int flag as a float and truncates it, so "+22" or "22.0" set the port 22

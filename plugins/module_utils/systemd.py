@@ -138,9 +138,14 @@ TIMEDATE_PROPERTIES = [
 TIMEDATE_OPTIONAL = {"rtc_time_usec": "Failed to read RTC: "}
 
 
-def systemd_proxy(module, interface):
+# The helpers below add failed_result to a failure, such as changed=True when the caller has already written.
+
+
+def systemd_proxy(module, interface, failed_result=None):
+    failed_result = failed_result or {}
+
     if not HAS_DASBUS:
-        module.fail_json(msg=missing_required_lib("dasbus"), exception=DASBUS_IMPORT_ERROR)
+        module.fail_json(msg=missing_required_lib("dasbus"), exception=DASBUS_IMPORT_ERROR, **failed_result)
 
     service, path = INTERFACES[interface]
 
@@ -150,7 +155,7 @@ def systemd_proxy(module, interface):
         bus.connection  # noqa: B018
         return bus.get_proxy(service, path)
     except (DBusError, GLibError) as error:
-        module.fail_json(msg=f"unable to reach {service} on the system bus: {error}")
+        module.fail_json(msg=f"unable to reach {service} on the system bus: {error}", **failed_result)
 
 
 def systemd_value(value):
@@ -167,10 +172,11 @@ def systemd_value(value):
     return value
 
 
-def systemd_properties(module, proxy, properties, optional=None):
+def systemd_properties(module, proxy, properties, optional=None, failed_result=None):
     """Return the properties by name, None for one the service lacks, or for one in optional that the service fails to
     read with an error beginning with the message optional maps its name to."""
     optional = optional or {}
+    failed_result = failed_result or {}
     values = {}
 
     for name, prop in properties:
@@ -185,41 +191,46 @@ def systemd_properties(module, proxy, properties, optional=None):
                 values[name] = None
                 continue
 
-            module.fail_json(msg=f"unable to read the {prop} property: {error}")
+            module.fail_json(msg=f"unable to read the {prop} property: {error}", **failed_result)
 
         values[name] = systemd_value(value)
 
     return values
 
 
-def systemd_version(module):
+def systemd_version(module, failed_result=None):
     """Return the major version of the running systemd, such as 252 for "252.32-1.el9"."""
-    proxy = systemd_proxy(module, "systemd1")
-    version = systemd_properties(module, proxy, [("version", "Version")])["version"]
+    failed_result = failed_result or {}
+    proxy = systemd_proxy(module, "systemd1", failed_result)
+    version = systemd_properties(module, proxy, [("version", "Version")], failed_result=failed_result)["version"]
     match = re.match(r"\d+", version)
 
     if not match:
-        module.fail_json(msg=f"unable to read the systemd version: unexpected Version property {version!r}")
+        module.fail_json(
+            msg=f"unable to read the systemd version: unexpected Version property {version!r}", **failed_result
+        )
 
     return int(match.group())
 
 
-def systemd_result(module, proxy, method, *args):
+def systemd_result(module, proxy, method, *args, failed_result=None):
+    failed_result = failed_result or {}
+
     if not hasattr(proxy, method):
-        module.fail_json(msg=f"{method} is not supported by this version of systemd")
+        module.fail_json(msg=f"{method} is not supported by this version of systemd", **failed_result)
 
     try:
         return getattr(proxy, method)(*args)
     except (DBusError, GLibError, TimeoutError) as error:
-        module.fail_json(msg=f"unable to call {method}: {error}")
+        module.fail_json(msg=f"unable to call {method}: {error}", **failed_result)
 
 
-def systemd_call(module, proxy, method, *args):
-    systemd_result(module, proxy, method, *args)
+def systemd_call(module, proxy, method, *args, failed_result=None):
+    systemd_result(module, proxy, method, *args, failed_result=failed_result)
 
 
-def locale_status(module, proxy):
-    status = systemd_properties(module, proxy, LOCALE_PROPERTIES)
+def locale_status(module, proxy, failed_result=None):
+    status = systemd_properties(module, proxy, LOCALE_PROPERTIES, failed_result=failed_result)
 
     variables = dict(entry.split("=", 1) for entry in status["locale"])
 

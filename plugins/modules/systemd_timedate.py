@@ -152,7 +152,9 @@ timedate:
       options, and when O(time) is set, C(time_usec) is the time it would
       set.
     - Empty when dasbus is unavailable in check mode.
-  returned: always
+    - Empty when the module fails after it has changed a setting. Not returned
+      when it fails before changing one.
+  returned: unless the module fails before changing a setting
   type: dict
   contains:
     can_ntp:
@@ -260,9 +262,10 @@ SECONDS = re.compile(r"^[ \t]*UNIX seconds: @([0-9]+)(?:\.([0-9]{6}))?[ \t]*$", 
 SETTINGS = ["local_rtc", "ntp", "time", "timezone"]
 
 
-def parse_time(module, analyze, value, zone):
+def parse_time(module, analyze, value, zone, failed_result=None):
     # parse as timedatectl set-time does, in the time zone the host ends up with;
     # SYSTEMD_COLORS from the task environment would colour the output even on a pipe
+    failed_result = failed_result or {}
     environ = {"LC_ALL": "C", "SYSTEMD_COLORS": "0"}
     if zone:
         environ["TZ"] = f":{zone}"
@@ -273,14 +276,14 @@ def parse_time(module, analyze, value, zone):
         expand_user_and_vars=False,
     )
     if rc != 0:
-        module.fail_json(msg=f"unable to parse the time specification {value}: {stderr.strip()}")
+        module.fail_json(msg=f"unable to parse the time specification {value}: {stderr.strip()}", **failed_result)
 
     # the last match, as the original form echoed before it is caller input
     seconds, fraction = SECONDS.findall(stdout)[-1]
     usec = int(seconds) * MICROSECONDS + int(fraction or 0)
 
     if usec <= 0 or usec // MICROSECONDS >= SETTOD_SEC_MAX:
-        module.fail_json(msg=f"unable to set time: invalid time {value}")
+        module.fail_json(msg=f"unable to set time: invalid time {value}", **failed_result)
 
     return usec
 
@@ -332,13 +335,14 @@ def ntp_units():
     return units
 
 
-def ntp_jobs(module, manager, units):
+def ntp_jobs(module, manager, units, failed_result):
     """Return the IDs of the jobs systemd has queued for the unit object paths units, as ListJobs reports them."""
     # each job is its ID, unit name, type, state, job object path and unit object path
-    return {job[0] for job in systemd_result(module, manager, "ListJobs") if job[5] in units}
+    jobs = systemd_result(module, manager, "ListJobs", failed_result=failed_result)
+    return {job[0] for job in jobs if job[5] in units}
 
 
-def wait_for_ntp(module, proxy, ntp):
+def wait_for_ntp(module, proxy, ntp, failed_result):
     # SetNTP returns once the jobs starting or stopping the time services are
     # queued, and systemd-timedated refuses other requests until they finish
     # and NTP reports the change. From systemd 241, while they run, it reports
@@ -346,18 +350,22 @@ def wait_for_ntp(module, proxy, ntp):
     # no job of a time service is left, whether SetNTP queued it or joined an
     # earlier one.
     deadline = monotonic() + NTP_TIMEOUT
-    manager = systemd_proxy(module, "systemd1")
+    manager = systemd_proxy(module, "systemd1", failed_result)
     # systemd reports a job under the unit's own name, which LoadUnit resolves an alias to
-    names = ntp_units() if systemd_version(module) >= NTP_UNIT_LISTS_VERSION else {NTP_DEFAULT_UNIT}
-    units = {systemd_result(module, manager, "LoadUnit", name) for name in names}
+    names = ntp_units() if systemd_version(module, failed_result) >= NTP_UNIT_LISTS_VERSION else {NTP_DEFAULT_UNIT}
+    units = {systemd_result(module, manager, "LoadUnit", name, failed_result=failed_result) for name in names}
 
     while True:
-        if not ntp_jobs(module, manager, units) and systemd_properties(module, proxy, [("ntp", "NTP")])["ntp"] == ntp:
+        if (
+            not ntp_jobs(module, manager, units, failed_result)
+            and systemd_properties(module, proxy, [("ntp", "NTP")], failed_result=failed_result)["ntp"] == ntp
+        ):
             return
 
         if monotonic() >= deadline:
             module.fail_json(
-                msg=f"unable to set ntp to {ntp}: network time synchronization did not change within {NTP_TIMEOUT} seconds"
+                msg=f"unable to set ntp to {ntp}: network time synchronization did not change within {NTP_TIMEOUT} seconds",
+                **failed_result,
             )
 
         sleep(0.5)
@@ -434,17 +442,21 @@ def ensure_present(module):
     if module.check_mode:
         module.exit_json(changed=True, timedate=predicted)
 
+    failed_result = {}
+
     for method, args in pending:
         if method == "SetTime":
             # parse again so a time relative to now does not lag behind the earlier changes and the NTP wait
-            args = (parse_time(module, analyze, value, predicted["timezone"]), False, False)
+            args = (parse_time(module, analyze, value, predicted["timezone"], failed_result), False, False)
 
-        systemd_call(module, proxy, method, *args)
+        systemd_call(module, proxy, method, *args, failed_result=failed_result)
+        # a later failure leaves this request applied
+        failed_result = {"changed": True, "timedate": {}}
 
         if method == "SetNTP":
-            wait_for_ntp(module, proxy, args[0])
+            wait_for_ntp(module, proxy, args[0], failed_result)
 
-    current = systemd_properties(module, proxy, TIMEDATE_PROPERTIES, TIMEDATE_OPTIONAL)
+    current = systemd_properties(module, proxy, TIMEDATE_PROPERTIES, TIMEDATE_OPTIONAL, failed_result)
 
     module.exit_json(changed=True, timedate=current)
 

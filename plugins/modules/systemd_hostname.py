@@ -236,7 +236,9 @@ hostname:
       options, so a setting being removed is predicted as an empty string
       even when C(systemd-hostnamed) then reports a computed fallback.
     - Empty when dasbus is unavailable in check mode.
-  returned: always
+    - Empty when the module fails after it has changed a setting. Not returned
+      when it fails before changing one.
+  returned: unless the module fails before changing a setting
   type: dict
   contains:
     boot_id:
@@ -826,10 +828,14 @@ def ensure_present(module):
     if module.check_mode:
         module.exit_json(changed=True, hostname=predicted)
 
-    for _param, method, args in pending:
-        systemd_call(module, proxy, method, *args)
+    failed_result = {}
 
-    current = systemd_properties(module, proxy, HOSTNAME_PROPERTIES)
+    for _param, method, args in pending:
+        systemd_call(module, proxy, method, *args, failed_result=failed_result)
+        # a later failure leaves this request applied
+        failed_result = {"changed": True, "hostname": {}}
+
+    current = systemd_properties(module, proxy, HOSTNAME_PROPERTIES, failed_result=failed_result)
 
     module.exit_json(changed=True, hostname=current)
 
