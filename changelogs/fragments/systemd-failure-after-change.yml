@@ -1,0 +1,7 @@
+---
+bugfixes:
+  - systemd_hostname, systemd_locale, systemd_timedate - report a change, with
+    an empty ``hostname``, ``locale`` or ``timedate``, when the module fails
+    after it has applied a setting, such as when a later request is refused,
+    the network time synchronization change does not settle in time, or the
+    settings cannot be read back, instead of reporting no change.

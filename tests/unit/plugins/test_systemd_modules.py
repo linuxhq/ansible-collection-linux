@@ -184,6 +184,128 @@ def test_manager_missing_dasbus_in_check_mode(
     assert run_module(plugin, {}, True) == {"changed": False, key: {}}
 
 
+class RequestProxy:
+    """A proxy reporting the properties in values by their D-Bus names, which applies every Set request but the one
+    named refused, which it refuses, and fails every property read after a request when reads_fail is set."""
+
+    def __init__(self, values, refused=None, reads_fail=False):
+        self.values = values
+        self.refused = refused
+        self.reads_fail = reads_fail
+        self.calls = []
+
+    def __getattr__(self, name):
+        if name.startswith("Set"):
+            return lambda *args: self.request(name)
+
+        if self.reads_fail and self.calls:
+            raise systemd_utils.DBusError("Connection timed out")
+
+        try:
+            return self.values[name]
+        except KeyError:
+            raise AttributeError(name) from None
+
+    def request(self, name):
+        self.calls.append(name)
+
+        if name == self.refused:
+            raise systemd_utils.DBusError("Access denied")
+
+
+REQUESTS = [
+    (
+        systemd_hostname,
+        "hostname",
+        {"DefaultHostname": "localhost", "Hostname": "old", "HostnameSource": "static", "StaticHostname": "old"},
+        {"static_hostname": "new", "chassis": "vm"},
+        ["SetStaticHostname", "SetChassis"],
+    ),
+    (
+        systemd_locale,
+        "locale",
+        {
+            "Locale": ["LANG=en_US.UTF-8"],
+            "VConsoleKeymap": "us",
+            "VConsoleKeymapToggle": "",
+            "X11Layout": "us",
+            "X11Model": "pc105",
+            "X11Options": "",
+            "X11Variant": "",
+        },
+        {"locale": {"lang": "de_DE.UTF-8"}, "vconsole_keymap": "de", "x11_layout": "de"},
+        ["SetLocale", "SetVConsoleKeyboard", "SetX11Keyboard"],
+    ),
+    (
+        systemd_timedate,
+        "timedate",
+        {"CanNTP": True, "LocalRTC": False, "NTP": False, "Timezone": "UTC", "TimeUSec": 1784083200123456},
+        {"timezone": "Europe/Berlin", "local_rtc": True},
+        ["SetTimezone", "SetLocalRTC"],
+    ),
+]
+
+
+@pytest.mark.parametrize("plugin,key,values,params,methods", REQUESTS)
+def test_manager_refused_request_reports_earlier_changes(monkeypatch, run_module, plugin, key, values, params, methods):
+    for index, refused in enumerate(methods):
+        proxy = RequestProxy(values, refused)
+        monkeypatch.setattr(plugin, "systemd_proxy", Mock(return_value=proxy))
+        result = run_module(plugin, params)
+        assert result["failed"] and result["msg"] == f"unable to call {refused}: Access denied"
+        assert proxy.calls == methods[: index + 1]
+        if index:
+            assert result["changed"] is True and result[key] == {}
+        else:
+            # the first request is refused before anything is written
+            assert "changed" not in result and key not in result
+
+
+@pytest.mark.parametrize("plugin,key,values,params,methods", REQUESTS)
+def test_manager_failed_read_after_requests_reports_changes(
+    monkeypatch, run_module, plugin, key, values, params, methods
+):
+    proxy = RequestProxy(values, reads_fail=True)
+    monkeypatch.setattr(plugin, "systemd_proxy", Mock(return_value=proxy))
+    result = run_module(plugin, params)
+    assert result["failed"] and result["msg"].endswith("property: Connection timed out")
+    assert result["changed"] is True and result[key] == {}
+    # systemd_locale reads the converted X11 settings back before it sends the requested ones
+    assert proxy.calls == (methods[:2] if plugin is systemd_locale else methods)
+
+
+@pytest.mark.parametrize("reads_fail", [False, True])
+def test_locale_x11_request_alone_reports_change_only_once_applied(monkeypatch, run_module, reads_fail):
+    proxy = RequestProxy(REQUESTS[1][2], None if reads_fail else "SetX11Keyboard", reads_fail)
+    monkeypatch.setattr(systemd_locale, "systemd_proxy", Mock(return_value=proxy))
+    result = run_module(systemd_locale, {"x11_layout": "de"})
+    assert result["failed"] and proxy.calls == ["SetX11Keyboard"]
+    if reads_fail:
+        assert result["changed"] is True and result["locale"] == {}
+    else:
+        assert "changed" not in result and "locale" not in result
+
+
+def test_timedate_failed_method_lookup_in_ntp_wait_reports_change(monkeypatch, run_module):
+    # dasbus introspects the systemd manager when the wait first looks up LoadUnit, after SetNTP is applied
+    proxy = RequestProxy(REQUESTS[2][2], reads_fail=True)
+    monkeypatch.setattr(systemd_timedate, "systemd_proxy", Mock(return_value=proxy))
+    result = run_module(systemd_timedate, {"ntp": True})
+    assert result["failed"] and result["msg"] == "unable to call LoadUnit: Connection timed out"
+    assert result["changed"] is True and result["timedate"] == {}
+    assert proxy.calls == ["SetNTP"]
+
+
+def test_timedate_time_parse_failure_after_another_request_reports_change(monkeypatch, run_module, analyze):
+    analyze.side_effect = [(0, analyze_output("@1784083200"), ""), (1, "", "Failed to parse timestamp")]
+    proxy = RequestProxy(REQUESTS[2][2])
+    monkeypatch.setattr(systemd_timedate, "systemd_proxy", Mock(return_value=proxy))
+    result = run_module(systemd_timedate, {"timezone": "Europe/Berlin", "time": "@1784083200"})
+    assert result["failed"] and result["msg"].startswith("unable to parse the time specification")
+    assert result["changed"] is True and result["timedate"] == {}
+    assert proxy.calls == ["SetTimezone"]
+
+
 @pytest.mark.parametrize(
     "plugin,key,reader,current",
     [
@@ -315,9 +437,9 @@ def test_ntp_alone_is_left_to_systemd(monkeypatch, run_module):
     monkeypatch.setattr(systemd_timedate, "systemd_properties", Mock(return_value={**TIMEDATE, "can_ntp": False}))
     calls = []
 
-    def refuse(module, proxy, method, *args):
+    def refuse(module, proxy, method, *args, failed_result=None):
         calls.append(method)
-        module.fail_json(msg=f"unable to call {method}: NTP not supported")
+        module.fail_json(msg=f"unable to call {method}: NTP not supported", **(failed_result or {}))
 
     monkeypatch.setattr(systemd_timedate, "systemd_call", refuse)
     result = run_module(systemd_timedate, {"ntp": True})
@@ -706,9 +828,9 @@ def test_locale_keyboard_noncharacter_in_first_request_is_left_to_systemd(monkey
     monkeypatch.setattr(systemd_locale, "locale_status", Mock(return_value=LOCALE))
     calls = []
 
-    def refuse(module, proxy, name, *args):
+    def refuse(module, proxy, name, *args, failed_result=None):
         calls.append(name)
-        module.fail_json(msg=f"unable to call {name}: Bad message")
+        module.fail_json(msg=f"unable to call {name}: Bad message", **(failed_result or {}))
 
     monkeypatch.setattr(systemd_locale, "systemd_call", refuse)
     result = run_module(systemd_locale, dict(params, _ansible_no_log=True))
@@ -822,9 +944,9 @@ def test_locale_keyboard_syntax_in_first_request_is_left_to_systemd(monkeypatch,
     locale_keyboard_module(monkeypatch)
     calls = []
 
-    def refuse(module, proxy, name, *args):
+    def refuse(module, proxy, name, *args, failed_result=None):
         calls.append(name)
-        module.fail_json(msg=f"unable to call {name}: Received invalid keyboard data")
+        module.fail_json(msg=f"unable to call {name}: Received invalid keyboard data", **(failed_result or {}))
 
     monkeypatch.setattr(systemd_locale, "systemd_call", refuse)
     result = run_module(systemd_locale, params)
@@ -839,9 +961,9 @@ def test_locale_noncharacter_is_left_to_systemd(monkeypatch, run_module):
     monkeypatch.setattr(systemd_locale, "locale_status", Mock(return_value=LOCALE))
     calls = []
 
-    def refuse(module, proxy, method, *args):
+    def refuse(module, proxy, method, *args, failed_result=None):
         calls.append(method)
-        module.fail_json(msg=f"unable to call {method}: Bad message")
+        module.fail_json(msg=f"unable to call {method}: Bad message", **(failed_result or {}))
 
     monkeypatch.setattr(systemd_locale, "systemd_call", refuse)
     result = run_module(systemd_locale, {"locale": {"lang": "de_DE.UTF-8\ufdd0"}, "x11_layout": "de"})
@@ -907,9 +1029,9 @@ def test_timezone_noncharacter_is_left_to_systemd(monkeypatch, run_module):
     monkeypatch.setattr(systemd_timedate, "systemd_properties", Mock(return_value=TIMEDATE))
     calls = []
 
-    def refuse(module, proxy, method, *args):
+    def refuse(module, proxy, method, *args, failed_result=None):
         calls.append(method)
-        module.fail_json(msg=f"unable to call {method}: Bad message")
+        module.fail_json(msg=f"unable to call {method}: Bad message", **(failed_result or {}))
 
     monkeypatch.setattr(systemd_timedate, "systemd_call", refuse)
     result = run_module(systemd_timedate, {"timezone": "Europe/Berl\ufdd0", "local_rtc": True})
@@ -1319,13 +1441,13 @@ def ntp_wait_module(monkeypatch, current, settled, done, queued_before=False, se
         readings[0] += 1
         return bool(started) and readings[0] < done
 
-    def properties(module, proxy, names, optional=None):
+    def properties(module, proxy, names, optional=None, failed_result=None):
         if len(names) > 1:
             return {**TIMEDATE, "ntp": current}
 
         return {"ntp": True if job_queued() else settled}
 
-    def list_jobs(module, manager, method, *args):
+    def list_jobs(module, manager, method, *args, failed_result=None):
         # chrony.service is an alias of chronyd.service
         if method == "LoadUnit":
             names = {service, "chrony.service"} if service == "chronyd.service" else {service}
@@ -1341,7 +1463,7 @@ def ntp_wait_module(monkeypatch, current, settled, done, queued_before=False, se
     monkeypatch.setattr(systemd_timedate, "systemd_properties", properties)
     monkeypatch.setattr(systemd_timedate, "systemd_result", list_jobs)
     monkeypatch.setattr(systemd_timedate, "ntp_jobs", NTP_JOBS)
-    mutate = Mock(side_effect=lambda *args: started.append(args[2]))
+    mutate = Mock(side_effect=lambda *args, **kwargs: started.append(args[2]))
     monkeypatch.setattr(systemd_timedate, "systemd_call", mutate)
     return mutate
 
@@ -1350,6 +1472,8 @@ def test_ntp_change_wait_times_out(monkeypatch, run_module, analyze):
     mutate = ntp_wait_module(monkeypatch, True, True, 0)
     result = run_module(systemd_timedate, {"ntp": False, "time": "@1784083200"})
     assert result["failed"] and "ntp" in result["msg"] and "30 seconds" in result["msg"]
+    # SetNTP was applied
+    assert result["changed"] is True and result["timedate"] == {}
     assert [entry.args[2] for entry in mutate.call_args_list] == ["SetNTP"]
 
 
@@ -1967,9 +2091,9 @@ def test_hostname_first_request_is_validated_by_systemd(monkeypatch, tmp_path, r
     hostname_module(monkeypatch, tmp_path, current, "CHASSIS=server\n")
     calls = []
 
-    def refuse(module, proxy, name, *args):
+    def refuse(module, proxy, name, *args, failed_result=None):
         calls.append(name)
-        module.fail_json(msg=f"unable to call {name}: Invalid argument")
+        module.fail_json(msg=f"unable to call {name}: Invalid argument", **(failed_result or {}))
 
     monkeypatch.setattr(systemd_hostname, "systemd_call", refuse)
     result = run_module(systemd_hostname, params)
@@ -2027,9 +2151,9 @@ def test_hostname_static_hostname_validated_by_systemd(monkeypatch, tmp_path, ru
     hostname_module(monkeypatch, tmp_path, HOSTNAME, etc_hostname="old\n")
     calls = []
 
-    def refuse(module, proxy, method, *args):
+    def refuse(module, proxy, method, *args, failed_result=None):
         calls.append(method)
-        module.fail_json(msg=f"unable to call {method}: Invalid static hostname")
+        module.fail_json(msg=f"unable to call {method}: Invalid static hostname", **(failed_result or {}))
 
     monkeypatch.setattr(systemd_hostname, "systemd_call", refuse)
     params = {"static_hostname": value, "chassis": "vm", "_ansible_no_log": True}
@@ -2152,9 +2276,11 @@ def test_time_alone_with_ntp_enabled_is_left_to_systemd(monkeypatch, run_module,
     monkeypatch.setattr(systemd_timedate, "systemd_properties", Mock(return_value={**TIMEDATE, "ntp": True}))
     calls = []
 
-    def refuse(module, proxy, method, *args):
+    def refuse(module, proxy, method, *args, failed_result=None):
         calls.append(method)
-        module.fail_json(msg=f"unable to call {method}: Automatic time synchronization is enabled")
+        module.fail_json(
+            msg=f"unable to call {method}: Automatic time synchronization is enabled", **(failed_result or {})
+        )
 
     monkeypatch.setattr(systemd_timedate, "systemd_call", refuse)
     result = run_module(systemd_timedate, {"local_rtc": True, "time": "@1784083200"})

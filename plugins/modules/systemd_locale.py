@@ -286,7 +286,9 @@ locale:
     - In check mode, the settings that would change are predicted from the
       options.
     - Empty when dasbus is unavailable in check mode.
-  returned: always
+    - Empty when the module fails after it has changed a setting. Not returned
+      when it fails before changing one.
+  returned: unless the module fails before changing a setting
   type: dict
   contains:
     locale:
@@ -792,20 +794,33 @@ def ensure_present(module):
     if module.check_mode:
         module.exit_json(changed=True, locale=predicted)
 
+    failed_result = {}
+
     for method, args in pending:
-        systemd_call(module, proxy, method, *args)
+        systemd_call(module, proxy, method, *args, failed_result=failed_result)
+        # a later failure leaves this request applied
+        failed_result = {"changed": True, "locale": {}}
 
     if convert_keymap and any(module.params[name] is not None for name in X11_SETTINGS):
         # SetVConsoleKeyboard converts the keymap into the X11 settings, so compare against those
-        keyboard = keyboard_change(module, locale_status(module, proxy), X11_SETTINGS)
+        keyboard = keyboard_change(module, locale_status(module, proxy, failed_result), X11_SETTINGS)
 
     if keyboard is not None:
         # Converting back would replace the requested console settings and can drop the toggle keymap
         convert = all(module.params[name] is None for name in VCONSOLE_SETTINGS)
 
-        systemd_call(module, proxy, "SetX11Keyboard", *(keyboard[name] for name in X11_SETTINGS), convert, False)
+        systemd_call(
+            module,
+            proxy,
+            "SetX11Keyboard",
+            *(keyboard[name] for name in X11_SETTINGS),
+            convert,
+            False,
+            failed_result=failed_result,
+        )
+        failed_result = {"changed": True, "locale": {}}
 
-    current = locale_status(module, proxy)
+    current = locale_status(module, proxy, failed_result)
 
     module.exit_json(changed=True, locale=current)
 

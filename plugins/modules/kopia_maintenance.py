@@ -275,17 +275,27 @@ maintenance:
       enabled: true
       interval: 3600000000000
     schedule:
-      next_full_maintenance: '2026-07-22T05:59:38.254277061Z'
-      next_quick_maintenance: '2026-07-21T06:59:38.25427727Z'
+      next_full_maintenance: '2026-11-20T08:43:23.044209127Z'
+      next_quick_maintenance: '2026-11-19T09:43:23.04420921Z'
       runs:
         snapshot-gc:
-          - end: '2026-07-21T05:59:38.051437598Z'
+          - end: '2026-11-19T08:43:23.04546328Z'
             extra:
               - data:
                   deleted_content_count: 0
                   deleted_content_size: 0
+                  in_use_content_count: 0
+                  in_use_content_size: 0
+                  in_use_system_content_count: 2
+                  in_use_system_content_size: 1030
+                  recovered_content_count: 0
+                  recovered_content_size: 0
+                  unreferenced_content_count: 0
+                  unreferenced_content_size: 0
+                  unreferenced_recent_content_count: 0
+                  unreferenced_recent_content_size: 0
                 kind: snapshotGCStats
-            start: '2026-07-21T05:59:38.050921016Z'
+            start: '2026-11-19T08:43:23.04525815Z'
             success: true
 """
 
