@@ -127,15 +127,15 @@ effective_policy:
       only falls back to when it takes a snapshot, such as the CPU count for
       C(upload.max_parallel_file_reads), is not returned unless a policy sets
       it.
-    - V(false) and V(0) count as set, and so override parent policies, only
-      in C(error_handling), C(logging), C(retention), C(upload),
+    - V(false) and V(0) count as set, and so override parent policies, only in
+      C(error_handling), C(logging), C(retention), C(upload),
       C(files.ignore_cache_dirs), C(files.one_file_system),
       C(os_snapshots.volume_shadow_copy.enable) and C(scheduling.run_missed).
       kopia does not store them, or an empty string or list, as the value of
-      other fields, such as C(scheduling.manual) or C(compression.max_size),
-      so there a parent value applies. Zeros inside a list entry, such as a
-      C(scheduling.time_of_day) entry for midnight, are kept. An empty section, such as C(retention), sets
-      nothing.
+      other fields outside C(actions), such as C(scheduling.manual) or
+      C(compression.max_size), so there a parent value applies. Zeros inside a
+      list entry, such as a C(scheduling.time_of_day) entry for midnight, are
+      kept. An empty section, such as C(retention), sets nothing.
     - C(compression.never_compress), C(compression.only_compress) and
       C(scheduling.time_of_day) instead combine the entries of each policy up
       to the first that sets C(compression.no_parent_never_compress),
