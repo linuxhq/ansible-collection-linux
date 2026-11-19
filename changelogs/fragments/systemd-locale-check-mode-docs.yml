@@ -1,4 +1,0 @@
----
-bugfixes:
-  - systemd_locale - document the check-mode limits under
-    ``attributes.check_mode`` and mark its support as partial.

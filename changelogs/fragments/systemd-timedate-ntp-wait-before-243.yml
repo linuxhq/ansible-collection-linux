@@ -1,9 +1,0 @@
----
-bugfixes:
-  - systemd_timedate - with ``ntp`` changed on systemd 239 to 242, wait for
-    the jobs of ``systemd-timesyncd.service``, which ``systemd-timedated``
-    manages by default there, instead of the services named in
-    ``ntp-units.d/*.list`` files, which it reads only from systemd 243. On
-    systemd 241 and 242, which report network time synchronization enabled
-    while the service starts, a start that failed was reported as a change
-    with ``ntp`` enabled instead of failing after 30 seconds.

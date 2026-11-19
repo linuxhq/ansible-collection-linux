@@ -1,5 +1,0 @@
----
-bugfixes:
-  - rclone role - write a floating-point value in ``rclone_config``, such as
-    ``0.5`` for ``pacer_min_sleep``, as given instead of truncating it to an
-    integer.

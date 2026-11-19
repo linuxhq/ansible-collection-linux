@@ -1,9 +1,0 @@
----
-bugfixes:
-  - systemd_timedate - reject a relative ``time`` that resolves to a time at or
-    before the epoch, such as ``-60y``, before any setting is written.
-    ``systemd-timedated`` refused it only after the other settings in the
-    same task, such as ``timezone``, were applied.
-  - systemd_locale - fail before writing any setting when ``locale`` would
-    change the locale on systemd older than 239, whose ``systemd-localed``
-    clears the locale variables a request leaves out.

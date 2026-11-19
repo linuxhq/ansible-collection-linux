@@ -1,5 +1,0 @@
----
-bugfixes:
-  - kopia_repository - say that the host is connected to a kopia repository
-    server, which the module does not manage, instead of reporting an empty
-    storage type, when the connection is to a kopia repository server.

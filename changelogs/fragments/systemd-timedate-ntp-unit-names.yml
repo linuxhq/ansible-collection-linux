@@ -1,6 +1,0 @@
----
-bugfixes:
-  - systemd_timedate - with ``ntp=true``, skip the lines of the
-    ``ntp-units.d/*.list`` files that are not valid plain unit names, such as
-    ``chronyd`` or ``foo@.service``, which ``systemd-timedated`` ignores,
-    instead of failing after network time synchronization was changed.

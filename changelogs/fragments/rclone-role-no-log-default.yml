@@ -1,7 +1,0 @@
----
-minor_changes:
-  - rclone role - default ``rclone_no_log`` to ``true``. In diff mode, the
-    task managing the configuration file showed the previous decrypted
-    configuration, whose secrets Ansible does not mask when they are no
-    longer in the new configuration. Set ``rclone_no_log`` to ``false`` to
-    show the task's output and diff.

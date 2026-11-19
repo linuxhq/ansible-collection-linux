@@ -1,4 +1,0 @@
----
-trivial:
-  - rclone role - remove a template branch that rendered strings as the
-    default branch does.
