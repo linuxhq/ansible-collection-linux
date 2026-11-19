@@ -126,7 +126,7 @@ options:
         U+FFFD in their place.
     type: dict
 requirements:
-  - kopia
+  - kopia >= 0.10.7
 attributes:
   check_mode:
     description:

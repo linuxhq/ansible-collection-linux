@@ -1,7 +1,12 @@
 ---
 bugfixes:
-  - kopia_maintenance, kopia_maintenance_info - document that they require
-    kopia 0.10.7 or later. Before 0.9.0, ``kopia maintenance info --json``
-    prints only the schedule, without the maintenance parameters the modules
-    read, and before 0.10.7, ``kopia repository status`` has no ``--json``,
-    which the modules use in check mode and to resolve ``owner=me``.
+  - kopia_maintenance, kopia_maintenance_info, kopia_repository,
+    kopia_repository_info, kopia_snapshot, kopia_snapshot_info - document
+    that they require kopia 0.10.7 or later, the first release in which
+    ``kopia repository status`` has ``--json``. The repository modules always
+    run it, the maintenance modules in check mode and to resolve
+    ``owner=me``, kopia_snapshot_info in check mode, and both snapshot
+    modules for a ``path`` that kopia reads as ``user@host``. Before 0.9.0,
+    ``kopia maintenance info --json`` also prints only the schedule, without
+    the maintenance parameters that kopia_maintenance and
+    kopia_maintenance_info read.

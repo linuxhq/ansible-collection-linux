@@ -224,7 +224,7 @@ options:
     type: bool
     default: false
 requirements:
-  - kopia
+  - kopia >= 0.10.7
 attributes:
   check_mode:
     description: Predicts changes without modifying the target.
