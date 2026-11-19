@@ -1,7 +1,0 @@
----
-bugfixes:
-  - rclone_config_encryption - report an error other than a missing file,
-    such as a permission error on a parent directory, when checking
-    ``path``. Without ``content`` the module failed saying the configuration
-    file does not exist, and in check mode with ``content`` it reported that
-    the file would be created.

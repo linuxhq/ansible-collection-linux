@@ -1,7 +1,0 @@
----
-bugfixes:
-  - systemd_locale - write the console settings without converting them into
-    the X11 keyboard settings when ``vconsole_keymap`` is unchanged and only
-    the toggle keymap changes. ``systemd-localed`` converted the unchanged
-    keymap and replaced the configured X11 layout, model and options, which
-    check mode did not predict and a second run did not report.

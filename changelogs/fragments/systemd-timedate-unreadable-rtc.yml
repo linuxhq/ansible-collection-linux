@@ -1,8 +1,0 @@
----
-bugfixes:
-  - systemd_timedate, systemd_timedate_info - return ``rtc_time_usec`` as
-    ``null`` when systemd-timedated reports that it failed to read the
-    hardware clock, instead of failing before reading or changing any other
-    setting. Other failures to read the property still fail. Document that
-    systemd-timedated then changes ``local_rtc`` without updating the system
-    clock for ``adjust_system_clock=true``.

@@ -1,7 +1,0 @@
----
-bugfixes:
-  - kopia_maintenance - fail before running kopia, also in check mode, when
-    ``list_parallelism`` or ``max_retained_log_count`` is outside
-    -9007199254740992 to 9007199254740992. kopia parses these flags as a
-    floating-point number before storing an integer, so it stored a rounded
-    or wrapped value and every run reported a change.

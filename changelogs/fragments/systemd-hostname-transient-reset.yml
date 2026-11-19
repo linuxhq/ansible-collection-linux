@@ -1,7 +1,0 @@
----
-bugfixes:
-  - systemd_hostname - with ``transient_hostname`` set to an empty string,
-    no longer call ``SetHostname`` after ``SetStaticHostname`` when the
-    static hostname changes, as ``systemd-hostnamed`` already applies the
-    static hostname, or else the default hostname, in place of the transient
-    one. The reported result is unchanged.

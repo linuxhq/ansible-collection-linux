@@ -1,9 +1,0 @@
----
-bugfixes:
-  - kopia_maintenance, kopia_maintenance_info - replace the ``maintenance``
-    sample, which showed only some of the snapshot garbage collection
-    statistics, with output captured from kopia 0.23.1, with host-specific
-    values replaced.
-  - kopia_repository, kopia_repository_info - replace the ``repository``
-    sample, which left out fields kopia always reports, with output captured
-    from kopia 0.23.1, with host-specific values replaced.

@@ -1,9 +1,0 @@
----
-bugfixes:
-  - systemd_timedate - with ``ntp=true``, skip an ``ntp-units.d/*.list``
-    file that cannot be opened or read, such as a dangling symlink, a symlink
-    loop or a directory, as ``systemd-timedated`` does, instead of failing
-    after network time synchronization was changed. As in
-    ``systemd-timedated``, a file that cannot be followed does not override a
-    file of the same name in a later directory, and a file linked to any
-    character device names nothing.

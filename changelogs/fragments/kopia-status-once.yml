@@ -1,4 +1,0 @@
----
-trivial:
-  - kopia_maintenance, kopia_snapshot_info - read the repository status once
-    in check mode instead of again for ``owner=me`` or a ``user@host`` path.

@@ -1,9 +1,0 @@
----
-bugfixes:
-  - rclone_config_encryption - fail before writing, also in check mode, for an
-    ``owner`` or ``group`` ID outside ``0`` to ``4294967294``. A larger or
-    negative ID made the module fail with a traceback after it wrote the file,
-    and check mode reported a change, while ``-1`` and ``4294967295``, which
-    ``chown`` reads as no change, were reported as changed on every run.
-  - rclone_obscure, rclone_deobscure - document when the filter result is
-    returned.
