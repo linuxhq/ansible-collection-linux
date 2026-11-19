@@ -307,7 +307,7 @@ snapshot:
           type: str
         path:
           description:
-            - Absolute path of the snapshotted directory.
+            - Absolute path of the snapshotted directory or file.
           returned: always
           type: str
         user_name:

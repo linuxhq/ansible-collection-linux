@@ -19,4 +19,19 @@
           - _systemd_hostname_info_dict.pretty_hostname == 'Molecule Test'
           - _systemd_hostname_info_dict.static_hostname ==
             inventory_hostname ~ '.example.com'
+
+    - name: Ensure systemd 256 hostname properties are verified
+      tags:
+        - systemd_hostname_info
+      ansible.builtin.assert:
+        that:
+          - _systemd_hostname_info_dict.boot_id is match('[0-9a-f]{32}$')
+          - _systemd_hostname_info_dict.firmware_date is integer
+          - _systemd_hostname_info_dict.machine_id is match('[0-9a-f]{32}$')
+          - _systemd_hostname_info_dict.operating_system_support_end
+            is integer
+          - _systemd_hostname_info_dict.vsock_cid is integer
+      when:
+        - ansible_facts.systemd.version >= 256
+
 ...

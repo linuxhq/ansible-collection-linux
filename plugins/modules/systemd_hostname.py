@@ -272,6 +272,8 @@ hostname:
     firmware_date:
       description:
         - Firmware release date in microseconds since the epoch.
+        - V(18446744073709551615), the largest unsigned 64-bit value, when the
+          firmware date is unknown.
       returned: >-
         always, as V(none) when the running systemd does not implement it
       type: int
@@ -400,6 +402,8 @@ hostname:
       description:
         - End of support of the operating system in microseconds since the
           epoch.
+        - V(18446744073709551615), the largest unsigned 64-bit value, when it
+          is unknown, such as when C(os-release) sets no C(SUPPORT_END).
       returned: >-
         always, as V(none) when the running systemd does not implement it
       type: int
@@ -425,43 +429,43 @@ hostname:
     vsock_cid:
       description:
         - VSOCK context ID of the host.
+        - V(4294967295), C(VMADDR_CID_ANY), when the host has no VSOCK context
+          ID, such as when it has no VSOCK device.
       returned: >-
         always, as V(none) when the running systemd does not implement it
       type: int
   sample:
-    boot_id: 8d1e0f2a4b6c8d0e1f2a3b4c5d6e7f80
-    chassis: server
+    boot_id: 8d1e0f2a4b6c4d0e9f2a3b4c5d6e7f80
+    chassis: vm
     chassis_asset_tag: null
     default_hostname: localhost
     deployment: production
-    firmware_date: 1735689600000000
-    firmware_vendor: Dell Inc.
-    firmware_version: 2.19.0
-    hardware_model: PowerEdge R640
+    firmware_date: 18446744073709551615
+    firmware_vendor: ''
+    firmware_version: ''
+    hardware_model: ''
     hardware_sku: null
-    hardware_vendor: Dell Inc.
+    hardware_vendor: ''
     hardware_version: null
-    home_url: https://www.redhat.com/
+    home_url: https://almalinux.org/
     hostname: server.example.com
     hostname_source: static
-    icon_name: computer-server
+    icon_name: computer-vm
     kernel_name: Linux
-    kernel_release: 5.14.0-570.el9.x86_64
-    kernel_version: '#1 SMP PREEMPT_DYNAMIC'
+    kernel_release: 6.12.0-55.40.1.el10_0.aarch64
+    kernel_version: '#1 SMP PREEMPT_DYNAMIC Tue Oct 21 04:45:09 CDT 2025'
     location: rack 4
-    machine_id: 3f0a1b2c3d4e5f60718293a4b5c6d7e8
-    operating_system_cpe_name: cpe:/o:redhat:enterprise_linux:9::baseos
+    machine_id: 3f0a1b2c3d4e4f60918293a4b5c6d7e8
+    operating_system_cpe_name: cpe:/o:almalinux:almalinux:10::baseos
     operating_system_fancy_name: null
     operating_system_image_id: null
     operating_system_image_version: null
-    operating_system_pretty_name: Red Hat Enterprise Linux 9.6 (Plow)
-    operating_system_support_end: 1904169600000000
+    operating_system_pretty_name: AlmaLinux 10.0 (Purple Lion)
+    operating_system_support_end: 2064268800000000
     pretty_hostname: Example Server
     static_hostname: server.example.com
-    vsock_cid: null
-    tags:
-      - production
-      - web
+    tags: null
+    vsock_cid: 4294967295
 """
 
 import re
