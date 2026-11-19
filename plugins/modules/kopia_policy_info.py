@@ -131,9 +131,10 @@ effective_policy:
       in C(error_handling), C(logging), C(retention), C(upload),
       C(files.ignore_cache_dirs), C(files.one_file_system),
       C(os_snapshots.volume_shadow_copy.enable) and C(scheduling.run_missed).
-      kopia does not store them, or an empty string or list, in other fields,
-      such as C(scheduling.manual) or C(compression.max_size), so there a
-      parent value applies. An empty section, such as C(retention), sets
+      kopia does not store them, or an empty string or list, as the value of
+      other fields, such as C(scheduling.manual) or C(compression.max_size),
+      so there a parent value applies. Zeros inside a list entry, such as a
+      C(scheduling.time_of_day) entry for midnight, are kept. An empty section, such as C(retention), sets
       nothing.
     - C(compression.never_compress), C(compression.only_compress) and
       C(scheduling.time_of_day) instead combine the entries of each policy up
