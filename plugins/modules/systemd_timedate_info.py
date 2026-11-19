@@ -70,6 +70,7 @@ timedate:
     rtc_time_usec:
       description:
         - Time of the real-time clock in microseconds since the epoch.
+        - V(null) when C(systemd-timedated) fails to read the real-time clock.
       returned: always
       type: int
     time_usec:
@@ -107,6 +108,7 @@ from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.linuxhq.linux.plugins.module_utils.systemd import (
     HAS_DASBUS,
+    TIMEDATE_OPTIONAL,
     TIMEDATE_PROPERTIES,
     systemd_properties,
     systemd_proxy,
@@ -120,7 +122,7 @@ def info(module):
 
     proxy = systemd_proxy(module, "timedate1")
 
-    timedate = systemd_properties(module, proxy, TIMEDATE_PROPERTIES)
+    timedate = systemd_properties(module, proxy, TIMEDATE_PROPERTIES, TIMEDATE_OPTIONAL)
     timezones = systemd_result(module, proxy, "ListTimezones")
 
     module.exit_json(changed=False, timedate=timedate, timezones=list(timezones))

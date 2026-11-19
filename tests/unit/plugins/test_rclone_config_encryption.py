@@ -545,7 +545,11 @@ def test_mode_out_of_range_fails_before_writing(tmp_path, run_module, mode, stat
 @pytest.mark.parametrize("kind", ["fifo", "device"])
 @pytest.mark.parametrize("state", ["present", "absent"])
 @pytest.mark.parametrize("check_mode", [False, True])
-def test_path_that_is_not_a_regular_file_fails_before_reading(tmp_path, run_module, kind, state, check_mode):
+@pytest.mark.parametrize("crypto", [False, True])
+@pytest.mark.parametrize("content", [None, "new"])
+def test_path_that_is_not_a_regular_file_fails_before_reading(
+    monkeypatch, tmp_path, run_module, kind, state, check_mode, crypto, content
+):
     # reading a FIFO would block and a device such as /dev/zero never end, and writing would replace the device;
     # /dev/null stands for any device, as reading /dev/zero would not end
     link = tmp_path / "rclone.conf"
@@ -556,6 +560,7 @@ def test_path_that_is_not_a_regular_file_fails_before_reading(tmp_path, run_modu
         target = Path("/dev/null")
 
     link.symlink_to(target)
+    monkeypatch.setattr(plugin, "HAS_PYCRYPTODOME", crypto)
 
     def expire(signum, frame):
         raise AssertionError("the module blocked")
@@ -564,7 +569,7 @@ def test_path_that_is_not_a_regular_file_fails_before_reading(tmp_path, run_modu
     signal.alarm(5)
     try:
         result = run_module(
-            plugin, {"path": str(link), "password": "secret", "state": state, "content": "new"}, check_mode
+            plugin, {"path": str(link), "password": "secret", "state": state, "content": content}, check_mode
         )
     finally:
         signal.alarm(0)

@@ -105,10 +105,8 @@ options:
         for bytes that are not valid UTF-8, stand for those bytes.
       - Unless the task sets C(no_log), Ansible fails before the module runs
         for a path with any lone surrogate code point, because it logs the
-        arguments as UTF-8. ansible-core 2.18 also returns the arguments with
-        the result, which then fails as not valid UTF-8 after the module has
-        run. Lone surrogates in the returned RV(path) and in failure messages
-        are backslash escaped, such as C(\udcff).
+        arguments as UTF-8. Lone surrogates in the returned RV(path) and in
+        failure messages are backslash escaped, such as C(\udcff).
     type: path
     required: true
   state:
@@ -231,23 +229,25 @@ def label(text):
 
 
 def stat_config(module, path):
-    """Return the status of path, or None when it does not exist; os.path.exists reads any error as a missing file."""
+    """Return the status of the regular file at path, or None when it does not exist; os.path.exists reads any error
+    as a missing file."""
     try:
-        return os.stat(path)
+        status = os.stat(path)
     except (FileNotFoundError, NotADirectoryError):
         return None
     except OSError as error:
         module.fail_json(msg=f"unable to access configuration file {label(path)}: {label(to_native(error))}")
 
-
-def read_config(module, path):
-    status = stat_config(module, path)
-    if status is None:
-        return None
-
     # reading a FIFO would block and a device such as /dev/zero never end, and writing would replace the device
     if not stat.S_ISREG(status.st_mode):
         module.fail_json(msg=f"unable to manage configuration file {label(path)}: it is not a regular file")
+
+    return status
+
+
+def read_config(module, path):
+    if stat_config(module, path) is None:
+        return None
 
     try:
         with open(path, "rb") as handle:

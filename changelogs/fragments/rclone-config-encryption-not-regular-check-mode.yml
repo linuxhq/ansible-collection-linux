@@ -1,0 +1,5 @@
+---
+bugfixes:
+  - rclone_config_encryption - fail in check mode without pycryptodome when
+    ``path`` is not a regular file, such as a FIFO or a device, as a real run
+    does, instead of reporting a change.

@@ -16,8 +16,7 @@ bugfixes:
     target of a symbolic link, so the result is valid UTF-8, which
     ansible-core 2.19 and later require. Document that Ansible fails before
     the module runs for a ``path`` with a lone surrogate unless the task
-    sets ``no_log``, and that ansible-core 2.18 returns the arguments with
-    the result, which then fails after the module has run.
+    sets ``no_log``.
 minor_changes:
   - rclone_deobscure - leave a value too short to hold the initialization
     vector to pycryptodome, which refuses it, so the failure now carries

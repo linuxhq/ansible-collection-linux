@@ -20,8 +20,6 @@ bugfixes:
   - rclone_config_encryption - include the path in every failure message.
   - rclone_config_encryption - document diff mode support, which returns the
     decrypted configuration in the diff.
-  - rclone_obscure, rclone_deobscure - accept vault encrypted values on
-    ansible-core 2.18.
   - rclone_obscure, rclone_deobscure - document that an empty string is
     returned unchanged.
 security_fixes:

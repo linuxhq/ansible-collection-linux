@@ -6,6 +6,7 @@ import pytest
 
 from ansible.module_utils import basic
 
+from ansible_collections.linuxhq.linux.plugins.module_utils import systemd as systemd_utils
 from ansible_collections.linuxhq.linux.plugins.modules import (
     systemd_hostname,
     systemd_hostname_info,
@@ -228,6 +229,74 @@ def test_clear_static_before_setting_transient(monkeypatch, run_module, hostname
     result = run_module(systemd_hostname, {"static_hostname": "", "transient_hostname": "transient"}, True)
     assert result["hostname"]["hostname"] == "transient"
     assert result["hostname"]["static_hostname"] == ""
+
+
+class TimedateProxy:
+    """timedate1 properties as systemd-timedated reports them, raising the error failing maps a property to."""
+
+    def __init__(self, failing=None):
+        self.failing = failing or {}
+        self.values = {
+            "CanNTP": True,
+            "LocalRTC": False,
+            "NTP": False,
+            "NTPSynchronized": True,
+            "RTCTimeUSec": 1784083200000000,
+            "TimeUSec": 1784083200123456,
+            "Timezone": "UTC",
+        }
+
+    def __getattr__(self, name):
+        if name in self.failing:
+            raise self.failing[name]
+
+        try:
+            return self.values[name]
+        except KeyError:
+            raise AttributeError(name) from None
+
+    def SetTimezone(self, timezone, interactive):
+        self.values["Timezone"] = timezone
+
+    def ListTimezones(self):
+        return ["Europe/Berlin", "UTC"]
+
+
+@pytest.mark.parametrize(
+    "plugin,params,changed,timezone",
+    [
+        (systemd_timedate, {"timezone": "UTC"}, False, "UTC"),
+        (systemd_timedate, {"timezone": "Europe/Berlin"}, True, "Europe/Berlin"),
+        (systemd_timedate_info, {}, False, "UTC"),
+    ],
+)
+def test_timedate_unreadable_rtc_is_null(monkeypatch, run_module, plugin, params, changed, timezone):
+    # systemd-timedated fails the RTCTimeUSec read for a hardware clock it cannot read, other than a missing or busy one
+    error = systemd_utils.DBusError("Failed to read RTC: Inappropriate ioctl for device")
+    monkeypatch.setattr(plugin, "systemd_proxy", Mock(return_value=TimedateProxy({"RTCTimeUSec": error})))
+    result = run_module(plugin, params)
+    assert not result.get("failed")
+    assert result["changed"] is changed
+    assert result["timedate"]["rtc_time_usec"] is None
+    assert result["timedate"]["timezone"] == timezone
+    assert result["timedate"]["time_usec"] == 1784083200123456
+
+
+@pytest.mark.parametrize("plugin", [systemd_timedate, systemd_timedate_info])
+@pytest.mark.parametrize(
+    "prop,error",
+    [
+        ("TimeUSec", systemd_utils.DBusError("Failed to read RTC: Invalid argument")),
+        ("RTCTimeUSec", systemd_utils.DBusError("Access denied")),
+        ("RTCTimeUSec", systemd_utils.GLibError("Failed to read RTC: Timeout was reached")),
+        ("RTCTimeUSec", TimeoutError("timed out")),
+    ],
+)
+def test_timedate_other_property_failure_fails(monkeypatch, run_module, plugin, prop, error):
+    monkeypatch.setattr(plugin, "systemd_proxy", Mock(return_value=TimedateProxy({prop: error})))
+    result = run_module(plugin, {"timezone": "UTC"} if plugin is systemd_timedate else {})
+    assert result["failed"]
+    assert result["msg"] == f"unable to read the {prop} property: {error}"
 
 
 def test_ntp_requires_available_service(monkeypatch, run_module):
@@ -1250,7 +1319,7 @@ def ntp_wait_module(monkeypatch, current, settled, done, queued_before=False, se
         readings[0] += 1
         return bool(started) and readings[0] < done
 
-    def properties(module, proxy, names):
+    def properties(module, proxy, names, optional=None):
         if len(names) > 1:
             return {**TIMEDATE, "ntp": current}
 

@@ -35,6 +35,9 @@ options:
       - Update the system clock from the hardware clock when O(local_rtc)
         changes, rather than the other way around.
       - Only used when O(local_rtc) is set.
+      - When C(systemd-timedated) cannot read the hardware clock, it changes
+        O(local_rtc) without updating the system clock, and the module
+        reports success.
     type: bool
     default: false
   local_rtc:
@@ -175,6 +178,7 @@ timedate:
     rtc_time_usec:
       description:
         - Time of the real-time clock in microseconds since the epoch.
+        - V(null) when C(systemd-timedated) fails to read the real-time clock.
       returned: always
       type: int
     time_usec:
@@ -209,6 +213,7 @@ from ansible_collections.linuxhq.linux.plugins.module_utils.systemd import (
     ENV_WHITESPACE,
     HAS_DASBUS,
     LINE_END,
+    TIMEDATE_OPTIONAL,
     TIMEDATE_PROPERTIES,
     check_utf8,
     systemd_call,
@@ -378,7 +383,7 @@ def ensure_present(module):
 
     proxy = systemd_proxy(module, "timedate1")
 
-    current = systemd_properties(module, proxy, TIMEDATE_PROPERTIES)
+    current = systemd_properties(module, proxy, TIMEDATE_PROPERTIES, TIMEDATE_OPTIONAL)
     predicted = dict(current)
     pending = []
 
@@ -434,7 +439,7 @@ def ensure_present(module):
         if method == "SetNTP":
             wait_for_ntp(module, proxy, args[0])
 
-    current = systemd_properties(module, proxy, TIMEDATE_PROPERTIES)
+    current = systemd_properties(module, proxy, TIMEDATE_PROPERTIES, TIMEDATE_OPTIONAL)
 
     module.exit_json(changed=True, timedate=current)
 
