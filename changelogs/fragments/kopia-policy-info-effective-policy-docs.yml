@@ -5,3 +5,6 @@ bugfixes:
     ``no_parent``, that ``no_parent`` is never returned in it, and that the
     folder actions come only from the policy of ``target`` itself, and replace
     its sample with real ``kopia policy show`` output.
+  - kopia_policy_info - document that ``effective_policy`` combines
+    ``compression.never_compress``, ``compression.only_compress`` and
+    ``scheduling.time_of_day`` from the policy and its parent policies.

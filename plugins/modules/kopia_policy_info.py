@@ -123,6 +123,11 @@ effective_policy:
     - Each value comes from the most specific policy that sets it, from the
       policy of O(target) up through its parent policies to the global policy,
       and otherwise from kopia's built-in defaults.
+    - C(compression.never_compress), C(compression.only_compress) and
+      C(scheduling.time_of_day) instead combine the entries of each policy up
+      to the first that sets C(compression.no_parent_never_compress),
+      C(compression.no_parent_only_compress) or
+      C(scheduling.no_parent_time_of_day) respectively.
     - When a policy sets C(no_parent), the policies above it and kopia's
       defaults are ignored, so only the values set from O(target) up to that
       policy are returned. C(no_parent) itself is never returned.

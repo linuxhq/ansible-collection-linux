@@ -36,10 +36,21 @@ provisioner:
             path: /srv/kopia
 
         kopia_policies:
+          - target: (global)
+            policy:
+              retention:
+                keep_latest: 10
+
           - target: /home/vagrant
             policy:
               retention:
                 keep_latest: 2
+
+          - target: /srv/no-parent
+            policy:
+              no_parent: true
+              retention:
+                keep_latest: 1
 
         kopia_policy_info_target: /home/vagrant
 
