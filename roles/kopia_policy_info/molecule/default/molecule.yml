@@ -38,6 +38,8 @@ provisioner:
         kopia_policies:
           - target: (global)
             policy:
+              compression:
+                max_size: 1048576
               retention:
                 keep_latest: 10
 

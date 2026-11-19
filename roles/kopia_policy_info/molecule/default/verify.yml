@@ -37,6 +37,7 @@
           - _kopia_policy_info_defined is false
           - _kopia_policy_info_policy == {}
           - _kopia_policy_info_effective_policy.retention.keep_latest == 10
+          - _kopia_policy_info_effective_policy.compression.max_size == 1048576
 
     - name: Ensure kopia policy information is gathered for a target whose policy sets no_parent
       tags:
