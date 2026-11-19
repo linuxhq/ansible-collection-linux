@@ -1,0 +1,7 @@
+---
+bugfixes:
+  - kopia_policy_info - document that ``effective_policy`` also holds kopia's
+    built-in defaults for the values no policy sets, unless a policy sets
+    ``no_parent``, that ``no_parent`` is never returned in it, and that the
+    folder actions come only from the policy of ``target`` itself, and replace
+    its sample with real ``kopia policy show`` output.

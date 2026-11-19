@@ -16,6 +16,9 @@
           - _kopia_policy_info_defined is true
           - _kopia_policy_info_policy.retention.keep_latest == 2
           - _kopia_policy_info_effective_policy.retention.keep_latest == 2
+          - _kopia_policy_info_policy.retention.keep_daily is not defined
+          - _kopia_policy_info_effective_policy.retention.keep_daily is number
+          - _kopia_policy_info_effective_policy.no_parent is not defined
           - _kopia_policy_info_policies == []
 
     - name: Ensure kopia policy information is gathered for a target without a policy
