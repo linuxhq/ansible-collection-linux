@@ -70,7 +70,12 @@ timedate:
     rtc_time_usec:
       description:
         - Time of the real-time clock in microseconds since the epoch.
-        - V(null) when C(systemd-timedated) fails to read the real-time clock.
+        - V(0) when the host has no real-time clock or it is busy, from
+          systemd 256 also when it holds no valid time (a change some earlier
+          stable releases backport), and from systemd 257 also when its time
+          cannot be converted.
+        - V(none) when C(systemd-timedated) fails to read the real-time clock
+          for any other reason.
       returned: always
       type: int
     time_usec:

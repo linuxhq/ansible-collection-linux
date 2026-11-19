@@ -1,0 +1,5 @@
+---
+trivial:
+  - kopia, kopia_maintenance_info, kopia_policy_info, kopia_repository_info,
+    kopia_snapshot_info roles - run the Molecule scenarios on AlmaLinux 10
+    as well as AlmaLinux 9.
